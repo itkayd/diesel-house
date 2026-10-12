@@ -66,7 +66,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 16,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -78,7 +78,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 16,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -90,7 +90,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 17,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -102,7 +102,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 17,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -114,7 +114,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 18,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -126,7 +126,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 18,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -138,7 +138,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 19,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     },
@@ -150,7 +150,7 @@
       "frameHeight": 32,
       "columns": 24,
       "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "layout": "24 frames: 6 per direction (right, up, left, down)",
       "characterIndex": 19,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     }

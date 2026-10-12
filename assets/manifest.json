@@ -1,0 +1,158 @@
+{
+  "assets": [
+    {
+      "key": "limezu_room_builder",
+      "path": "public/assets/tiles/limezu_room_builder.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 17,
+      "rows": 23,
+      "use": "floors and walls",
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_interiors",
+      "path": "public/assets/furniture/limezu_interiors.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "columns": 16,
+      "rows": 89,
+      "use": "furniture",
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "kenney_indoor",
+      "path": "public/assets/furniture/kenney_roguelike_indoor.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "spacing": 1,
+      "columns": 27,
+      "rows": 18,
+      "use": "extra props",
+      "source": "Roguelike Indoors by Kenney (CC0)"
+    },
+    {
+      "key": "chibis_a",
+      "path": "public/assets/characters/chibis_a.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 12,
+      "rows": 8,
+      "layout": "RPG Maker: 4x2 characters per sheet, each 3 frames wide x 4 rows (down, left, right, up)",
+      "characterIndexes": "0-7",
+      "source": "16-Char Sprite Collection (Modern Chibis) by finalbossblues"
+    },
+    {
+      "key": "chibis_b",
+      "path": "public/assets/characters/chibis_b.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 12,
+      "rows": 8,
+      "layout": "RPG Maker: 4x2 characters per sheet, each 3 frames wide x 4 rows (down, left, right, up)",
+      "characterIndexes": "8-15",
+      "source": "16-Char Sprite Collection (Modern Chibis) by finalbossblues"
+    },
+    {
+      "key": "limezu_adam_run",
+      "path": "public/assets/characters/limezu_adam_run.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 16,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_adam_idle",
+      "path": "public/assets/characters/limezu_adam_idle.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 16,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_alex_run",
+      "path": "public/assets/characters/limezu_alex_run.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 17,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_alex_idle",
+      "path": "public/assets/characters/limezu_alex_idle.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 17,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_amelia_run",
+      "path": "public/assets/characters/limezu_amelia_run.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 18,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_amelia_idle",
+      "path": "public/assets/characters/limezu_amelia_idle.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 18,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_bob_run",
+      "path": "public/assets/characters/limezu_bob_run.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 19,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    },
+    {
+      "key": "limezu_bob_idle",
+      "path": "public/assets/characters/limezu_bob_idle.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 32,
+      "columns": 24,
+      "rows": 1,
+      "layout": "24 frames: 6 per direction (right, up, left, down) - verify in Phase 2",
+      "characterIndex": 19,
+      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
+    }
+  ]
+}

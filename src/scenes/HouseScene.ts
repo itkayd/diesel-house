@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ROOM_IDS, TILE_SIZE, type Zone } from '../config';
 import { showZone } from '../ui/overlay';
+import { isTouchDevice, Joystick } from '../ui/joystick';
 
 const SPEED = 80; // px per second
 
@@ -12,6 +13,7 @@ export class HouseScene extends Phaser.Scene {
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
   private zones: ZoneRect[] = [];
   private zone: Zone | null = null;
+  private joystick: Joystick | null = null;
 
   constructor() {
     super('House');
@@ -41,6 +43,7 @@ export class HouseScene extends Phaser.Scene {
     this.body.setCollideWorldBounds(true);
 
     this.keys = this.input.keyboard!.addKeys('up,down,left,right,w,a,s,d') as typeof this.keys;
+    if (isTouchDevice()) this.joystick = new Joystick();
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -78,9 +81,9 @@ export class HouseScene extends Phaser.Scene {
     let vx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
     let vy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
 
-    // Touch / mouse: hold to walk towards the pointer.
+    // Mouse: hold to walk towards the pointer. Touch uses the joystick instead.
     const p = this.input.activePointer;
-    if (!vx && !vy && p.isDown) {
+    if (!vx && !vy && p.isDown && !p.wasTouch) {
       const dx = p.worldX - this.player.x;
       const dy = p.worldY - this.player.y;
       if (Math.hypot(dx, dy) > 4) {
@@ -91,6 +94,11 @@ export class HouseScene extends Phaser.Scene {
 
     const v = new Phaser.Math.Vector2(vx, vy);
     if (v.lengthSq() > 0) v.normalize().scale(SPEED);
+
+    // Joystick wins over everything else; its push distance sets the speed.
+    if (this.joystick && (this.joystick.vector.x || this.joystick.vector.y)) {
+      v.set(this.joystick.vector.x, this.joystick.vector.y).scale(SPEED);
+    }
     this.body.setVelocity(v.x, v.y);
 
     const zone = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y))?.name ?? null;

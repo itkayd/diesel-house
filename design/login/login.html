@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diesel House Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: full-bleed pixel living room at night; the front door sits dead centre,
+   the house name hangs in the dark ceiling above it, the sign-in card rests on the floor below. */
+:root {
+  --night: #140f1c;        /* ceiling / outside dark */
+  --panel: #2b2034;        /* card face, like the plum wallpaper in shadow */
+  --panel-edge: #0d0912;   /* pixel outline */
+  --wood: #7a4b31;         /* door + floor trim */
+  --lamp: #f4b860;         /* warm lamp / fire glow, the one accent */
+  --lamp-deep: #c9822f;
+  --cream: #fff4e0;        /* text on dark */
+  --muted: #bcaccb;        /* secondary text */
+  --error: #ff8f7a;
+  --font-display: "Pixelify Sans", "Courier New", monospace;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--night);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 16px;
+  overflow: hidden;
+}
+#scene {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+.stage {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-inline: 16px;
+  padding-block: clamp(16px, 4vh, 40px);
+  box-sizing: border-box;
+}
+.sign {
+  justify-self: center;
+  text-align: center;
+  display: grid;
+  gap: 6px;
+}
+.sign h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 6vw, 52px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--cream);
+  text-shadow: 0 0 18px rgba(244, 184, 96, 0.55), 3px 3px 0 var(--panel-edge);
+  text-wrap: balance;
+}
+.sign p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(14px, 2.2vw, 17px);
+  letter-spacing: 0.06em;
+  color: var(--lamp);
+  text-shadow: 2px 2px 0 var(--panel-edge);
+}
+.card {
+  grid-row: 3;
+  justify-self: center;
+  width: min(100%, 400px);
+  box-sizing: border-box;
+  background: var(--panel);
+  padding: 22px 22px 18px;
+  display: grid;
+  gap: 14px;
+  /* chunky pixel frame: hard outline + inner bevel, no soft radius */
+  box-shadow:
+    0 0 0 3px var(--panel-edge),
+    inset 0 3px 0 rgba(255, 244, 224, 0.10),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+    6px 6px 0 3px rgba(13, 9, 18, 0.65);
+}
+.card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+.card .lede { margin: 0; color: var(--muted); line-height: 1.45; font-size: 15px; }
+.field { display: grid; gap: 6px; }
+label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+input[type="email"] {
+  font: inherit;
+  font-size: 17px;
+  color: var(--cream);
+  background: var(--panel-edge);
+  border: 0;
+  padding: 12px 12px;
+  box-shadow: inset 0 0 0 2px #4a3a57;
+  border-radius: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+input[type="email"]::placeholder { color: #75668a; }
+input[type="email"]:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--lamp); }
+.knock {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: var(--panel-edge);
+  background: var(--lamp);
+  border: 0;
+  padding: 13px 16px 15px;
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 var(--lamp-deep);
+  transition: transform 80ms ease;
+}
+.knock:hover { filter: brightness(1.06); }
+.knock:active { transform: translateY(2px); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -2px 0 var(--lamp-deep); }
+.knock:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
+.knock[disabled] { opacity: 0.7; cursor: progress; }
+.fine { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.error { margin: 0; font-size: 14px; color: var(--error); }
+.linkish {
+  font: inherit; font-size: 14px;
+  background: none; border: 0; padding: 0;
+  color: var(--lamp); text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; justify-self: start;
+}
+.linkish:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; }
+.email-out { color: var(--cream); font-weight: 700; word-break: break-all; }
+.preview-tag {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 10px;
+  font-family: var(--font-display); font-size: 12px; letter-spacing: 0.06em;
+  color: var(--muted); background: rgba(13, 9, 18, 0.7); padding: 4px 8px;
+}
+@media (max-height: 620px) {
+  .card { padding: 16px; gap: 10px; }
+  .card .lede { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .knock { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<main class="stage">
+  <header class="sign">
+    <h1>Diesel House</h1>
+    <p>8 rooms · walk in to talk</p>
+  </header>
+
+  <section class="card" aria-live="polite">
+    <form id="login" class="card-inner" novalidate style="display:grid;gap:14px">
+      <h2>Knock to come in</h2>
+      <p class="lede">Step into a room and you hear everyone inside. Step back into the hallway and it goes quiet.</p>
+      <div class="field">
+        <label for="email">Your email</label>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+      </div>
+      <p id="err" class="error" hidden></p>
+      <button id="go" class="knock" type="submit">Knock on the door</button>
+      <p class="fine">Invite only. We email you a link that opens the door, so there's no password to remember.</p>
+    </form>
+
+    <div id="sent" hidden style="display:grid;gap:12px">
+      <h2>Check your inbox</h2>
+      <p class="lede">We sent a link to <span id="sentTo" class="email-out"></span>. Open it on this device and the door opens.</p>
+      <p class="fine">Nothing there after a minute? Check spam, or try again.</p>
+      <button id="again" class="linkish" type="button">Use a different email</button>
+    </div>
+  </section>
+</main>
+
+
+<script>
+(() => {
+  const SRC = { scene: "/assets/ui/login_scene.png", adam: "/assets/characters/limezu_adam_idle.png", amelia: "/assets/characters/limezu_amelia_idle.png" };
+  const T = 16, SW = 384, SH = 176;              // scene size in pixels (24 x 11 tiles)
+  const DOOR_X = 12 * T;                         // centre of the front door
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const canvas = document.getElementById("scene");
+  const ctx = canvas.getContext("2d");
+  const imgs = {};
+  let loaded = 0;
+  for (const [k, src] of Object.entries(SRC)) {
+    const im = new Image();
+    im.onload = () => { if (++loaded === 3) start(); };
+    im.src = src; imgs[k] = im;
+  }
+
+  // light sources in scene pixels: fairy-light strands, fireplace, windows
+  const strands = [[2.5, 2], [8, 2], [14, 2], [21, 2]];
+  const fire = { x: 20 * T, y: 2.9 * T };
+  let doorOpen = 0, doorTarget = 0;
+
+  let s = 3, ox = 0, oy = 0, dpr = 1;
+  function layout() {
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    s = Math.max(2, Math.ceil(Math.max(canvas.width / SW, canvas.height / SH)));
+    ox = Math.round(canvas.width / 2 - DOOR_X * s);       // keep the door centred
+    ox = Math.min(0, Math.max(canvas.width - SW * s, ox));
+    oy = 0;
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  function sprite(img, frame, x, y) {
+    ctx.drawImage(img, frame * 16, 0, 16, 32, ox + x * s, oy + y * s, 16 * s, 32 * s);
+  }
+
+  function glow(x, y, r, color, a) {
+    const g = ctx.createRadialGradient(ox + x * s, oy + y * s, 0, ox + x * s, oy + y * s, r * s);
+    g.addColorStop(0, color.replace("A", a));
+    g.addColorStop(1, color.replace("A", 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(ox + (x - r) * s, oy + (y - r) * s, r * 2 * s, r * 2 * s);
+  }
+
+  function frame(t) {
+    const sec = t / 1000;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#140f1c";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imgs.scene, ox, oy, SW * s, SH * s);
+
+    // characters: Amelia by the sofa facing right, Adam on the rug facing the viewer
+    const f = reduce ? 0 : Math.floor(sec * 7) % 6;
+    sprite(imgs.amelia, 0 + f, 8.4 * T, 3.6 * T);
+    const adamFacing = doorTarget ? 6 : 18;             // turns to face the door once you knock
+    sprite(imgs.adam, adamFacing + f, 11.5 * T, 4.1 * T);
+
+    // night: tint everything, then add warm light back
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "#6b5c86";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.globalCompositeOperation = "lighter";
+    const flick = reduce ? 0.5 : 0.45 + 0.12 * Math.sin(sec * 9) + 0.06 * Math.sin(sec * 23);
+    glow(fire.x, fire.y, 70, "rgba(244,150,60,A)", flick * 0.55);
+    strands.forEach(([tx, ty], i) => {
+      const tw = reduce ? 0.5 : 0.4 + 0.18 * Math.sin(sec * 2.2 + i * 1.7);
+      glow(tx * T + 16, ty * T + 6, 34, "rgba(255,226,170,A)", tw * 0.45);
+    });
+    glow(6.5 * T, 3 * T, 40, "rgba(150,180,255,A)", 0.12);     // moonlight through the curtains
+    glow(17 * T, 3 * T, 36, "rgba(150,180,255,A)", 0.10);
+
+    // the door: a warm spill of light once you knock
+    doorOpen += (doorTarget - doorOpen) * (reduce ? 1 : 0.06);
+    if (doorOpen > 0.01) {
+      glow(DOOR_X, 3.4 * T, 30 + 40 * doorOpen, "rgba(255,200,120,A)", 0.7 * doorOpen);
+    }
+
+    // soft vignette so the card and title read clearly
+    ctx.globalCompositeOperation = "source-over";
+    const v = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    v.addColorStop(0, "rgba(20,15,28,0.35)");
+    v.addColorStop(0.45, "rgba(20,15,28,0)");
+    v.addColorStop(1, "rgba(20,15,28,0.75)");
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    requestAnimationFrame(frame);
+  }
+
+  function start() { layout(); requestAnimationFrame(frame); }
+  window.addEventListener("resize", layout);
+
+  // ---- sign-in ----
+  const form = document.getElementById("login");
+  const email = document.getElementById("email");
+  const err = document.getElementById("err");
+  const go = document.getElementById("go");
+  const sent = document.getElementById("sent");
+
+  async function sendLink(address) {
+    // Real version (Phase 5): Supabase magic link. supabase = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+    const { error } = await supabase.auth.signInWithOtp({
+      email: address,
+      options: { emailRedirectTo: window.location.origin, shouldCreateUser: true },
+    });
+    if (error) throw new Error(error.status === 422 || /not allowed|signups/i.test(error.message)
+      ? "That email isn't on the guest list. Ask Diesel to add you."
+      : "The link didn't send. Check your connection and try again.");
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    const address = email.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      err.textContent = "Type the email address your invite went to, like you@example.com.";
+      err.hidden = false; email.focus(); return;
+    }
+    go.disabled = true; go.textContent = "Knocking…";
+    try {
+      await sendLink(address);
+      document.getElementById("sentTo").textContent = address;
+      form.hidden = true; sent.hidden = false;
+      doorTarget = 1;
+    } catch (ex) {
+      err.textContent = ex && ex.message ? ex.message : "The link didn't send. Check your connection and try again.";
+      err.hidden = false;
+    } finally {
+      go.disabled = false; go.textContent = "Knock on the door";
+    }
+  });
+
+  document.getElementById("again").addEventListener("click", () => {
+    sent.hidden = true; form.hidden = false; doorTarget = 0; email.select();
+  });
+})();
+</script>
+
+</body>
+</html>

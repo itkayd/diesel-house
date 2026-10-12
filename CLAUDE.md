@@ -150,6 +150,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 ## Phase 5 — Accounts and room ownership
 - Supabase Auth (magic-link email). Invite-only: allowlist of 8 emails in a table.
+- **Login screen is already designed: `design/login/login.html`.** Match it exactly (pixel living room at night drawn on a canvas from `public/assets/ui/login_scene.png`, two LimeZu characters idling, flickering fireplace and fairy lights, door glows when you knock, "Knock on the door" card). Port it into `src/ui/login.ts` as the HTML overlay shown before the Phaser game when there's no session. Keep its copy, fonts (Pixelify Sans + Atkinson Hyperlegible) and colours. `design/login/build_scene.py` regenerates the scene PNG.
+- If a signed-in user's email is not on the allowlist (`is_member()` returns false), sign them out and show: "That email isn't on the guest list. Ask Diesel to add you."
 - `rooms` table: `id (room_01..08)`, `owner_id`, `door_state (open|knock|locked)`, `mood`, `name`.
 - Row-level security: only the owner can change their room.
 - Settings screen for the owner to name their room.

@@ -28,6 +28,27 @@ The user is on **Windows** (PowerShell). Give Windows commands.
 
 Do **not** add other paid services, a long-running server or a media server (LiveKit etc.) without asking the user.
 
+### Supabase — ALREADY SET UP (do not create a new project or recreate tables)
+- Project: `diesel-house`, ref `adnpeaytzgelqxuvpdyf`, region London (eu-west-2)
+- URL: `https://adnpeaytzgelqxuvpdyf.supabase.co`
+- Publishable key (safe for the browser): `sb_publishable_Nc4Gqi7dfIN4TqFyNHxFpA_vYzgQjW7`
+- Schema is live — see `supabase/migrations/20261012_initial_schema.sql`:
+  - `allowed_emails` (invite list, admin-only) + `is_member()` helper
+  - `profiles` (display_name, character_index 0–19, colour)
+  - `rooms` (room_01…room_08 seeded; owner_id, name, door_state open|knock|locked, mood)
+  - `messages` (room chat) and `reactions`
+  - RLS on everything; `rooms`, `messages`, `reactions` are in the realtime publication
+- Positions and voice signalling use **Realtime broadcast/presence channels**, not tables.
+- Any schema change → new migration file in `supabase/migrations/` and tell the user; Claude in claude.ai applies it.
+
+### Friends are worldwide (UK, Middle East, USA)
+- Voice is peer-to-peer, so audio goes directly between friends; distance adds some delay but no server hop.
+- Twilio TURN: use the `global` edge URLs Twilio returns (they route to the nearest region). Keep all TURN URLs Twilio returns, **including TURN over TCP/TLS on port 443**. Some Middle East networks restrict VoIP/UDP, and 443 TLS is the route most likely to get through.
+- Set `iceTransportPolicy: 'all'`; if a connection fails within 10 s, retry once with `iceTransportPolicy: 'relay'` (forces TURN).
+- Supabase is in London. Signalling and position updates from the US/Middle East add about 100–200 ms; interpolate positions smoothly so movement doesn't look jumpy.
+- Show times (chat timestamps, "last seen") in each viewer's **local time zone**; store everything in UTC.
+- Test Phase 4 with at least one friend abroad, not just two devices on the same Wi-Fi.
+
 ### Twilio TURN
 - Create `api/turn.ts` (Vercel function) that calls Twilio's Tokens endpoint (`POST /2010-04-01/Accounts/{SID}/Tokens.json`) with `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` (or an API key) and returns `ice_servers`.
 - Require a logged-in Supabase user (check the access token) before returning credentials.
@@ -45,8 +66,8 @@ Do **not** add other paid services, a long-running server or a media server (Liv
 
 ### Env vars (`.env.example`)
 ```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_URL=https://adnpeaytzgelqxuvpdyf.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_Nc4Gqi7dfIN4TqFyNHxFpA_vYzgQjW7
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 SUPABASE_URL=
@@ -105,7 +126,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 ---
 
 ## Phase 3 — Supabase + multiplayer presence
-- Ask the user for the Supabase project URL and anon key (they will create the project; Claude in claude.ai can help). Put them in `.env` locally.
+- Supabase is already set up (see above). Copy `.env.example` to `.env`; the URL and publishable key are already filled in.
 - Broadcast position about 10 times a second over Supabase Realtime; interpolate other players smoothly.
 - Name tag above each character.
 - Track which zone each player is in (hallway / room_XX).

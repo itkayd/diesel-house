@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import houseMap from '../../maps/house.tmj?raw';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -6,7 +7,8 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload() {
-    // Asset loading is wired up in Phase 1 from assets/manifest.json.
+    this.load.image('limezu_room_builder', 'assets/tiles/limezu_room_builder.png');
+    this.load.tilemapTiledJSON('house', JSON.parse(houseMap));
   }
 
   create() {

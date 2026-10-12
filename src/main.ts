@@ -7,6 +7,7 @@ new Phaser.Game({
   parent: 'game',
   backgroundColor: '#1b1b24',
   pixelArt: true,
+  roundPixels: true,
   scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
   physics: { default: 'arcade', arcade: { debug: false } },
   scene: [PreloadScene, HouseScene],

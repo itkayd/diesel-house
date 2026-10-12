@@ -1,1 +1,16 @@
+import type { Zone } from '../config';
+
 export const overlay = () => document.getElementById('overlay') as HTMLDivElement;
+
+let zoneLabel: HTMLDivElement | null = null;
+
+// Small badge showing where the player is standing.
+export function showZone(zone: Zone | null) {
+  if (!zoneLabel) {
+    zoneLabel = document.createElement('div');
+    zoneLabel.style.cssText =
+      'position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);font-size:14px';
+    overlay().appendChild(zoneLabel);
+  }
+  zoneLabel.textContent = !zone ? '' : zone === 'hallway' ? 'Hallway' : `Room ${Number(zone.slice(-2))}`;
+}

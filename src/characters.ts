@@ -68,23 +68,3 @@ export function createCharacterAnims(anims: Phaser.Animations.AnimationManager) 
 
 // The pose shown in the character picker.
 export const portraitFrame = (index: number) => characterFrames(index).idle.down[0];
-
-const STORAGE_KEY = 'diesel-house.character';
-
-export function savedCharacter(): number | null {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    const n = v === null ? NaN : Number(v);
-    return Number.isInteger(n) && n >= 0 && n < CHARACTER_COUNT ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveCharacter(index: number) {
-  try {
-    localStorage.setItem(STORAGE_KEY, String(index));
-  } catch {
-    // Private browsing: the choice just won't be remembered.
-  }
-}

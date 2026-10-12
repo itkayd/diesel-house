@@ -1,15 +1,26 @@
 import Phaser from 'phaser';
 import { ROOM_IDS, TILE_SIZE, type Zone } from '../config';
-import { animKey, type Dir, saveCharacter, savedCharacter } from '../characters';
-import { showZone } from '../ui/overlay';
+import type { Dir } from '../characters';
+import { Presence, type PlayerInfo, type PosMsg } from '../net/presence';
+import { saveCharacter, savedCharacter, saveName, savedName } from '../prefs';
+import { showStatus, showZone } from '../ui/overlay';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addChangeCharacterButton, pickCharacter } from '../ui/picker';
+import { Avatar } from './Avatar';
 
 const SPEED = 80; // px per second
+const SEND_EVERY = 100; // ms between position updates while moving (~10/s)
+const IDLE_RESEND = 5000; // ms between "still here" updates while standing still
+const INTERP_DELAY = 150; // ms: other players are drawn this far in the past so we can smooth between updates
+const STALE_AFTER = 15000; // ms without any update before someone is hidden (locked phone, closed tab)
 
 type ZoneRect = { name: Zone; rect: Phaser.Geom.Rectangle };
+type Snapshot = { t: number; x: number; y: number; dir: Dir; moving: boolean };
+// clockOffset: smallest (our clock - their clock) seen; maps their timestamps onto our timeline.
+type Remote = { avatar: Avatar; info: PlayerInfo; snaps: Snapshot[]; clockOffset: number; lastHeard: number; active: boolean };
 
 export class HouseScene extends Phaser.Scene {
+  private me!: Avatar;
   private player!: Phaser.GameObjects.Sprite;
   private body!: Phaser.Physics.Arcade.Body;
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
@@ -17,8 +28,13 @@ export class HouseScene extends Phaser.Scene {
   private zone: Zone | null = null;
   private joystick: Joystick | null = null;
   private character = 0;
-  private facing: Dir = 'down';
+  private name = '';
   private canMove = false;
+
+  private presence: Presence | null = null;
+  private remotes = new Map<string, Remote>();
+  private lastSent = 0;
+  private wasMoving = false;
 
   constructor() {
     super('House');
@@ -40,15 +56,17 @@ export class HouseScene extends Phaser.Scene {
     // Sprite position is the character's feet; the physics body is a small box around them.
     const spawn = map.findObject('zones', (o) => o.name === 'spawn')!;
     const saved = savedCharacter();
+    const name = savedName();
     this.character = saved ?? 0;
-    this.player = this.add.sprite(spawn.x!, spawn.y!, 'chibis_a').setOrigin(0.5, 1);
+    this.name = name ?? '';
+    this.me = new Avatar(this, spawn.x!, spawn.y!, this.character, this.name);
+    this.player = this.me.sprite;
     this.physics.add.existing(this.player);
     this.body = this.player.body as Phaser.Physics.Arcade.Body;
     this.body.setSize(10, 6).setOffset(3, 26);
     this.physics.add.collider(this.player, walls);
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.body.setCollideWorldBounds(true);
-    this.playAnim('idle');
 
     this.keys = this.input.keyboard!.addKeys('up,down,left,right,w,a,s,d') as typeof this.keys;
     if (isTouchDevice()) this.joystick = new Joystick();
@@ -60,8 +78,8 @@ export class HouseScene extends Phaser.Scene {
     this.scale.on('resize', this.fitCamera, this);
 
     addChangeCharacterButton(() => this.choose());
-    if (saved === null) this.choose();
-    else this.canMove = true;
+    if (saved === null || name === null) this.choose();
+    else this.start();
 
     if (import.meta.env.DEV) (window as unknown as { __house: HouseScene }).__house = this; // used by automated checks
   }
@@ -69,18 +87,126 @@ export class HouseScene extends Phaser.Scene {
   private async choose() {
     this.canMove = false;
     this.body.setVelocity(0, 0);
-    this.setCharacter(await pickCharacter(this.textures, savedCharacter()));
+    const { character, name } = await pickCharacter(this.textures, savedCharacter(), savedName());
+    this.character = character;
+    this.name = name;
+    saveCharacter(character);
+    saveName(name);
+    this.me.setCharacter(character);
+    this.me.setName(name);
+    if (this.presence) this.presence.update({ character, name });
+    this.start();
+  }
+
+  // Joins the house once we know who we are.
+  private start() {
     this.canMove = true;
+    if (this.presence) return;
+    this.presence = new Presence(
+      { name: this.name, character: this.character, zone: this.zone },
+      {
+        onJoin: (p) => this.addRemote(p),
+        onLeave: (id) => this.removeRemote(id),
+        onInfo: (p) => this.updateRemote(p),
+        onPos: (m) => this.receivePos(m),
+        onStatus: (s) => this.showPresenceStatus(s),
+      },
+    );
+    this.presence.connect();
   }
 
-  setCharacter(index: number) {
-    this.character = index;
-    saveCharacter(index);
-    this.playAnim('idle');
+  private showPresenceStatus(s: 'connecting' | 'online' | 'offline') {
+    if (s === 'connecting') showStatus('Connecting…', false);
+    else if (s === 'offline') showStatus('Offline', false);
+    else showStatus(`${this.activeCount()} in the house`, true);
   }
 
-  private playAnim(kind: 'walk' | 'idle') {
-    this.player.play(animKey(this.character, kind, this.facing), true);
+  private activeCount() {
+    let n = 1;
+    for (const r of this.remotes.values()) if (r.active) n++;
+    return n;
+  }
+
+  private addRemote(p: PlayerInfo) {
+    const avatar = new Avatar(this, 0, 0, p.character, p.name);
+    avatar.setVisible(false); // shown once we know where they are
+    this.remotes.set(p.id, { avatar, info: p, snaps: [], clockOffset: Infinity, lastHeard: 0, active: false });
+    this.sendPos(true); // so the newcomer sees us straight away
+    this.showPresenceStatus('online');
+  }
+
+  private removeRemote(id: string) {
+    this.remotes.get(id)?.avatar.destroy();
+    this.remotes.delete(id);
+    this.showPresenceStatus('online');
+  }
+
+  private updateRemote(p: PlayerInfo) {
+    const r = this.remotes.get(p.id);
+    if (!r) return;
+    if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
+    if (r.info.name !== p.name) r.avatar.setName(p.name);
+    r.info = { ...p, zone: r.info.zone }; // zone from position updates is fresher than presence
+  }
+
+  private receivePos(m: PosMsg) {
+    const r = this.remotes.get(m.id);
+    if (!r) return;
+    const now = Date.now();
+    r.clockOffset = Math.min(r.clockOffset, now - m.t);
+    const t = m.t + r.clockOffset;
+    if (r.snaps.length && t <= r.snaps[r.snaps.length - 1].t) return; // out of order
+    r.snaps.push({ t, x: m.x, y: m.y, dir: m.dir, moving: m.moving });
+    if (r.snaps.length > 30) r.snaps.shift();
+    r.info.zone = m.zone;
+    r.lastHeard = now;
+    if (!r.active) {
+      r.active = true;
+      r.avatar.setPosition(m.x, m.y);
+      r.avatar.setVisible(true);
+      this.showPresenceStatus('online');
+    }
+  }
+
+  private sendPos(force = false) {
+    if (!this.presence) return;
+    const moving = this.body.velocity.lengthSq() > 0;
+    const now = performance.now();
+    const due = moving ? SEND_EVERY : IDLE_RESEND;
+    const stopped = this.wasMoving && !moving;
+    if (!force && !stopped && now - this.lastSent < due) return;
+    this.lastSent = now;
+    this.wasMoving = moving;
+    this.presence.sendPos({ x: Math.round(this.player.x), y: Math.round(this.player.y), dir: this.me.facing, moving, zone: this.zone });
+  }
+
+  // Draws each remote player a little in the past, blending between the two updates either side.
+  private interpolateRemotes() {
+    const now = Date.now();
+    const renderT = now - INTERP_DELAY;
+    for (const r of this.remotes.values()) {
+      if (r.active && now - r.lastHeard > STALE_AFTER) {
+        r.active = false;
+        r.snaps = [];
+        r.avatar.setVisible(false);
+        this.showPresenceStatus('online');
+      }
+      const s = r.snaps;
+      if (!r.active || !s.length) continue;
+      while (s.length >= 2 && s[1].t <= renderT) s.shift();
+      const a = s[0];
+      const b = s[1];
+      let x = a.x;
+      let y = a.y;
+      if (b && renderT > a.t) {
+        const k = Math.min(1, (renderT - a.t) / (b.t - a.t));
+        x = a.x + (b.x - a.x) * k;
+        y = a.y + (b.y - a.y) * k;
+      }
+      const moved = Math.abs(x - r.avatar.sprite.x) + Math.abs(y - r.avatar.sprite.y) > 0.01;
+      r.avatar.setPosition(x, y);
+      r.avatar.animate(moved || (b?.moving ?? a.moving), (b ?? a).dir);
+    }
   }
 
   // About 18x14 tiles in view, never so far out that the house stops filling the screen.
@@ -115,19 +241,30 @@ export class HouseScene extends Phaser.Scene {
     const v = this.canMove ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
     this.body.setVelocity(v.x, v.y);
 
-    if (v.lengthSq() > 0) {
-      this.facing = Math.abs(v.x) > Math.abs(v.y) ? (v.x > 0 ? 'right' : 'left') : v.y > 0 ? 'down' : 'up';
-      this.playAnim('walk');
-    } else {
-      this.playAnim('idle');
-    }
-    this.player.setDepth(this.player.y);
+    const moving = v.lengthSq() > 0;
+    const dir: Dir = !moving
+      ? this.me.facing
+      : Math.abs(v.x) > Math.abs(v.y)
+        ? v.x > 0
+          ? 'right'
+          : 'left'
+        : v.y > 0
+          ? 'down'
+          : 'up';
+    this.me.animate(moving, dir);
+    this.me.sync();
 
     const zone = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y - 3))?.name ?? null;
     if (zone !== this.zone) {
       this.zone = zone;
       showZone(zone);
+      this.presence?.update({ zone });
+      this.sendPos(true);
+    } else {
+      this.sendPos();
     }
+
+    this.interpolateRemotes();
   }
 
   private inputVelocity() {

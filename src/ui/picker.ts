@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import { CHARACTER_COUNT, portraitFrame } from '../characters';
+import { NAME_MAX } from '../prefs';
 import { overlay } from './overlay';
 
 const SCALE = 3;
@@ -17,12 +18,28 @@ function portrait(textures: Phaser.Textures.TextureManager, index: number) {
   return c;
 }
 
-// Full-screen grid of characters. Resolves with the chosen index.
-export function pickCharacter(textures: Phaser.Textures.TextureManager, current: number | null): Promise<number> {
+// Full-screen name box + grid of characters. Resolves with the name and chosen index.
+export function pickCharacter(
+  textures: Phaser.Textures.TextureManager,
+  current: number | null,
+  currentName: string | null,
+): Promise<{ character: number; name: string }> {
   return new Promise((resolve) => {
     const panel = document.createElement('div');
     panel.style.cssText = `position:absolute;inset:0;pointer-events:auto;background:rgba(15,15,22,.92);overflow-y:auto;
       display:flex;flex-direction:column;align-items:center;padding:calc(20px + env(safe-area-inset-top)) 16px 24px;box-sizing:border-box`;
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = 'Your name';
+    nameLabel.style.cssText = 'font-size:14px;opacity:.8;margin-bottom:6px';
+    const nameInput = document.createElement('input');
+    nameInput.id = 'player-name';
+    nameLabel.htmlFor = nameInput.id;
+    nameInput.maxLength = NAME_MAX;
+    nameInput.value = currentName ?? '';
+    nameInput.placeholder = 'Type your name';
+    nameInput.setAttribute('autocomplete', 'nickname');
+    nameInput.style.cssText = `width:100%;max-width:280px;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:2px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.08);color:#fff;font:16px system-ui,sans-serif;margin-bottom:20px;text-align:center`;
     const title = document.createElement('h2');
     title.textContent = 'Pick your character';
     title.style.cssText = 'margin:0 0 16px;font-size:20px;font-weight:600';
@@ -39,12 +56,19 @@ export function pickCharacter(textures: Phaser.Textures.TextureManager, current:
         border:2px solid ${selected ? '#ffd34d' : 'transparent'}`;
       b.appendChild(portrait(textures, i));
       b.addEventListener('click', () => {
+        const name = nameInput.value.trim().slice(0, NAME_MAX);
+        if (!name) {
+          nameInput.style.borderColor = '#ff6b6b';
+          nameInput.placeholder = 'Type your name first';
+          nameInput.focus();
+          return;
+        }
         panel.remove();
-        resolve(i);
+        resolve({ character: i, name });
       });
       grid.appendChild(b);
     }
-    panel.append(title, grid);
+    panel.append(nameLabel, nameInput, title, grid);
     overlay().appendChild(panel);
   });
 }

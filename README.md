@@ -2,7 +2,10 @@
 
 A private 2D voice-hangout app for a group of 8 friends.
 
-The app is a top-down house with a hallway and 8 rooms, one owned by each friend. Walk your character into a room and you hear everyone inside. Walk out and it's silent. Everything said in a room shows as live captions, and friends can comment and react on any line.
+The app is a top-down house with a hallway and 8 rooms, one owned by each friend. Walk your character into a room and you hear everyone inside. Walk out and it's silent. Each room has its own text chat with reactions.
+
+## Stack
+Phaser 3 + TypeScript + Vite · Supabase (auth, database, realtime) · WebRTC voice with Twilio TURN · Vercel hosting · ElevenLabs sound effects
 
 ## Files in this repo
 
@@ -18,7 +21,7 @@ Planning done, art sourced. Next: Claude Code runs **Phase 0** in `CLAUDE.md`.
 
 ## Running cost target
 
-£0/month at friend-group scale, using free tiers only (Supabase, Vercel, free TURN relay) and on-device captions.
+About £0/month at friend-group scale: Supabase and Vercel free tiers, plus Twilio TURN usage (pennies).
 
 ## Private repo
 

@@ -15,6 +15,12 @@ All art is free. Three packs are merged into one pixel-art style (16×16 tiles, 
 | `lucide` | UI icons (mic, mute, lock, knock, captions, settings) | ISC |
 | OpenMoji (`openmoji`) | Reaction emojis | CC BY-SA 4.0 — credit required |
 
+## Sound effects
+
+| Source | Files | Licence |
+|---|---|---|
+| ElevenLabs (generated for this project) | `public/assets/sfx/knock`, `doorbell`, `door_open`, `join`, `leave` (`.mp3`) | Generated with the user's ElevenLabs account; usable under their plan's terms |
+
 ## Rules
 - **Keep the repo private.** LimeZu and finalbossblues terms don't allow public redistribution.
 - **Never commercialise** this app with the LimeZu free pack in it. If that changes, buy the full LimeZu pack first.

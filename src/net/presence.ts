@@ -83,7 +83,7 @@ export class Presence {
   }
 
   sendPos(m: Omit<PosMsg, 'id' | 't'>) {
-    if (this.channel?.state !== 'joined') return;
+    if (this.channel?.state !== 'joined' || !supabase?.realtime.isConnected()) return;
     void this.channel.send({ type: 'broadcast', event: 'pos', payload: { ...m, id: this.id, t: Date.now() } });
   }
 

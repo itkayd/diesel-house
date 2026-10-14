@@ -5,12 +5,15 @@ import { animKey, type Dir } from '../characters';
 export class Avatar {
   readonly sprite: Phaser.GameObjects.Sprite;
   private tag: Phaser.GameObjects.Text;
+  private glow: Phaser.GameObjects.Ellipse;
   private character: number;
   facing: Dir = 'down';
 
   constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string) {
     this.character = character;
     this.sprite = scene.add.sprite(x, y, 'chibis_a').setOrigin(0.5, 1);
+    // Green ring at the feet while this person is talking.
+    this.glow = scene.add.ellipse(x, y - 1, 18, 7, 0x4dff88, 0.45).setStrokeStyle(1, 0x9dffbe, 0.9).setVisible(false);
     this.tag = scene.add
       .text(x, y - 33, name, {
         fontFamily: 'system-ui, sans-serif',
@@ -42,6 +45,7 @@ export class Avatar {
   // Keeps depth sorting and the name tag in step with the sprite.
   sync() {
     this.sprite.setDepth(this.sprite.y);
+    this.glow.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(this.sprite.y - 0.5);
     this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 33));
   }
 
@@ -53,10 +57,20 @@ export class Avatar {
   setVisible(v: boolean) {
     this.sprite.setVisible(v);
     this.tag.setVisible(v);
+    if (!v) this.glow.setVisible(false);
+  }
+
+  setSpeaking(on: boolean) {
+    this.glow.setVisible(on && this.sprite.visible);
+  }
+
+  get speaking() {
+    return this.glow.visible;
   }
 
   destroy() {
     this.sprite.destroy();
     this.tag.destroy();
+    this.glow.destroy();
   }
 }

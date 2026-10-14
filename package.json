@@ -5,15 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "vite --mode https",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "map": "node scripts/build-map.mjs"
+    "map": "node scripts/build-map.mjs",
+    "test:e2e": "node tests/e2e/run-all.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
+    "lucide": "^1.55.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "playwright-core": "^1.64.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
   }

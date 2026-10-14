@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { ROOM_IDS, TILE_SIZE, type Zone } from '../config';
+import { ROOM_IDS, TILE_SIZE, type RoomId, type Zone } from '../config';
 import type { Dir } from '../characters';
 import { Presence, type PlayerInfo, type PosMsg } from '../net/presence';
+import { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName } from '../prefs';
 import { showStatus, showZone } from '../ui/overlay';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addChangeCharacterButton, pickCharacter } from '../ui/picker';
+import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 
 const SPEED = 80; // px per second
@@ -13,6 +15,7 @@ const SEND_EVERY = 100; // ms between position updates while moving (~10/s)
 const IDLE_RESEND = 5000; // ms between "still here" updates while standing still
 const INTERP_DELAY = 150; // ms: other players are drawn this far in the past so we can smooth between updates
 const STALE_AFTER = 15000; // ms without any update before someone is hidden (locked phone, closed tab)
+const JOIN_VOICE_AFTER = 300; // ms standing in a room before joining its voice (avoids flapping in doorways)
 
 type ZoneRect = { name: Zone; rect: Phaser.Geom.Rectangle };
 type Snapshot = { t: number; x: number; y: number; dir: Dir; moving: boolean };
@@ -35,6 +38,9 @@ export class HouseScene extends Phaser.Scene {
   private remotes = new Map<string, Remote>();
   private lastSent = 0;
   private wasMoving = false;
+  private voice: Voice | null = null;
+  private voiceControls: VoiceControls | null = null;
+  private voiceTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super('House');
@@ -68,7 +74,8 @@ export class HouseScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.body.setCollideWorldBounds(true);
 
-    this.keys = this.input.keyboard!.addKeys('up,down,left,right,w,a,s,d') as typeof this.keys;
+    // No key capture, so letters still reach text boxes (name, chat).
+    this.keys = this.input.keyboard!.addKeys('up,down,left,right,w,a,s,d', false) as typeof this.keys;
     if (isTouchDevice()) this.joystick = new Joystick();
 
     const cam = this.cameras.main;
@@ -113,6 +120,39 @@ export class HouseScene extends Phaser.Scene {
       },
     );
     this.presence.connect();
+
+    const forceRelay = import.meta.env.DEV && new URLSearchParams(location.search).has('relay'); // test TURN on its own
+    this.voice = new Voice(
+      this.presence.id,
+      {
+        onSpeaking: (id, on) => (id === this.presence!.id ? this.me : this.remotes.get(id)?.avatar)?.setSpeaking(on),
+        onStatus: (s) => this.voiceControls?.show(s),
+      },
+      { forceRelay },
+    );
+    this.voiceControls = new VoiceControls({
+      onMute: (m) => this.voice!.setMuted(m),
+      onPushToTalk: (on) => this.voice!.setPushToTalk(on),
+      onTalking: (t) => this.voice!.setTalking(t),
+    });
+    this.updateVoice();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
+    window.addEventListener('pagehide', () => this.voice?.leave());
+  }
+
+  // Leaving a room cuts voice at once; joining waits until you've actually stepped in.
+  private updateVoice() {
+    if (!this.voice) return;
+    this.voiceTimer?.remove();
+    this.voiceTimer = null;
+    const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
+    if (!room) {
+      this.voice.leave();
+      return;
+    }
+    if (this.voice.room === room) return;
+    this.voice.leave();
+    this.voiceTimer = this.time.delayedCall(JOIN_VOICE_AFTER, () => void this.voice!.join(room));
   }
 
   private showPresenceStatus(s: 'connecting' | 'online' | 'offline') {
@@ -260,6 +300,7 @@ export class HouseScene extends Phaser.Scene {
       showZone(zone);
       this.presence?.update({ zone });
       this.sendPos(true);
+      this.updateVoice();
     } else {
       this.sendPos();
     }

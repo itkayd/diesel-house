@@ -59,7 +59,7 @@ async function player(name, character, { micGranted = false, micSeen = false, mi
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
-  await page.goto('http://localhost:5173/');
+  await page.goto('http://localhost:5173/?guest');
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined');
   return { name, ctx, page };
 }

@@ -1,0 +1,70 @@
+import { chromium } from 'playwright-core';
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+// Phase 5 front door and lock-down. Needs `npm run dev`. Sends no emails.
+const out = fileURLToPath(new URL('./output', import.meta.url));
+mkdirSync(out, { recursive: true });
+const res = [];
+const check = (n, p, ok) => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}  -> ${JSON.stringify(p)}`);
+const errors = [];
+
+// 1. Without a session the login screen (design/login/login.html) is the front door; no game yet.
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+page.on('pageerror', (e) => errors.push(e.message));
+await page.goto('http://localhost:5173/');
+await page.waitForSelector('#login-screen', { timeout: 15000 }).catch(() => {});
+const login = await page.evaluate(() => ({
+  shown: !!document.getElementById('login-screen'),
+  title: document.querySelector('#login-screen h1')?.textContent,
+  tagline: document.querySelector('#login-screen .sign p')?.textContent,
+  card: document.querySelector('#login-screen .card h2')?.textContent,
+  button: document.querySelector('#login-screen #go')?.textContent,
+  gameStarted: !!window.__house,
+}));
+check('no session: the login screen shows, the game does not start', login,
+  login.shown && login.title === 'Diesel House' && login.card === 'Knock to come in' && login.button === 'Knock on the door' && !login.gameStarted);
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${out}/auth_login_phone.png` });
+
+// 2. A typo in the email is caught before anything is sent.
+await page.fill('#email', 'not-an-email');
+await page.click('#go');
+const err = await page.locator('#err').textContent();
+check('bad email: friendly message, nothing sent', { err }, /Type the email address your invite went to/.test(err ?? ''));
+await browser.close();
+
+// 3. A client holding only the publishable key (no login) cannot join the private channels.
+const env = Object.fromEntries(
+  readFileSync(new URL('../../.env', import.meta.url), 'utf8')
+    .split(/\r?\n/)
+    .filter((l) => /^[A-Z_]+=/.test(l))
+    .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]),
+);
+const anon = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+async function tryJoin(topic) {
+  return new Promise((resolve) => {
+    const ch = anon.channel(topic, { config: { private: true } });
+    let got = 0;
+    ch.on('broadcast', { event: '*' }, () => got++);
+    const timer = setTimeout(() => resolve({ status: 'no answer', got }), 10000);
+    ch.subscribe((status, e) => {
+      if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        clearTimeout(timer);
+        resolve({ status, reason: e?.message?.slice(0, 120), got });
+        void anon.removeChannel(ch);
+      }
+    });
+  });
+}
+const house = await tryJoin('house');
+const voice = await tryJoin('voice:room_01');
+check('no login: refused on the private "house" channel', house, house.status !== 'SUBSCRIBED');
+check('no login: refused on a private voice room channel', voice, voice.status !== 'SUBSCRIBED');
+await anon.removeAllChannels();
+
+console.log(res.join('\n'));
+console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
+if (res.some((r) => r.startsWith('FAIL')) || errors.length) process.exitCode = 1;
+process.exit();

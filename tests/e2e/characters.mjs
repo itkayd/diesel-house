@@ -11,7 +11,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 await ctx.addInitScript(() => localStorage.setItem('diesel-house.mic-ok', '1')); // mic card is tested in audio.mjs
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(e.message)); page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-await page.goto('http://localhost:5173/');
+await page.goto('http://localhost:5173/?guest');
 await page.waitForFunction(() => window.__house?.player);
 const st = () => page.evaluate(() => { const h = window.__house; return { x: Math.round(h.player.x), y: Math.round(h.player.y), zone: h.zone, anim: h.player.anims.currentAnim?.key, frame: h.player.frame.name, tex: h.player.texture.key }; });
 const hold = async (key, ms = 2500) => { await page.keyboard.down(key); await page.waitForTimeout(ms); const during = await st(); await page.keyboard.up(key); await page.waitForTimeout(150); return { during, after: await st() }; };

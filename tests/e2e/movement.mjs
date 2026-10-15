@@ -23,7 +23,7 @@ async function player(name, character, { query = '', phone = false } = {}) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
-  await page.goto('http://localhost:5173/' + query);
+  await page.goto('http://localhost:5173/?guest' + query.replace('?', '&'));
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined');
   return { ctx, page, id: await page.evaluate(() => window.__house.presence.id) };
 }
@@ -46,7 +46,7 @@ const seen = () => B.page.evaluate((id) => {
 }, A.id);
 
 // 1. Budget: a 10 s walk (east along the hallway; the wall stops it near the end).
-await tp(A, 48, 256);
+await tp(A, 48, 270); // y=270 keeps clear of the hallway lamps' bases
 await A.page.waitForTimeout(600);
 let before = await sentMoves(A);
 await hold(A, 'ArrowRight', 10_000);
@@ -55,7 +55,7 @@ const walkMsgs = (await sentMoves(A)) - before;
 check('10 s walk sends at most 25 movement messages (was ~100 at 10/s)', { messages: walkMsgs, reduction: `${(100 / walkMsgs).toFixed(1)}x` }, walkMsgs <= 25 && 100 / walkMsgs >= 4);
 
 // 2. Smoothness with 200 ms lag: sample B's view of A every frame-ish while A walks west.
-await tp(A, 600, 256);
+await tp(A, 600, 270);
 await B.page.waitForTimeout(1500);
 const samples = [];
 const errs = [];

@@ -15,7 +15,7 @@ async function player(name, character) {
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
   page.on('console', (m) => m.type() === 'warning' && warnings.push(name + ': ' + m.text()));
-  await page.goto('http://localhost:5173/');
+  await page.goto('http://localhost:5173/?guest');
   await page.waitForFunction(() => window.__house?.presence);
   return { ctx, page };
 }

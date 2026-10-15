@@ -1,0 +1,189 @@
+/* Login screen, ported from design/login/login.html (scoped to #login-screen).
+   Full-bleed pixel living room at night; the front door sits dead centre, the house name hangs in the
+   dark ceiling above it, the sign-in card rests on the floor below. */
+#login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--night);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 16px;
+  overflow: hidden;
+}
+#login-screen #scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+#login-screen .stage {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-inline: 16px;
+  padding-block: clamp(16px, 4vh, 40px);
+  box-sizing: border-box;
+}
+#login-screen .sign {
+  justify-self: center;
+  text-align: center;
+  display: grid;
+  gap: 6px;
+}
+#login-screen .sign h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 6vw, 52px);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--cream);
+  text-shadow: 0 0 18px rgba(244, 184, 96, 0.55), 3px 3px 0 var(--panel-edge);
+  text-wrap: balance;
+}
+#login-screen .sign p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(14px, 2.2vw, 17px);
+  letter-spacing: 0.06em;
+  color: var(--lamp);
+  text-shadow: 2px 2px 0 var(--panel-edge);
+}
+#login-screen .card {
+  grid-row: 3;
+  justify-self: center;
+  width: min(100%, 400px);
+  box-sizing: border-box;
+  background: var(--panel);
+  padding: 22px 22px 18px;
+  display: grid;
+  gap: 14px;
+  /* chunky pixel frame: hard outline + inner bevel, no soft radius */
+  box-shadow:
+    0 0 0 3px var(--panel-edge),
+    inset 0 3px 0 rgba(255, 244, 224, 0.1),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.35),
+    6px 6px 0 3px rgba(13, 9, 18, 0.65);
+}
+#login-screen .card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+#login-screen .card .lede {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 15px;
+}
+#login-screen .field {
+  display: grid;
+  gap: 6px;
+}
+#login-screen label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#login-screen input[type='email'] {
+  font: inherit;
+  font-size: 17px;
+  color: var(--cream);
+  background: var(--panel-edge);
+  border: 0;
+  padding: 12px 12px;
+  box-shadow: inset 0 0 0 2px #4a3a57;
+  border-radius: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+#login-screen input[type='email']::placeholder {
+  color: #75668a;
+}
+#login-screen input[type='email']:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--lamp);
+}
+#login-screen .knock {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  color: var(--panel-edge);
+  background: var(--lamp);
+  border: 0;
+  padding: 13px 16px 15px;
+  cursor: pointer;
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 var(--lamp-deep);
+  transition: transform 80ms ease;
+}
+#login-screen .knock:hover {
+  filter: brightness(1.06);
+}
+#login-screen .knock:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -2px 0 var(--lamp-deep);
+}
+#login-screen .knock:focus-visible {
+  outline: 3px solid var(--cream);
+  outline-offset: 3px;
+}
+#login-screen .knock[disabled] {
+  opacity: 0.7;
+  cursor: progress;
+}
+#login-screen .fine {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+#login-screen .error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--error);
+}
+#login-screen .linkish {
+  font: inherit;
+  font-size: 14px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--lamp);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  justify-self: start;
+}
+#login-screen .linkish:focus-visible {
+  outline: 2px solid var(--lamp);
+  outline-offset: 3px;
+}
+#login-screen .email-out {
+  color: var(--cream);
+  font-weight: 700;
+  word-break: break-all;
+}
+@media (max-height: 620px) {
+  #login-screen .card {
+    padding: 16px;
+    gap: 10px;
+  }
+  #login-screen .card .lede {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #login-screen .knock {
+    transition: none;
+  }
+}

@@ -26,7 +26,7 @@ async function player(name, character, viewport = { width: 1280, height: 800 }) 
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
-  await page.goto('http://localhost:5173/');
+  await page.goto('http://localhost:5173/?guest');
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined');
   return { ctx, page, id: await page.evaluate(() => window.__house.presence.id) };
 }
@@ -51,6 +51,7 @@ check('a nameplate over each of the 8 doors', { plates: plates.length }, plates.
 const B = await player('Bo look', 17);
 await A.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, B.id, { timeout: 15000 });
 await tp(B, 448, 120);
+await B.page.waitForFunction(() => window.__house.zone === 'room_03', null, { timeout: 5000 }).catch(() => {});
 await A.page.waitForFunction(() => window.__house.look.plate('room_03').headCount === 1, null, { timeout: 8000 }).catch(() => {});
 await A.page.waitForTimeout(800);
 // Real visitors may be in other rooms, so every plate is compared with who A knows is in that room.

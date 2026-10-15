@@ -9,7 +9,7 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 await ctx.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone'), localStorage.setItem('diesel-house.mic-ok', '1')));
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
-await page.goto('http://localhost:5173/');
+await page.goto('http://localhost:5173/?guest');
 await page.waitForFunction(() => window.__house?.player);
 const cdp = await ctx.newCDPSession(page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
@@ -37,7 +37,7 @@ await touch('touchStart', box.x, box.y); await touch('touchMove', box.x, box.y -
 const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 82); // stopped by the sofa
 // Desktop: no joystick
 const dp = await browser.newPage({ viewport: { width: 1366, height: 768 } }); await dp.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
-await dp.goto('http://localhost:5173/'); await dp.waitForFunction(() => window.__house?.player);
+await dp.goto('http://localhost:5173/?guest'); await dp.waitForFunction(() => window.__house?.player);
 const n = await dp.evaluate(() => document.querySelectorAll('#joystick').length);
 check('no joystick on desktop', n, n === 0);
 console.log(res.join('\n')); console.log(errors.length ? 'ERRORS: ' + errors.join('\n') : 'no page errors');

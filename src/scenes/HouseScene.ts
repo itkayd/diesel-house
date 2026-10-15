@@ -5,9 +5,14 @@ import type { Dir } from '../characters';
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { installAudioUnlock } from '../net/audio';
 import { msgStats } from '../net/stats';
+import { signOut } from '../net/auth';
+import { currentUser, loadNames, loadProfile, saveProfile } from '../net/profile';
+import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
-import { showWhere, zoneLabel } from '../ui/overlay';
+import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
+import { addRoomSettings } from '../ui/roomSettings';
+import { el } from '../ui/modal';
 import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
@@ -75,6 +80,9 @@ export class HouseScene extends Phaser.Scene {
   private presenceState: 'connecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
   private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
+  private rooms = new Map<RoomId, Room>();
+  private ownerNames = new Map<string, string>();
+  private replacedToast: (() => void) | null = null;
 
   constructor() {
     super('House');
@@ -144,10 +152,53 @@ export class HouseScene extends Phaser.Scene {
         }),
       ),
     );
-    if (saved === null || name === null) void this.choose();
-    else void this.start();
+    addSettingsSection(
+      90,
+      (box) => {
+        if (!currentUser()) return;
+        const out = el('button', 'dh-btn dh-btn--quiet');
+        out.type = 'button';
+        out.id = 'sign-out';
+        out.textContent = 'Sign out';
+        out.addEventListener('click', async () => {
+          this.voice?.leave();
+          this.presence?.leave();
+          await signOut();
+          location.reload();
+        });
+        const who = el('small', 'dh-lede', `Signed in as ${currentUser()!.email}`);
+        box.append(who, out);
+      },
+      true,
+    );
+    void this.identify(saved, name);
 
     if (import.meta.env.DEV) (window as unknown as { __house: HouseScene }).__house = this; // used by automated checks
+  }
+
+  // Who are you? Your profile if you have one; otherwise the picker, once, saved to your profile.
+  private async identify(saved: number | null, name: string | null) {
+    const user = currentUser();
+    if (user) {
+      const profile = await loadProfile(user.id);
+      if (profile) {
+        this.applyIdentity(profile.character_index, profile.display_name);
+        return void this.start();
+      }
+      // New here: offer the picker, prefilled with anything this device remembers.
+      return void this.choose();
+    }
+    if (saved === null || name === null) void this.choose();
+    else void this.start();
+  }
+
+  private applyIdentity(character: number, name: string) {
+    this.character = character;
+    this.name = name;
+    saveCharacter(character);
+    saveName(name);
+    this.me.setCharacter(character);
+    this.me.setName(name);
   }
 
   private async choose() {
@@ -159,12 +210,9 @@ export class HouseScene extends Phaser.Scene {
       return;
     }
     const { character, name } = choice;
-    this.character = character;
-    this.name = name;
-    saveCharacter(character);
-    saveName(name);
-    this.me.setCharacter(character);
-    this.me.setName(name);
+    this.applyIdentity(character, name);
+    const user = currentUser();
+    if (user) await saveProfile(user.id, name, character);
     if (this.presence) this.presence.update({ character, name });
     void this.start();
   }
@@ -177,6 +225,7 @@ export class HouseScene extends Phaser.Scene {
     showWhere(this.zone, 'Connecting…', 'warn');
     const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
     this.presence = new Presence(
+      currentUser()?.id ?? crypto.randomUUID(),
       { name: this.name, character: this.character, zone: this.zone },
       {
         onJoin: (p) => this.addRemote(p),
@@ -184,6 +233,8 @@ export class HouseScene extends Phaser.Scene {
         onInfo: (p) => this.updateRemote(p),
         onMove: (m) => this.receiveMove(m),
         onStatus: (s) => this.showPresenceStatus(s),
+        onRoomChange: (room) => void this.roomChanged(room),
+        onReplaced: () => this.replaced(),
       },
       { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
     );
@@ -197,7 +248,7 @@ export class HouseScene extends Phaser.Scene {
         onStatus: (s) => this.voiceControls?.show(s),
         onAudioLocked: showSoundBanner,
         askMic: askForMic,
-        volumeFor: (id) => savedVolume(this.remotes.get(id)?.info.name ?? ''),
+        volumeFor: (id) => savedVolume(id),
       },
       { forceRelay },
     );
@@ -214,6 +265,17 @@ export class HouseScene extends Phaser.Scene {
       },
     });
     addVoiceSettings(this.voice, this.voiceControls);
+    addRoomSettings(
+      () => [...this.rooms.values()].find((r) => r.owner_id && r.owner_id === currentUser()?.id) ?? null,
+      async (change) => {
+        const mine = [...this.rooms.values()].find((r) => r.owner_id === currentUser()?.id);
+        if (!mine) return 'not your room';
+        const err = await updateRoom(mine.id, change);
+        if (!err) await this.roomChanged({ ...mine, ...change });
+        return err;
+      },
+    );
+    void this.loadRooms();
     this.updateVoice();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
     window.addEventListener('pagehide', () => {
@@ -224,7 +286,7 @@ export class HouseScene extends Phaser.Scene {
 
   // Leaving a room cuts voice at once; joining waits until you've actually stepped in.
   private updateVoice() {
-    if (!this.voice) return;
+    if (!this.voice || this.presence?.isReplaced) return;
     this.voiceTimer?.remove();
     this.voiceTimer = null;
     const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
@@ -244,6 +306,65 @@ export class HouseScene extends Phaser.Scene {
     else if (s === 'offline') showWhere(this.zone, 'Offline', 'off');
     else if (this.zone && this.zone !== 'hallway') showWhere(this.zone, `${this.countIn(this.zone)} here`, 'ok');
     else showWhere(this.zone, `${this.activeCount()} in the house`, 'ok');
+  }
+
+  // Rooms from the database: names, moods, door states, owners. Kept live via the house channel.
+  private async loadRooms() {
+    const rooms = await loadRooms();
+    this.ownerNames = await loadNames([...new Set(rooms.map((r) => r.owner_id).filter((x): x is string => !!x))]);
+    for (const r of rooms) this.rooms.set(r.id, r);
+    this.showRooms();
+  }
+
+  private async roomChanged(room: Room) {
+    if (room.owner_id && !this.ownerNames.has(room.owner_id)) {
+      const names = await loadNames([room.owner_id]);
+      names.forEach((v, k) => this.ownerNames.set(k, v));
+    }
+    this.rooms.set(room.id, room);
+    this.showRooms();
+  }
+
+  private showRooms() {
+    const info = (zone: Zone) => {
+      if (zone === 'hallway') return { name: 'Hallway', mood: null };
+      const r = this.rooms.get(zone);
+      return { name: roomLabel(r, r?.owner_id ? this.ownerNames.get(r.owner_id) : undefined, `Room ${Number(zone.slice(-2))}`), mood: r?.mood ?? null };
+    };
+    setRoomInfo(info);
+    for (const id of ROOM_IDS) {
+      const r = this.rooms.get(id);
+      this.look.setRoom(id, { ...info(id), door: r?.door_state ?? 'open' });
+    }
+    this.showPresenceStatus(this.presenceState);
+  }
+
+  // Same person opened Diesel House somewhere else: this tab goes quiet until they take it back.
+  private replaced() {
+    this.voice?.leave();
+    this.canMove = false;
+    this.body.setVelocity(0, 0);
+    this.replacedToast?.();
+    this.replacedToast = toast({
+      icon: 'user-round',
+      id: 'replaced-toast',
+      who: 'You opened Diesel House somewhere else',
+      what: 'This tab has gone quiet.',
+      ttl: 0,
+      actions: [
+        {
+          label: 'Use it here',
+          id: 'use-here',
+          onClick: () => {
+            this.replacedToast = null;
+            this.presence?.reclaim();
+            this.canMove = true;
+            this.sendMove(true);
+            this.updateVoice();
+          },
+        },
+      ],
+    });
   }
 
   // Nameplate faces and room warmth, from who's where.
@@ -287,8 +408,8 @@ export class HouseScene extends Phaser.Scene {
     const r = this.remotes.get(id);
     if (!r || !this.voice?.hasPeer(id)) return;
     const name = r.info.name;
-    showVolumePopover(name, r.info.character, savedVolume(name), (v) => {
-      saveVolume(name, v);
+    showVolumePopover(name, r.info.character, savedVolume(id), (v) => {
+      saveVolume(id, v);
       this.voice?.setVolume(id, v);
     });
   }

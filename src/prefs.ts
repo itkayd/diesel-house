@@ -33,7 +33,7 @@ export const savedName = () => read(NAME_KEY)?.trim().slice(0, NAME_MAX) || null
 
 export const saveName = (name: string) => write(NAME_KEY, name);
 
-// How loud each person is for you, 0..1. Keyed by display name until accounts give us stable ids (Phase 5).
+// How loud each person is for you, 0..1, keyed by their account id.
 const VOLUME_KEY = 'diesel-house.volumes';
 
 function volumes(): Record<string, number> {

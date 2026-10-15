@@ -1,26 +1,49 @@
 import Phaser from 'phaser';
 import { ROOM_IDS, TILE_SIZE, type RoomId, type Zone } from '../config';
 import type { Dir } from '../characters';
-import { Presence, type PlayerInfo, type PosMsg } from '../net/presence';
-import { Voice } from '../net/voice';
-import { saveCharacter, savedCharacter, saveName, savedName } from '../prefs';
+// Presence and Voice (and the Supabase client behind them) load after the picker; see start().
+import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
+import { installAudioUnlock } from '../net/audio';
+import { msgStats } from '../net/stats';
+import type { Voice } from '../net/voice';
+import { saveCharacter, savedCharacter, saveName, savedName, savedVolume, saveVolume } from '../prefs';
 import { showStatus, showZone } from '../ui/overlay';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addChangeCharacterButton, pickCharacter } from '../ui/picker';
+import { askForMic } from '../ui/micPrompt';
+import { addSettings } from '../ui/settings';
+import { showVolumePopover, volumePopoverOpen } from '../ui/volumePopover';
+import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 
 const SPEED = 80; // px per second
-const SEND_EVERY = 100; // ms between position updates while moving (~10/s)
-const IDLE_RESEND = 5000; // ms between "still here" updates while standing still
-const INTERP_DELAY = 150; // ms: other players are drawn this far in the past so we can smooth between updates
-const STALE_AFTER = 15000; // ms without any update before someone is hidden (locked phone, closed tab)
+const SLOW = 0.5; // joystick half-push speed, as a fraction of SPEED
+// Movement messages: one when movement changes, a correction every 500 ms while walking, a heartbeat
+// every 15 s while standing still. Other screens extrapolate in between (dead reckoning).
+const CORRECT_EVERY = 500;
+const IDLE_RESEND = 15_000;
+const EXTRAPOLATE_MAX = 750; // ms past the last message we keep walking someone forward (then wait for news)
+const SNAP_OVER = 24; // px: corrections bigger than this jump; smaller ones glide
+const GLIDE_MS = 150; // ms to glide out a small correction
+const STALE_AFTER = 40_000; // ms without any message before someone is hidden (locked phone, closed tab)
 const JOIN_VOICE_AFTER = 300; // ms standing in a room before joining its voice (avoids flapping in doorways)
 
 type ZoneRect = { name: Zone; rect: Phaser.Geom.Rectangle };
-type Snapshot = { t: number; x: number; y: number; dir: Dir; moving: boolean };
+// Last movement heard from someone, with t already moved onto our clock.
+type Motion = { t: number; x: number; y: number; vx: number; vy: number; dir: Dir };
 // clockOffset: smallest (our clock - their clock) seen; maps their timestamps onto our timeline.
-type Remote = { avatar: Avatar; info: PlayerInfo; snaps: Snapshot[]; clockOffset: number; lastHeard: number; active: boolean };
+// glide: leftover display error from the last correction, faded out over GLIDE_MS.
+type Remote = {
+  avatar: Avatar;
+  info: PlayerInfo;
+  motion: Motion | null;
+  glide: { dx: number; dy: number; at: number };
+  clockOffset: number;
+  lastHeard: number;
+  active: boolean;
+};
+type Sent = { vx: number; vy: number; dir: Dir; at: number };
 
 export class HouseScene extends Phaser.Scene {
   private me!: Avatar;
@@ -36,11 +59,15 @@ export class HouseScene extends Phaser.Scene {
 
   private presence: Presence | null = null;
   private remotes = new Map<string, Remote>();
-  private lastSent = 0;
-  private wasMoving = false;
+  // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
+  private earlyMoves = new Map<string, MoveMsg>();
+  private sent: Sent | null = null;
+  readonly msgStats = msgStats; // dev checks: messages per minute
   private voice: Voice | null = null;
   private voiceControls: VoiceControls | null = null;
   private voiceTimer: Phaser.Time.TimerEvent | null = null;
+  private starting = false;
+  private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
 
   constructor() {
     super('House');
@@ -49,13 +76,22 @@ export class HouseScene extends Phaser.Scene {
   create() {
     const map = this.make.tilemap({ key: 'house' });
     const tiles = map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!;
-    map.createLayer('floor', tiles);
+    const floor = map.createLayer('floor', tiles)!;
     const walls = map.createLayer('walls', tiles)!;
     walls.setCollisionByExclusion([-1]);
 
     for (const obj of map.getObjectLayer('zones')!.objects) {
       if (obj.name === 'hallway' || (ROOM_IDS as readonly string[]).includes(obj.name))
         this.zones.push({ name: obj.name as Zone, rect: new Phaser.Geom.Rectangle(obj.x!, obj.y!, obj.width!, obj.height!) });
+      // Rooms whose floor is one of the plain greys get a colour (see scripts/build-map.mjs).
+      const tint = (obj.properties as { name: string; value: string }[] | undefined)?.find((p) => p.name === 'floorTint')?.value;
+      if (tint) {
+        const colour = Phaser.Display.Color.HexStringToColor(tint).color;
+        // Rooms above the hallway end in their doorway row, which has hallway floor: leave that untinted.
+        const hall = this.zones.find((z) => z.name === 'hallway')!.rect;
+        const rows = obj.height! / TILE_SIZE - (obj.y! < hall.y ? 1 : 0);
+        floor.forEachTile((t) => (t.tint = colour), this, obj.x! / TILE_SIZE, obj.y! / TILE_SIZE, obj.width! / TILE_SIZE, rows);
+      }
     }
     this.addRoomLabels();
 
@@ -77,6 +113,7 @@ export class HouseScene extends Phaser.Scene {
     // No key capture, so letters still reach text boxes (name, chat).
     this.keys = this.input.keyboard!.addKeys('up,down,left,right,w,a,s,d', false) as typeof this.keys;
     if (isTouchDevice()) this.joystick = new Joystick();
+    installAudioUnlock(); // first tap/key anywhere switches sound on (needed on iPhone)
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -85,8 +122,8 @@ export class HouseScene extends Phaser.Scene {
     this.scale.on('resize', this.fitCamera, this);
 
     addChangeCharacterButton(() => this.choose());
-    if (saved === null || name === null) this.choose();
-    else this.start();
+    if (saved === null || name === null) void this.choose();
+    else void this.start();
 
     if (import.meta.env.DEV) (window as unknown as { __house: HouseScene }).__house = this; // used by automated checks
   }
@@ -102,22 +139,26 @@ export class HouseScene extends Phaser.Scene {
     this.me.setCharacter(character);
     this.me.setName(name);
     if (this.presence) this.presence.update({ character, name });
-    this.start();
+    void this.start();
   }
 
   // Joins the house once we know who we are.
-  private start() {
+  private async start() {
     this.canMove = true;
-    if (this.presence) return;
+    if (this.starting) return;
+    this.starting = true;
+    showStatus('Connecting…', false);
+    const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
     this.presence = new Presence(
       { name: this.name, character: this.character, zone: this.zone },
       {
         onJoin: (p) => this.addRemote(p),
         onLeave: (id) => this.removeRemote(id),
         onInfo: (p) => this.updateRemote(p),
-        onPos: (m) => this.receivePos(m),
+        onMove: (m) => this.receiveMove(m),
         onStatus: (s) => this.showPresenceStatus(s),
       },
+      { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
     );
     this.presence.connect();
 
@@ -127,6 +168,9 @@ export class HouseScene extends Phaser.Scene {
       {
         onSpeaking: (id, on) => (id === this.presence!.id ? this.me : this.remotes.get(id)?.avatar)?.setSpeaking(on),
         onStatus: (s) => this.voiceControls?.show(s),
+        onAudioLocked: showSoundBanner,
+        askMic: askForMic,
+        volumeFor: (id) => savedVolume(this.remotes.get(id)?.info.name ?? ''),
       },
       { forceRelay },
     );
@@ -135,9 +179,13 @@ export class HouseScene extends Phaser.Scene {
       onPushToTalk: (on) => this.voice!.setPushToTalk(on),
       onTalking: (t) => this.voice!.setTalking(t),
     });
+    addSettings({ listMics: () => this.voice!.listMics(), onMicChange: (id) => void this.voice!.setMicDevice(id) });
     this.updateVoice();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
-    window.addEventListener('pagehide', () => this.voice?.leave());
+    window.addEventListener('pagehide', () => {
+      this.voice?.leave();
+      this.presence?.leave();
+    });
   }
 
   // Leaving a room cuts voice at once; joining waits until you've actually stepped in.
@@ -170,12 +218,29 @@ export class HouseScene extends Phaser.Scene {
   private addRemote(p: PlayerInfo) {
     const avatar = new Avatar(this, 0, 0, p.character, p.name);
     avatar.setVisible(false); // shown once we know where they are
-    this.remotes.set(p.id, { avatar, info: p, snaps: [], clockOffset: Infinity, lastHeard: 0, active: false });
-    this.sendPos(true); // so the newcomer sees us straight away
+    avatar.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapAvatar(p.id));
+    this.remotes.set(p.id, { avatar, info: p, motion: null, glide: { dx: 0, dy: 0, at: 0 }, clockOffset: Infinity, lastHeard: 0, active: false });
+    this.sendMove(true); // so the newcomer sees us straight away
+    const early = this.earlyMoves.get(p.id);
+    this.earlyMoves.delete(p.id);
+    if (early) this.receiveMove(early);
     this.showPresenceStatus('online');
   }
 
+  // Tapping someone you're in a voice room with opens their volume slider.
+  private tapAvatar(id: string) {
+    this.tappedAvatar = true;
+    const r = this.remotes.get(id);
+    if (!r || !this.voice?.hasPeer(id)) return;
+    const name = r.info.name;
+    showVolumePopover(name, savedVolume(name), (v) => {
+      saveVolume(name, v);
+      this.voice?.setVolume(id, v);
+    });
+  }
+
   private removeRemote(id: string) {
+    this.earlyMoves.delete(id);
     this.remotes.get(id)?.avatar.destroy();
     this.remotes.delete(id);
     this.showPresenceStatus('online');
@@ -189,63 +254,82 @@ export class HouseScene extends Phaser.Scene {
     r.info = { ...p, zone: r.info.zone }; // zone from position updates is fresher than presence
   }
 
-  private receivePos(m: PosMsg) {
+  private receiveMove(m: MoveMsg) {
     const r = this.remotes.get(m.id);
-    if (!r) return;
+    if (!r) {
+      if (this.earlyMoves.size < 32) this.earlyMoves.set(m.id, m);
+      return;
+    }
     const now = Date.now();
     r.clockOffset = Math.min(r.clockOffset, now - m.t);
-    const t = m.t + r.clockOffset;
-    if (r.snaps.length && t <= r.snaps[r.snaps.length - 1].t) return; // out of order
-    r.snaps.push({ t, x: m.x, y: m.y, dir: m.dir, moving: m.moving });
-    if (r.snaps.length > 30) r.snaps.shift();
+    const motion: Motion = { t: m.t + r.clockOffset, x: m.x, y: m.y, vx: m.vx, vy: m.vy, dir: m.dir };
+    if (r.motion && motion.t <= r.motion.t) return; // out of order
     r.info.zone = m.zone;
     r.lastHeard = now;
     if (!r.active) {
       r.active = true;
+      r.motion = motion;
       r.avatar.setPosition(m.x, m.y);
       r.avatar.setVisible(true);
       this.showPresenceStatus('online');
+      return;
     }
+    // Where the new message says they are now, versus where we're drawing them: glide small differences
+    // away, jump big ones (e.g. a wall stopped them before we heard).
+    r.motion = motion;
+    const [px, py] = this.predict(motion, now);
+    const dx = r.avatar.sprite.x - px;
+    const dy = r.avatar.sprite.y - py;
+    r.glide = Math.hypot(dx, dy) > SNAP_OVER ? { dx: 0, dy: 0, at: 0 } : { dx, dy, at: now };
   }
 
-  private sendPos(force = false) {
+  private predict(m: Motion, now: number): [number, number] {
+    const dt = Math.min(Math.max(now - m.t, 0), EXTRAPOLATE_MAX) / 1000;
+    return [m.x + m.vx * dt, m.y + m.vy * dt];
+  }
+
+  // Sends our movement only when it changes, plus corrections and a heartbeat (see CORRECT_EVERY).
+  private sendMove(force = false) {
     if (!this.presence) return;
-    const moving = this.body.velocity.lengthSq() > 0;
+    // Velocity we're really moving at: input, minus any direction a wall is blocking.
+    const b = this.body.blocked;
+    let { x: vx, y: vy } = this.body.velocity;
+    if ((vx < 0 && b.left) || (vx > 0 && b.right)) vx = 0;
+    if ((vy < 0 && b.up) || (vy > 0 && b.down)) vy = 0;
+    vx = Math.round(vx);
+    vy = Math.round(vy);
+    const dir = this.me.facing;
     const now = performance.now();
-    const due = moving ? SEND_EVERY : IDLE_RESEND;
-    const stopped = this.wasMoving && !moving;
-    if (!force && !stopped && now - this.lastSent < due) return;
-    this.lastSent = now;
-    this.wasMoving = moving;
-    this.presence.sendPos({ x: Math.round(this.player.x), y: Math.round(this.player.y), dir: this.me.facing, moving, zone: this.zone });
+    const s = this.sent;
+    const moving = vx !== 0 || vy !== 0;
+    const changed = !s || s.vx !== vx || s.vy !== vy || s.dir !== dir;
+    const due = s && now - s.at >= (moving ? CORRECT_EVERY : IDLE_RESEND);
+    if (!force && !changed && !due) return;
+    this.sent = { vx, vy, dir, at: now };
+    // Body position, not the sprite: the sprite only catches up with physics after this update runs.
+    const tenth = (n: number) => Math.round(n * 10) / 10; // whole pixels would make corrections wobble back and forth
+    this.presence.sendMove({ x: tenth(this.body.center.x), y: tenth(this.body.bottom), vx, vy, dir, zone: this.zone });
   }
 
-  // Draws each remote player a little in the past, blending between the two updates either side.
-  private interpolateRemotes() {
+  // Draws everyone else where their last message says they should be by now, gliding out corrections.
+  private moveRemotes() {
     const now = Date.now();
-    const renderT = now - INTERP_DELAY;
     for (const r of this.remotes.values()) {
       if (r.active && now - r.lastHeard > STALE_AFTER) {
         r.active = false;
-        r.snaps = [];
+        r.motion = null;
         r.avatar.setVisible(false);
         this.showPresenceStatus('online');
       }
-      const s = r.snaps;
-      if (!r.active || !s.length) continue;
-      while (s.length >= 2 && s[1].t <= renderT) s.shift();
-      const a = s[0];
-      const b = s[1];
-      let x = a.x;
-      let y = a.y;
-      if (b && renderT > a.t) {
-        const k = Math.min(1, (renderT - a.t) / (b.t - a.t));
-        x = a.x + (b.x - a.x) * k;
-        y = a.y + (b.y - a.y) * k;
-      }
-      const moved = Math.abs(x - r.avatar.sprite.x) + Math.abs(y - r.avatar.sprite.y) > 0.01;
+      if (!r.active || !r.motion) continue;
+      const m = r.motion;
+      let [x, y] = this.predict(m, now);
+      const k = r.glide.at ? Math.max(0, 1 - (now - r.glide.at) / GLIDE_MS) : 0;
+      x += r.glide.dx * k;
+      y += r.glide.dy * k;
       r.avatar.setPosition(x, y);
-      r.avatar.animate(moved || (b?.moving ?? a.moving), (b ?? a).dir);
+      const walking = (m.vx !== 0 || m.vy !== 0) && now - m.t < EXTRAPOLATE_MAX;
+      r.avatar.animate(walking, m.dir);
     }
   }
 
@@ -299,19 +383,22 @@ export class HouseScene extends Phaser.Scene {
       this.zone = zone;
       showZone(zone);
       this.presence?.update({ zone });
-      this.sendPos(true);
+      this.sendMove(true);
       this.updateVoice();
     } else {
-      this.sendPos();
+      this.sendMove();
     }
 
-    this.interpolateRemotes();
+    this.moveRemotes();
   }
 
   private inputVelocity() {
-    // Joystick wins over everything else; its push distance sets the speed.
-    if (this.joystick && (this.joystick.vector.x || this.joystick.vector.y))
-      return new Phaser.Math.Vector2(this.joystick.vector.x, this.joystick.vector.y).scale(SPEED);
+    // Joystick wins over everything else. Rounded to 8 directions and 2 speeds so thumb wobble
+    // doesn't count as a change of movement (each change is a network message).
+    if (this.joystick && (this.joystick.vector.x || this.joystick.vector.y)) {
+      const { x, y } = this.joystick.vector;
+      return eightWay(x, y).scale(Math.hypot(x, y) < 0.6 ? SPEED * SLOW : SPEED);
+    }
 
     const k = this.keys;
     let vx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
@@ -319,15 +406,19 @@ export class HouseScene extends Phaser.Scene {
 
     // Mouse: hold to walk towards the pointer. Touch uses the joystick instead.
     const p = this.input.activePointer;
-    if (!vx && !vy && p.isDown && !p.wasTouch) {
+    if (!p.isDown) this.tappedAvatar = false;
+    if (!vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !volumePopoverOpen()) {
       const dx = p.worldX - this.player.x;
       const dy = p.worldY - (this.player.y - 8);
-      if (Math.hypot(dx, dy) > 4) {
-        vx = dx;
-        vy = dy;
-      }
+      if (Math.hypot(dx, dy) > 4) return eightWay(dx, dy).scale(SPEED);
     }
     const v = new Phaser.Math.Vector2(vx, vy);
     return v.lengthSq() > 0 ? v.normalize().scale(SPEED) : v;
   }
+}
+
+// Unit vector along the nearest of the 8 compass directions.
+function eightWay(x: number, y: number) {
+  const a = Math.round(Math.atan2(y, x) / (Math.PI / 4)) * (Math.PI / 4);
+  return new Phaser.Math.Vector2(Math.round(Math.cos(a) * 1e6) / 1e6, Math.round(Math.sin(a) * 1e6) / 1e6);
 }

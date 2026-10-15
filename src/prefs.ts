@@ -32,3 +32,28 @@ export const saveCharacter = (index: number) => write(CHARACTER_KEY, String(inde
 export const savedName = () => read(NAME_KEY)?.trim().slice(0, NAME_MAX) || null;
 
 export const saveName = (name: string) => write(NAME_KEY, name);
+
+// How loud each person is for you, 0..1. Keyed by display name until accounts give us stable ids (Phase 5).
+const VOLUME_KEY = 'diesel-house.volumes';
+
+function volumes(): Record<string, number> {
+  try {
+    return JSON.parse(read(VOLUME_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function savedVolume(person: string) {
+  const v = volumes()[person];
+  return typeof v === 'number' && v >= 0 && v <= 1 ? v : 1;
+}
+
+export function saveVolume(person: string, v: number) {
+  write(VOLUME_KEY, JSON.stringify({ ...volumes(), [person]: v }));
+}
+
+// Which microphone to use on this device ('' = the system default).
+const MIC_KEY = 'diesel-house.mic-device';
+export const savedMicDevice = () => read(MIC_KEY) ?? '';
+export const saveMicDevice = (id: string) => write(MIC_KEY, id);

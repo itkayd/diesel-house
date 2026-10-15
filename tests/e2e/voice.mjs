@@ -24,6 +24,7 @@ async function player(name, character, { mic = true, query = '' } = {}) {
   await ctx.addInitScript(([n, c, mic]) => {
     localStorage.setItem('diesel-house.name', n);
     localStorage.setItem('diesel-house.character', c);
+    localStorage.setItem('diesel-house.mic-ok', '1'); // seen the mic explainer before (tested in audio.mjs)
     if (!mic) navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));
   }, [name, String(character), mic]);
   const page = await ctx.newPage();

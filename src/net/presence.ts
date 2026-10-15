@@ -1,20 +1,22 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Dir } from '../characters';
 import type { Zone } from '../config';
+import { countMessage } from './stats';
 import { supabase } from './supabase';
 
 // Who someone is (shared via Realtime presence; changes rarely).
 export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null };
-// Where someone is (shared via Realtime broadcast, ~10 times a second while moving). Zone rides along
-// because presence updates take a few seconds to spread, and voice needs to know within a second.
-// `t` is the sender's clock (ms), so the receiver can replay movement with its original timing.
-export type PosMsg = { id: string; x: number; y: number; dir: Dir; moving: boolean; zone: Zone | null; t: number };
+// How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
+// 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
+// presence updates take a few seconds to spread, and voice needs to know within a second.
+// `t` is the sender's clock (ms) when the position was taken.
+export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number };
 
 type Handlers = {
   onJoin: (p: PlayerInfo) => void;
   onLeave: (id: string) => void;
   onInfo: (p: PlayerInfo) => void;
-  onPos: (m: PosMsg) => void;
+  onMove: (m: MoveMsg) => void;
   onStatus: (status: 'connecting' | 'online' | 'offline') => void;
 };
 
@@ -30,6 +32,7 @@ export class Presence {
   constructor(
     info: Omit<PlayerInfo, 'id'>,
     private h: Handlers,
+    private opts: { lagMs?: number } = {},
   ) {
     this.info = { ...info, id: this.id };
   }
@@ -42,12 +45,18 @@ export class Presence {
     }
     this.h.onStatus('connecting');
     const ch = supabase.channel(CHANNEL, { config: { broadcast: { self: false }, presence: { key: this.id } } });
-    ch.on('broadcast', { event: 'pos' }, ({ payload }) => this.h.onPos(payload as PosMsg));
+    ch.on('broadcast', { event: 'move' }, ({ payload }) => {
+      countMessage('received', 'move');
+      const m = payload as MoveMsg;
+      // Dev-only: ?lag=200 delays incoming movement (with jitter) to check smoothing on slow links.
+      if (this.opts.lagMs) setTimeout(() => this.h.onMove(m), this.opts.lagMs * (0.75 + Math.random() * 0.5));
+      else this.h.onMove(m);
+    });
     ch.on('presence', { event: 'sync' }, () => this.sync());
     ch.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         this.h.onStatus('online');
-        void ch.track(this.info);
+        void ch.track(this.info); // also re-announces us after a dropped connection rejoins
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         this.h.onStatus('offline');
       }
@@ -82,9 +91,14 @@ export class Presence {
     if (this.channel?.state === 'joined') void this.channel.track(this.info);
   }
 
-  sendPos(m: Omit<PosMsg, 'id' | 't'>) {
+  sendMove(m: Omit<MoveMsg, 'id' | 't'>) {
     if (this.channel?.state !== 'joined' || !supabase?.realtime.isConnected()) return;
-    void this.channel.send({ type: 'broadcast', event: 'pos', payload: { ...m, id: this.id, t: Date.now() } });
+    countMessage('sent', 'move');
+    void this.channel.send({ type: 'broadcast', event: 'move', payload: { ...m, id: this.id, t: Date.now() } });
   }
 
+  // Tab closing: tell everyone straight away rather than waiting for the server to notice.
+  leave() {
+    if (this.channel?.state === 'joined') void this.channel.untrack();
+  }
 }

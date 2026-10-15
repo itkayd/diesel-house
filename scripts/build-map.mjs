@@ -31,15 +31,17 @@ const FLOOR = {
   slate: { base: 201, pattern: false },
 };
 
+// The free pack has only four patterned floors; its plain floors are all near the same grey-taupe, so
+// those get a colour tint (stored as a "floorTint" property on the room zone; HouseScene applies it).
 const ROOM_STYLES = [
   { wall: 'pink', floor: 'brick' },
-  { wall: 'mint', floor: 'stone' },
-  { wall: 'yellow', floor: 'yellow' },
-  { wall: 'brown', floor: 'rose' },
-  { wall: 'grey', floor: 'teal' },
-  { wall: 'red', floor: 'mauve' },
+  { wall: 'mint', floor: 'stone', tint: '#a9c6ff' }, // dusty blue
+  { wall: 'yellow', floor: 'teal' },
+  { wall: 'brown', floor: 'rose', tint: '#c4e3a4' }, // sage
+  { wall: 'grey', floor: 'yellow' },
+  { wall: 'red', floor: 'mauve', tint: '#dcbcff' }, // lavender
   { wall: 'beige', floor: 'herringbone' },
-  { wall: 'wood', floor: 'slate' },
+  { wall: 'wood', floor: 'slate', tint: '#ffcf8f' }, // warm amber
 ];
 const HALL_STYLE = { wall: 'beige', floor: 'grey' };
 
@@ -84,8 +86,8 @@ function carve(x0, y0, w, h, style, gaps = []) {
 
 const zones = [];
 let nextId = 1;
-const rect = (name, x, y, w, h) =>
-  zones.push({ id: nextId++, name, type: 'zone', x: x * 16, y: y * 16, width: w * 16, height: h * 16, rotation: 0, visible: true });
+const rect = (name, x, y, w, h, properties = []) =>
+  zones.push({ id: nextId++, name, type: 'zone', x: x * 16, y: y * 16, width: w * 16, height: h * 16, rotation: 0, visible: true, properties });
 
 // Hallway, with door gaps in its face for the 4 top rooms.
 const roomX = (i) => 1 + i * (ROOM_W + 1);
@@ -110,8 +112,9 @@ for (let i = 0; i < 8; i++) {
   }
   // Room zone includes its own door cell, so stepping through the door puts you in the room.
   const name = `room_${String(i + 1).padStart(2, '0')}`;
-  if (top) rect(name, x, y, ROOM_W, ROOM_H + 1);
-  else rect(name, x, y - 1, ROOM_W, ROOM_H + 1);
+  const props = style.tint ? [{ name: 'floorTint', type: 'color', value: style.tint }] : [];
+  if (top) rect(name, x, y, ROOM_W, ROOM_H + 1, props);
+  else rect(name, x, y - 1, ROOM_W, ROOM_H + 1, props);
 }
 
 // Spawn: west end of the hallway, just below its wall face.

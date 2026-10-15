@@ -18,6 +18,8 @@ import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
 import { addGuestSettings } from '../ui/guestSettings';
 import { el } from '../ui/modal';
+import { openCredits } from '../ui/credits';
+import { icon } from '../ui/icons';
 import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
@@ -196,8 +198,16 @@ export class HouseScene extends Phaser.Scene {
           await signOut();
           location.reload();
         });
+        const credits = el('button', 'dh-btn dh-btn--quiet', 'Credits');
+        credits.type = 'button';
+        credits.id = 'credits-button';
+        credits.addEventListener('click', openCredits);
+        out.prepend(icon('log-out'));
+        credits.style.flex = out.style.flex = '1';
+        const row = el('div', 'dh-row');
+        row.append(credits, out);
         const who = el('small', 'dh-lede', user.guest ? `Visiting as a guest (${this.name})` : `Signed in as ${this.name}`);
-        box.append(who, out);
+        box.append(who, row);
       },
       true,
     );

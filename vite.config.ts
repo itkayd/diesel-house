@@ -1,8 +1,9 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import vercel from './vercel.json';
 
 // Runs the Vercel functions in api/ during `npm run dev` (Vercel runs them in production).
-// Until logins exist (Phase 5), /api/turn requests from this computer may skip the sign-in check.
+// /api/turn requests from this computer may skip the sign-in check (used by the voice tests).
 const API: Record<string, string> = { turn: 'handleTurn', ping: 'handle', admin: 'handle', join: 'handle' }; // file -> exported handler
 
 function devApi(env: Record<string, string>): Plugin {
@@ -47,8 +48,10 @@ export default defineConfig(({ mode }) => {
     // `npm run dev:https` serves over https so phones on the Wi-Fi can use the microphone.
     plugins: [devApi(env), ...(mode === 'https' ? [basicSsl()] : [])],
     server: { host: true }, // reachable from a phone on the same Wi-Fi
-    // Phaser alone is ~1.2 MB and can't be split; Supabase and voice already load separately after the picker.
+    // `npm run build && npx vite preview` serves the built site with the same security headers as Vercel.
+    preview: { headers: Object.fromEntries(vercel.headers[0].headers.map((h) => [h.key, h.value])) },
+    // Phaser (~1.2 MB) plus the Supabase client the login needs can't be split; voice loads separately after the picker.
     // Two pages: the game, and Diesel's door list (admin.html).
-    build: { chunkSizeWarningLimit: 1300, rollupOptions: { input: { main: 'index.html', admin: 'admin.html' } } },
+    build: { chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', admin: 'admin.html' } } },
   };
 });

@@ -1,6 +1,7 @@
 // Vercel function: GET /api/turn -> { iceServers } with short-lived Twilio TURN credentials.
-// Only for signed-in members (Supabase access token in the Authorization header).
-// Twilio secrets are server-side env vars only (no VITE_ prefix).
+// Only for people allowed in the house: members, and guests admitted with an invite code (Supabase access
+// token in the Authorization header). Twilio secrets are server-side env vars only (no VITE_ prefix). An API key
+// (TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET) is preferred over the main auth token when set.
 
 type Env = Record<string, string | undefined>;
 type TwilioIceServer = { url?: string; urls?: string; username?: string; credential?: string };
@@ -10,31 +11,36 @@ const TTL_SECONDS = 4 * 60 * 60; // credentials last one long hangout
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
-// True if the bearer token belongs to a signed-in user on the guest list.
-async function isMember(request: Request, env: Env): Promise<boolean> {
+// True if the bearer token belongs to a member or an admitted guest.
+async function inTheHouse(request: Request, env: Env): Promise<boolean> {
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
   const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
   const key = env.VITE_SUPABASE_ANON_KEY;
   if (!token || !url || !key) return false;
-  const res = await fetch(`${url}/rest/v1/rpc/is_member`, {
-    method: 'POST',
-    headers: { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: '{}',
-  });
-  return res.ok && (await res.json()) === true;
+  const ask = async (fn: string) => {
+    const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    return res.ok && (await res.json()) === true;
+  };
+  return (await ask('is_member')) || (await ask('is_guest'));
 }
 
 export async function handleTurn(request: Request, env: Env, opts: { allowAnonymous?: boolean } = {}): Promise<Response> {
-  if (!opts.allowAnonymous && !(await isMember(request, env))) return json({ error: 'not signed in' }, 401);
+  if (!opts.allowAnonymous && !(await inTheHouse(request, env))) return json({ error: 'not signed in' }, 401);
 
   const sid = env.TWILIO_ACCOUNT_SID;
-  const secret = env.TWILIO_AUTH_TOKEN;
+  const [user, secret] = env.TWILIO_API_KEY_SID && env.TWILIO_API_KEY_SECRET
+    ? [env.TWILIO_API_KEY_SID, env.TWILIO_API_KEY_SECRET]
+    : [sid, env.TWILIO_AUTH_TOKEN];
   if (!sid || !secret) return json({ error: 'TURN not configured' }, 503);
 
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Tokens.json`, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${btoa(`${sid}:${secret}`)}`,
+      Authorization: `Basic ${btoa(`${user}:${secret}`)}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({ Ttl: String(TTL_SECONDS) }),

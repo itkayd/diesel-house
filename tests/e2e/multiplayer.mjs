@@ -23,9 +23,13 @@ process.on('uncaughtException', async (e) => { console.log(res.join('\n')); cons
 const A = await player('Alice test', 16);
 const B = await player('Bob test', 19);
 const status = (p) => p.page.locator('#status').textContent();
-await B.page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('2 in the house'), null, { timeout: 15000 }).catch(() => {});
-await A.page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('2 in the house'), null, { timeout: 15000 }).catch(() => {});
-check('both see "2 in the house"', [await status(A), await status(B)], (await status(A)).includes('2 in') && (await status(B)).includes('2 in'));
+const count = async (p) => Number((await status(p)).match(/(\d+) in the house/)?.[1] ?? NaN);
+// Real people may be in the house too, so compare counts with each other rather than expecting exactly 2.
+const ids = { A: await A.page.evaluate(() => window.__house.presence.id), B: await B.page.evaluate(() => window.__house.presence.id) };
+const sees = (p, id) => p.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, id, { timeout: 15000 }).then(() => true, () => false);
+const seeEachOther = (await sees(A, ids.B)) && (await sees(B, ids.A));
+const counts = [await count(A), await count(B)];
+check('A and B see each other and agree on the head count', { counts, seeEachOther }, seeEachOther && counts[0] === counts[1] && counts[0] >= 2);
 
 const aId = await A.page.evaluate(() => window.__house.presence.id);
 const remoteA = () => B.page.evaluate((id) => { const r = window.__house.remotes.get(id); return r && { x: +r.avatar.sprite.x.toFixed(1), y: +r.avatar.sprite.y.toFixed(1), visible: r.avatar.sprite.visible, anim: r.avatar.sprite.anims.currentAnim?.key, name: r.info.name, zone: r.info.zone, character: r.info.character }; }, aId);
@@ -81,10 +85,12 @@ r = { ...(await remoteA()), ms: Date.now() - tn };
 check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 17 && r.zone === 'room_01');
 
 // A leaves
+// Look for A specifically: real visitors may come and go at the same time, so the head count alone can mislead.
 await A.ctx.close();
-await B.page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('1 in the house'), null, { timeout: 20000 }).catch(() => {});
+const tl = Date.now();
+await B.page.waitForFunction((id) => !window.__house.remotes.get(id), ids.A, { timeout: 20000 }).catch(() => {});
 r = await remoteA();
-check('A closes the tab -> B sees them leave', { remote: r ?? null, status: await status(B) }, !r && (await status(B)).includes('1 in'));
+check('A closes the tab -> B sees them leave', { remote: r ?? null, ms: Date.now() - tl }, !r);
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 if (warnings.length) console.log('warnings (not failures):\n' + [...new Set(warnings)].join('\n'));

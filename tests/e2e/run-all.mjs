@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const files = ['auth', 'characters', 'joystick', 'multiplayer', 'movement', 'voice', 'voice-extras', 'audio', 'look', 'doors'];
+const files = ['auth', 'characters', 'joystick', 'multiplayer', 'movement', 'voice', 'voice-extras', 'audio', 'look', 'doors', 'chat'];
 let failed = 0;
 for (const f of files) {
   console.log(`\n== ${f}`);

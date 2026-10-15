@@ -15,6 +15,7 @@ export type PlayerInfo = { id: string; name: string; character: number; zone: Zo
 export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number };
 // Door messages, addressed to one person: a knock (to the owner), let in / not now (to the visitor), or
 // being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
+export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
 export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
@@ -27,6 +28,9 @@ type Handlers = {
   onStatus: (status: 'connecting' | 'online' | 'offline') => void;
   onRoomChange: (room: Room) => void;
   onDoor: (m: DoorMsg) => void;
+  // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
+  // this person may see.
+  onChat: (e: ChatChange) => void;
   // This person opened Diesel House in another tab or device, which takes over.
   onReplaced: () => void;
 };
@@ -73,6 +77,11 @@ export class Presence {
     });
     ch.on('presence', { event: 'sync' }, () => this.sync());
     ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, ({ new: row }) => this.h.onRoomChange(row as Room));
+    for (const table of ['messages', 'reactions'] as const)
+      ch.on('postgres_changes', { event: '*', schema: 'public', table }, (p) => {
+        if (p.eventType === 'INSERT' || p.eventType === 'DELETE')
+          this.h.onChat({ table, type: p.eventType, row: (p.eventType === 'INSERT' ? p.new : p.old) as Record<string, unknown> });
+      });
     ch.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
         this.h.onStatus('online');

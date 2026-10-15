@@ -23,6 +23,8 @@ export class Avatar {
   private isSpeaking = false;
   private name: string;
   private guest = false;
+  private bubble: Phaser.GameObjects.Container | null = null;
+  private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
 
   constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string, isMe = false) {
@@ -92,11 +94,34 @@ export class Avatar {
     this.sync();
   }
 
+  // A short chat message shown over their head for a few seconds (design/game/mvp.html .dh-bubble).
+  say(text: string) {
+    const scene = this.sprite.scene;
+    this.bubble?.destroy();
+    this.bubbleTimer?.remove();
+    const t = scene.add
+      .text(0, 0, text, { fontFamily: '"Atkinson Hyperlegible", sans-serif', fontSize: '6px', color: '#0d0912', wordWrap: { width: 66 }, lineSpacing: 0 })
+      .setOrigin(0.5, 1)
+      .setResolution(8);
+    const w = Math.ceil(t.width) + 8;
+    const h = Math.ceil(t.height) + 4;
+    const bg = scene.add.graphics();
+    bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
+    bg.fillStyle(0xfff4e0, 1).fillRect(-w / 2, -h, w, h);
+    t.setPosition(0, -2);
+    this.bubble = scene.add.container(this.sprite.x, this.sprite.y - TAG_GAP - 12, [bg, t]).setDepth(100001);
+    this.bubbleTimer = scene.time.delayedCall(4000, () => {
+      this.bubble?.destroy();
+      this.bubble = null;
+    });
+  }
+
   // Keeps depth sorting, the ring and the name tag in step with the sprite.
   sync() {
     this.sprite.setDepth(this.sprite.y);
     this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(this.sprite.y - 0.5);
     this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP));
+    this.bubble?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 12));
   }
 
   animate(moving: boolean, dir: Dir = this.facing) {
@@ -125,5 +150,7 @@ export class Avatar {
     this.sprite.destroy();
     this.tag.destroy();
     this.ring.destroy();
+    this.bubble?.destroy();
+    this.bubbleTimer?.remove();
   }
 }

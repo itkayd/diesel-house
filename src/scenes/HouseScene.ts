@@ -11,6 +11,7 @@ import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import { letIn, myPasses, removeFromRoom } from '../net/passes';
 import type { DoorMsg } from '../net/presence';
 import { addSoundSettings, loadSounds, play } from '../ui/sounds';
+import { ChatPanel } from '../ui/chat';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
 import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
@@ -92,6 +93,7 @@ export class HouseScene extends Phaser.Scene {
   private passes = new Set<RoomId>();
   private lastDoorNote = 0;
   private lastKnock = new Map<RoomId, number>();
+  private chat: ChatPanel | null = null;
 
   constructor() {
     super('House');
@@ -263,6 +265,15 @@ export class HouseScene extends Phaser.Scene {
         onStatus: (s) => this.showPresenceStatus(s),
         onRoomChange: (room) => void this.roomChanged(room),
         onDoor: (m) => void this.doorMessage(m),
+        onChat: (e) => {
+          this.chat?.event(e);
+          // Short new messages pop up over the sender's head.
+          const text = String(e.row.text ?? '');
+          if (e.table === 'messages' && e.type === 'INSERT' && text.length < 40) {
+            const id = String(e.row.author_id);
+            (id === this.presence?.id ? this.me : this.remotes.get(id)?.avatar)?.say(text);
+          }
+        },
         onReplaced: () => this.replaced(),
       },
       { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
@@ -293,6 +304,8 @@ export class HouseScene extends Phaser.Scene {
         if (room) void this.voice!.join(room);
       },
     });
+    this.chat = new ChatPanel(() => ({ id: this.presence!.id, name: this.name, character: this.character }));
+    this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
     addVoiceSettings(this.voice, this.voiceControls);
     addRoomSettings(
       () => [...this.rooms.values()].find((r) => r.owner_id && r.owner_id === currentUser()?.id) ?? null,
@@ -691,6 +704,7 @@ export class HouseScene extends Phaser.Scene {
       this.presence?.update({ zone });
       this.sendMove(true);
       this.updateVoice();
+      this.chat?.setRoom(zone && zone !== 'hallway' ? (zone as RoomId) : null);
     } else {
       this.sendMove();
     }
@@ -699,6 +713,11 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private inputVelocity() {
+    // Typing in a box (chat, names) must never walk your character around.
+    const focus = document.activeElement;
+    if (focus instanceof HTMLInputElement || focus instanceof HTMLTextAreaElement || focus instanceof HTMLSelectElement) {
+      if (!this.joystick || !(this.joystick.vector.x || this.joystick.vector.y)) return new Phaser.Math.Vector2(0, 0);
+    }
     // Joystick wins over everything else. Rounded to 8 directions and 2 speeds so thumb wobble
     // doesn't count as a change of movement (each change is a network message).
     if (this.joystick && (this.joystick.vector.x || this.joystick.vector.y)) {

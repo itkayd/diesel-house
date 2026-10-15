@@ -33,9 +33,19 @@ await page.fill('#email', 'not-an-email');
 await page.click('#go');
 const err = await page.locator('#err').textContent();
 check('bad email: friendly message, nothing sent', { err }, /Type the email address your invite went to/.test(err ?? ''));
+// 3. Diesel's door list is passcode-locked (wrong passcode, or not set up yet, either way: no list).
+const admin = await browser.newPage();
+await admin.goto('http://localhost:5173/admin.html');
+await admin.waitForSelector('#passcode');
+await admin.fill('#passcode', 'definitely-not-it');
+await admin.click('#lock button');
+await admin.waitForSelector('#lock .dh-error:not([hidden])', { timeout: 8000 }).catch(() => {});
+const lockMsg = await admin.locator('#lock .dh-error').textContent().catch(() => null);
+const listed = await admin.locator('[data-request], [data-guest]').count();
+check('door list: a wrong passcode shows nothing', { lockMsg, listed }, listed === 0 && /Wrong passcode|Set ADMIN_PASSCODE/.test(lockMsg ?? ''));
 await browser.close();
 
-// 3. A client holding only the publishable key (no login) cannot join the private channels.
+// 4. A client holding only the publishable key (no login) cannot join the private channels.
 const env = Object.fromEntries(
   readFileSync(new URL('../../.env', import.meta.url), 'utf8')
     .split(/\r?\n/)

@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-// Sign-in with an emailed magic link; only people on the guest list (public.allowed_emails, checked by
+// Sign-in with a magic link (sent by Diesel, see requestAccess); only people on the guest list (public.allowed_emails, checked by
 // public.is_member()) get into the house.
 
 export const NOT_ON_LIST = "That email isn't on the guest list. Ask Diesel to add you.";
@@ -11,20 +11,13 @@ export async function currentSession(): Promise<Session | null> {
   return (await supabase.auth.getSession()).data.session;
 }
 
-export async function sendMagicLink(email: string) {
+// Knocking: records the email for Diesel (public.access_requests). He gets each person a sign-in link
+// from /admin.html and emails it himself, so the house doesn't depend on Supabase's few-an-hour sender.
+export async function requestAccess(email: string) {
   if (!supabase) throw new Error('The house is offline right now. Try again later.');
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin, shouldCreateUser: true },
-  });
-  if (error)
-    throw new Error(
-      error.status === 422 || /not allowed|signups/i.test(error.message)
-        ? NOT_ON_LIST
-        : error.status === 429
-          ? 'Too many links sent just now. Wait a few minutes and try again.'
-          : "The link didn't send. Check your connection and try again.",
-    );
+  const { error } = await supabase.from('access_requests').insert({ email });
+  if (error && error.code !== '23505') // 23505: already knocking, that's fine
+    throw new Error("The knock didn't go through. Check your connection and try again.");
 }
 
 export async function isMember(): Promise<boolean> {

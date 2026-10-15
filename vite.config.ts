@@ -3,7 +3,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Runs the Vercel functions in api/ during `npm run dev` (Vercel runs them in production).
 // Until logins exist (Phase 5), /api/turn requests from this computer may skip the sign-in check.
-const API: Record<string, string> = { turn: 'handleTurn', ping: 'handle' }; // file -> exported handler
+const API: Record<string, string> = { turn: 'handleTurn', ping: 'handle', admin: 'handle' }; // file -> exported handler
 
 function devApi(env: Record<string, string>): Plugin {
   return {
@@ -18,7 +18,15 @@ function devApi(env: Record<string, string>): Plugin {
           const local = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
           const headers = new Headers();
           for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v);
-          const response: Response = await mod[API[name]](new Request(`http://localhost/api${req.url}`, { headers }), env, {
+          const method = req.method ?? 'GET';
+          let body: Buffer | undefined;
+          if (method !== 'GET' && method !== 'HEAD') {
+            const chunks: Buffer[] = [];
+            for await (const c of req) chunks.push(c as Buffer);
+            body = Buffer.concat(chunks);
+          }
+          const request = new Request(`http://${req.headers.host ?? 'localhost'}/api${req.url}`, { method, headers, body: body ? new Uint8Array(body) : undefined });
+          const response: Response = await mod[API[name]](request, env, {
             allowAnonymous: local,
           });
           res.statusCode = response.status;
@@ -40,6 +48,7 @@ export default defineConfig(({ mode }) => {
     plugins: [devApi(env), ...(mode === 'https' ? [basicSsl()] : [])],
     server: { host: true }, // reachable from a phone on the same Wi-Fi
     // Phaser alone is ~1.2 MB and can't be split; Supabase and voice already load separately after the picker.
-    build: { chunkSizeWarningLimit: 1300 },
+    // Two pages: the game, and Diesel's door list (admin.html).
+    build: { chunkSizeWarningLimit: 1300, rollupOptions: { input: { main: 'index.html', admin: 'admin.html' } } },
   };
 });

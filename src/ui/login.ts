@@ -1,5 +1,5 @@
 import './login.css';
-import { sendMagicLink } from '../net/auth';
+import { requestAccess } from '../net/auth';
 
 // The front door: design/login/login.html ported as-is (same copy, fonts, colours, animated living room).
 // Shown before the game when nobody is signed in. Resolves never by itself: the magic link brings the
@@ -32,12 +32,12 @@ const HTML = `
       </div>
       <p id="err" class="error" hidden></p>
       <button id="go" class="knock" type="submit">Knock on the door</button>
-      <p class="fine">Invite only. We email you a link that opens the door, so there's no password to remember.</p>
+      <p class="fine">Invite only. Diesel emails you a link that opens the door, so there's no password to remember.</p>
     </form>
     <div id="sent" hidden style="display:grid;gap:12px">
-      <h2>Check your inbox</h2>
-      <p class="lede">We sent a link to <span id="sentTo" class="email-out"></span>. Open it on this device and the door opens.</p>
-      <p class="fine">Nothing there after a minute? Check spam, or try again.</p>
+      <h2>Knock knock!</h2>
+      <p class="lede">Diesel heard you. He'll email a link to <span id="sentTo" class="email-out"></span>. Open it and the door opens.</p>
+      <p class="fine">He sends them himself, so it can take a little while. Check spam if it doesn't turn up.</p>
       <button id="again" class="linkish" type="button">Use a different email</button>
     </div>
   </section>
@@ -74,7 +74,7 @@ export function showLogin(error?: string) {
     go.disabled = true;
     go.textContent = 'Knocking…';
     try {
-      await sendMagicLink(address);
+      await requestAccess(address);
       $('#sentTo').textContent = address;
       form.hidden = true;
       sent.hidden = false;

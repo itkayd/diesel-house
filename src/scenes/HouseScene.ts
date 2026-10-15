@@ -8,6 +8,9 @@ import { msgStats } from '../net/stats';
 import { signOut } from '../net/auth';
 import { currentUser, loadNames, loadProfile, saveProfile } from '../net/profile';
 import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
+import { letIn, myPasses, removeFromRoom } from '../net/passes';
+import type { DoorMsg } from '../net/presence';
+import { addSoundSettings, loadSounds, play } from '../ui/sounds';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
 import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
@@ -84,6 +87,11 @@ export class HouseScene extends Phaser.Scene {
   private rooms = new Map<RoomId, Room>();
   private ownerNames = new Map<string, string>();
   private replacedToast: (() => void) | null = null;
+  // Doors: where each doorway is, which rooms you hold a pass for, and when you last knocked.
+  private doorSpots = new Map<RoomId, { x: number; y: number; north: boolean }>();
+  private passes = new Set<RoomId>();
+  private lastDoorNote = 0;
+  private lastKnock = new Map<RoomId, number>();
 
   constructor() {
     super('House');
@@ -129,6 +137,24 @@ export class HouseScene extends Phaser.Scene {
     this.body.setSize(10, 6).setOffset(3, 26);
     this.physics.add.collider(this.player, walls);
     this.physics.add.collider(this.player, this.look.solids); // furniture bases
+    // Doorways: an invisible barrier that only stops you going in when the door is shut to you.
+    const doorBlocks = this.physics.add.staticGroup();
+    for (const d of map.getObjectLayer('doors')?.objects ?? []) {
+      const room = d.name as RoomId;
+      const north = (d.properties as { name: string; value: string }[] | undefined)?.find((p) => p.name === 'side')?.value === 'north';
+      this.doorSpots.set(room, { x: d.x! + d.width! / 2, y: north ? d.y! + d.height! + 14 : d.y! - 6, north });
+      doorBlocks.add(this.add.rectangle(d.x!, d.y!, d.width!, d.height!).setOrigin(0).setVisible(false).setData('room', room));
+    }
+    doorBlocks.refresh();
+    this.physics.add.collider(
+      this.player,
+      doorBlocks,
+      (_p, b) => this.bumpDoor((b as Phaser.GameObjects.Rectangle).getData('room')),
+      (_p, b) => this.doorShut((b as Phaser.GameObjects.Rectangle).getData('room')),
+      this,
+    );
+    void loadSounds();
+    addSoundSettings();
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.body.setCollideWorldBounds(true);
 
@@ -236,6 +262,7 @@ export class HouseScene extends Phaser.Scene {
         onMove: (m) => this.receiveMove(m),
         onStatus: (s) => this.showPresenceStatus(s),
         onRoomChange: (room) => void this.roomChanged(room),
+        onDoor: (m) => void this.doorMessage(m),
         onReplaced: () => this.replaced(),
       },
       { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
@@ -282,6 +309,8 @@ export class HouseScene extends Phaser.Scene {
       return u && !u.guest ? u.id : null;
     });
     void this.loadRooms();
+    const me = currentUser();
+    if (me) void myPasses(me.id).then((p) => (this.passes = p));
     this.updateVoice();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
     window.addEventListener('pagehide', () => {
@@ -343,6 +372,102 @@ export class HouseScene extends Phaser.Scene {
       this.look.setRoom(id, { ...info(id), door: r?.door_state ?? 'open' });
     }
     this.showPresenceStatus(this.presenceState);
+  }
+
+  // ---- doors ----
+
+  private ownerName(room: RoomId) {
+    const owner = this.rooms.get(room)?.owner_id;
+    return owner ? (this.ownerNames.get(owner) ?? 'the owner') : null;
+  }
+
+  // Is this door shut to you right now? (Never stops you leaving a room you're already in.)
+  private doorShut(room: RoomId) {
+    const r = this.rooms.get(room);
+    if (!r || r.door_state === 'open' || this.zone === room) return false;
+    const me = currentUser()?.id;
+    return !(me && r.owner_id === me) && !this.passes.has(room);
+  }
+
+  // Walked into a shut door: knock (knock-first) or say it's locked.
+  private bumpDoor(room: RoomId) {
+    const now = Date.now();
+    if (now - this.lastDoorNote < 3500) return;
+    this.lastDoorNote = now;
+    const r = this.rooms.get(room)!;
+    const label = zoneLabel(room);
+    const owner = this.ownerName(room);
+    if (r.door_state === 'locked') {
+      toast({ icon: 'lock', who: `${label} is locked`, what: owner ? `Ask ${owner} to open the door.` : 'Nobody can go in right now.', ttl: 2600 });
+      return;
+    }
+    if (!r.owner_id || !this.remotes.get(r.owner_id)?.active) {
+      toast({ icon: 'hand', who: "Nobody's home", what: `${owner ?? 'The owner'} isn't in the house right now.`, ttl: 2600 });
+      return;
+    }
+    if (now - (this.lastKnock.get(room) ?? 0) < 10_000) {
+      toast({ icon: 'hand', who: 'Still waiting…', what: `${owner} hasn't answered yet.`, small: true, ttl: 2000 });
+      return;
+    }
+    this.lastKnock.set(room, now);
+    this.presence?.sendDoor({ kind: 'knock', room, to: r.owner_id, name: this.name, character: this.character });
+    play('knock');
+    toast({ icon: 'hand', who: `You knocked on ${owner}'s door`, what: 'Waiting for them to answer…', ttl: 3000 });
+  }
+
+  private async doorMessage(m: DoorMsg) {
+    const me = currentUser()?.id;
+    const room = this.rooms.get(m.room);
+    const label = zoneLabel(m.room);
+    if (m.kind === 'knock') {
+      if (!room || room.owner_id !== me) return; // only the owner answers
+      play('knock');
+      play('doorbell', 0.6);
+      toast({
+        face: m.character,
+        id: 'knock-toast',
+        who: `${m.name} is knocking`,
+        what: `at ${label}`,
+        ttl: 30_000,
+        actions: [
+          {
+            label: 'Let in',
+            id: 'let-in',
+            onClick: async () => {
+              const err = await letIn(m.room, m.from);
+              if (err) toast({ icon: 'lock', who: "Couldn't let them in", what: err, ttl: 3000 });
+              else this.presence?.sendDoor({ kind: 'let-in', room: m.room, to: m.from, name: this.name, character: this.character });
+            },
+          },
+          { label: 'Not now', quiet: true, id: 'not-now', onClick: () => this.presence?.sendDoor({ kind: 'not-now', room: m.room, to: m.from, name: this.name, character: this.character }) },
+        ],
+      });
+    } else if (m.kind === 'let-in') {
+      if (!me) return;
+      this.passes = await myPasses(me); // trust the database, not the message
+      if (!this.passes.has(m.room)) return;
+      play('door_open');
+      toast({ face: m.character, who: `${m.name} let you in`, what: 'Come in!', small: true, ttl: 2600 });
+    } else if (m.kind === 'not-now') {
+      toast({ face: m.character, who: `${m.name} can't let you in right now`, small: true, ttl: 2600 });
+    } else if (m.kind === 'kick') {
+      if (!room || room.owner_id !== m.from) return; // only the room's owner can ask you to leave
+      this.passes.delete(m.room);
+      if (this.zone === m.room) {
+        const spot = this.doorSpots.get(m.room);
+        this.voice?.leave();
+        if (spot) this.body.reset(spot.x, spot.y);
+        this.sendMove(true);
+      }
+      toast({ face: m.character, who: `${m.name} asked you to leave`, what: label, ttl: 3500 });
+    }
+  }
+
+  // Owner: take someone out of your room (their pass goes; they're moved to the hallway).
+  private async removeFromMyRoom(room: RoomId, id: string) {
+    const err = await removeFromRoom(room, id);
+    if (err && err !== 'offline') toast({ icon: 'lock', who: "Couldn't remove them", what: err, ttl: 3000 });
+    this.presence?.sendDoor({ kind: 'kick', room, to: id, name: this.name, character: this.character });
   }
 
   // Same person opened Diesel House somewhere else: this tab goes quiet until they take it back.
@@ -415,10 +540,18 @@ export class HouseScene extends Phaser.Scene {
     const r = this.remotes.get(id);
     if (!r || !this.voice?.hasPeer(id)) return;
     const name = r.info.name;
-    showVolumePopover(name, r.info.character, savedVolume(id), (v) => {
-      saveVolume(id, v);
-      this.voice?.setVolume(id, v);
-    });
+    const room = r.info.zone && r.info.zone !== 'hallway' ? (r.info.zone as RoomId) : null;
+    const mine = room && this.rooms.get(room)?.owner_id === currentUser()?.id ? room : null;
+    showVolumePopover(
+      name,
+      r.info.character,
+      savedVolume(id),
+      (v) => {
+        saveVolume(id, v);
+        this.voice?.setVolume(id, v);
+      },
+      mine ? { label: 'Remove from my room', id: 'remove-guest', onClick: () => void this.removeFromMyRoom(mine, id) } : undefined,
+    );
   }
 
   private removeRemote(id: string) {
@@ -448,6 +581,11 @@ export class HouseScene extends Phaser.Scene {
     const motion: Motion = { t: m.t + r.clockOffset, x: m.x, y: m.y, vx: m.vx, vy: m.vy, dir: m.dir };
     if (r.motion && motion.t <= r.motion.t) return; // out of order
     const moved = r.info.zone !== m.zone;
+    // Quiet sounds for people coming into or leaving the room you're in.
+    if (moved && r.active && this.zone && this.zone !== 'hallway') {
+      if (m.zone === this.zone) play('join', 0.5);
+      else if (r.info.zone === this.zone) play('leave', 0.5);
+    }
     r.info.zone = m.zone;
     r.lastHeard = now;
     if (moved && r.active) this.showPresenceStatus(this.presenceState);

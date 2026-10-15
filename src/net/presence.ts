@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Dir } from '../characters';
-import type { Zone } from '../config';
+import type { RoomId, Zone } from '../config';
 import type { Room } from './rooms';
 import { devTest } from './mode';
 import { countMessage } from './stats';
@@ -13,6 +13,9 @@ export type PlayerInfo = { id: string; name: string; character: number; zone: Zo
 // presence updates take a few seconds to spread, and voice needs to know within a second.
 // `t` is the sender's clock (ms) when the position was taken.
 export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number };
+// Door messages, addressed to one person: a knock (to the owner), let in / not now (to the visitor), or
+// being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
+export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
 
@@ -23,6 +26,7 @@ type Handlers = {
   onMove: (m: MoveMsg) => void;
   onStatus: (status: 'connecting' | 'online' | 'offline') => void;
   onRoomChange: (room: Room) => void;
+  onDoor: (m: DoorMsg) => void;
   // This person opened Diesel House in another tab or device, which takes over.
   onReplaced: () => void;
 };
@@ -61,6 +65,11 @@ export class Presence {
       // Dev-only: ?lag=200 delays incoming movement (with jitter) to check smoothing on slow links.
       if (this.opts.lagMs) setTimeout(() => this.h.onMove(m), this.opts.lagMs * (0.75 + Math.random() * 0.5));
       else this.h.onMove(m);
+    });
+    ch.on('broadcast', { event: 'door' }, ({ payload }) => {
+      countMessage('received', 'door');
+      const m = payload as DoorMsg;
+      if (m.to === this.id && !this.replaced) this.h.onDoor(m);
     });
     ch.on('presence', { event: 'sync' }, () => this.sync());
     ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, ({ new: row }) => this.h.onRoomChange(row as Room));
@@ -127,6 +136,12 @@ export class Presence {
     if (this.replaced || this.channel?.state !== 'joined' || !supabase?.realtime.isConnected()) return;
     countMessage('sent', 'move');
     void this.channel.send({ type: 'broadcast', event: 'move', payload: { ...m, id: this.id, t: Date.now() } });
+  }
+
+  sendDoor(m: Omit<DoorMsg, 'from'>) {
+    if (this.channel?.state !== 'joined') return;
+    countMessage('sent', 'door');
+    void this.channel.send({ type: 'broadcast', event: 'door', payload: { ...m, from: this.id } });
   }
 
   // Tab closing: tell everyone straight away rather than waiting for the server to notice.

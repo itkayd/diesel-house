@@ -7,7 +7,13 @@ let pop: HTMLDivElement | null = null;
 
 // Per-person volume card (design/game/mvp.html `openVolume`): face, name, close, slider.
 // Tap anywhere else to close.
-export function showVolumePopover(name: string, character: number, value: number, onChange: (v: number) => void) {
+export function showVolumePopover(
+  name: string,
+  character: number,
+  value: number,
+  onChange: (v: number) => void,
+  extra?: { label: string; id: string; onClick: () => void },
+) {
   closeVolumePopover();
   pop = el('div', 'dh-panel vol-pop');
   pop.id = 'volume-popover';
@@ -39,6 +45,16 @@ export function showVolumePopover(name: string, character: number, value: number
   slider.addEventListener('input', () => onChange(Number(slider.value) / 100));
   row.append(icon('volume-1', { width: 18 }), slider, icon('volume-2', { width: 18 }));
   pop.append(head, row);
+  if (extra) {
+    const b = el('button', 'dh-btn dh-btn--danger', extra.label);
+    b.type = 'button';
+    b.id = extra.id;
+    b.addEventListener('click', () => {
+      closeVolumePopover();
+      extra.onClick();
+    });
+    pop.append(b);
+  }
   overlay().appendChild(pop);
   // Close on the next tap outside the card (after this tap has finished).
   setTimeout(() => window.addEventListener('pointerdown', outside, true), 0);

@@ -1,0 +1,311 @@
+/* Diesel House — game UI theme (MVP reference).
+   Copy this file to src/ui/theme.css and import it once from index.html.
+   Same tokens as design/login/login.html, so the game and the login look like one app.
+   Pixel rules: hard outlines via box-shadow, no border-radius, no blur, no gradients on chrome.
+   Fonts: self-host Pixelify Sans (500/700) + Atkinson Hyperlegible (400/700) under public/assets/fonts/. */
+
+:root {
+  /* colour */
+  --night: #140f1c;        /* page + darkness overlay */
+  --panel: #2b2034;        /* card / sheet face */
+  --panel-hi: #3a2c46;     /* hovered row, raised surface */
+  --panel-edge: #0d0912;   /* 3px pixel outline */
+  --line: #4a3a57;         /* inner input outline, dividers */
+  --wood: #7a4b31;         /* nameplate wood */
+  --wood-hi: #9a6440;
+  --lamp: #f4b860;         /* the one accent: primary buttons, focus, highlights */
+  --lamp-deep: #c9822f;
+  --cream: #fff4e0;        /* text */
+  --muted: #bcaccb;        /* secondary text */
+  --faint: #75668a;        /* placeholders, disabled */
+  --ok: #6fdc8c;           /* speaking, connected, mic live */
+  --warn: #f4b860;         /* connecting */
+  --error: #ff8f7a;        /* blocked, muted, failed */
+
+  /* room moods (rooms.mood) */
+  --mood-gaming: #7fb2ff;
+  --mood-deeptalk: #ff9fb2;
+  --mood-music: #c99bff;
+  --mood-study: #9be0a8;
+  --mood-chill: #7fd8d0;
+  --mood-dnd: #ff8f7a;     /* do not disturb */
+
+  /* type */
+  --font-display: "Pixelify Sans", "Courier New", monospace;   /* titles, buttons, labels, room names */
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif; /* chat, body */
+  --fs-xs: 12px; --fs-sm: 14px; --fs-md: 16px; --fs-lg: 20px; --fs-xl: 26px;
+
+  /* frame */
+  --frame: 0 0 0 3px var(--panel-edge), inset 0 3px 0 rgba(255,244,224,.10), inset 0 -3px 0 rgba(0,0,0,.35);
+  --frame-drop: var(--frame), 5px 5px 0 3px rgba(13,9,18,.65);
+  --gap: 12px;
+  --tap: 48px;             /* minimum tap target */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  color-scheme: dark;
+}
+
+/* ---------- surfaces ---------- */
+.dh-panel {
+  background: var(--panel); color: var(--cream);
+  box-shadow: var(--frame-drop);
+  padding: 18px; display: grid; gap: var(--gap);
+  font-family: var(--font-body);
+}
+.dh-panel h2, .dh-title {
+  margin: 0; font-family: var(--font-display); font-weight: 700; font-size: var(--fs-lg); letter-spacing: .02em;
+}
+.dh-lede { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.45; }
+.dh-label {
+  font-family: var(--font-display); font-size: var(--fs-xs); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.dh-divider { height: 3px; background: var(--panel-edge); margin: 2px -18px; }
+
+/* ---------- buttons ---------- */
+.dh-btn {
+  font-family: var(--font-display); font-weight: 700; font-size: var(--fs-md); letter-spacing: .04em;
+  min-height: var(--tap); padding: 10px 16px 12px; border: 0; cursor: pointer;
+  color: var(--panel-edge); background: var(--lamp);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 var(--lamp-deep);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.dh-btn:hover { filter: brightness(1.06); }
+.dh-btn:active { transform: translateY(2px); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -2px 0 var(--lamp-deep); }
+.dh-btn:focus-visible, .dh-iconbtn:focus-visible, .dh-mic:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
+.dh-btn--quiet {
+  color: var(--cream); background: var(--panel-hi);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 rgba(0,0,0,.35);
+}
+.dh-btn--danger { color: var(--panel-edge); background: var(--error); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 #c45a48; }
+.dh-btn svg { width: 18px; height: 18px; }
+
+.dh-iconbtn {
+  width: var(--tap); height: var(--tap); border: 0; padding: 0; cursor: pointer; position: relative;
+  display: inline-grid; place-items: center; color: var(--cream);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 3px 0 rgba(255,244,224,.10), inset 0 -3px 0 rgba(0,0,0,.35);
+}
+.dh-iconbtn:hover { background: var(--panel-hi); }
+.dh-iconbtn svg { width: 22px; height: 22px; }
+.dh-badge-dot {
+  position: absolute; top: -5px; right: -5px; width: 12px; height: 12px;
+  background: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge);
+}
+
+/* big mic button — states: live | muted | ptt | talking | blocked */
+.dh-mic {
+  width: 72px; height: 72px; border: 0; cursor: pointer; position: relative;
+  display: grid; place-items: center; color: var(--panel-edge);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -5px 0 rgba(0,0,0,.30);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.dh-mic svg { width: 32px; height: 32px; }
+.dh-mic[data-state="live"], .dh-mic[data-state="talking"] { background: var(--ok); }
+.dh-mic[data-state="talking"] { animation: dh-pulse 0.9s steps(2) infinite; }
+.dh-mic[data-state="muted"] { background: var(--error); }
+.dh-mic[data-state="ptt"] { background: var(--panel-hi); color: var(--cream); }
+.dh-mic[data-state="blocked"] { background: var(--panel); color: var(--faint); }
+.dh-mic .dh-conn {   /* voice connection dot: ok | warn | error */
+  position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; box-shadow: 0 0 0 3px var(--panel-edge);
+}
+.dh-conn[data-s="ok"] { background: var(--ok); }
+.dh-conn[data-s="warn"] { background: var(--warn); animation: dh-blink 1s steps(2) infinite; }
+.dh-conn[data-s="error"] { background: var(--error); }
+@keyframes dh-pulse { 50% { box-shadow: 0 0 0 3px var(--panel-edge), 0 0 0 7px rgba(111,220,140,.45), inset 0 -5px 0 rgba(0,0,0,.30); } }
+@keyframes dh-blink { 50% { opacity: .35; } }
+
+/* ---------- pills, badges ---------- */
+.dh-pill {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px 5px;
+  background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge);
+  font-family: var(--font-display); font-size: var(--fs-sm); letter-spacing: .03em; white-space: nowrap;
+}
+.dh-pill svg { width: 16px; height: 16px; }
+.dh-pill .dh-sub { color: var(--muted); font-family: var(--font-body); font-size: var(--fs-xs); }
+.dh-dot { width: 8px; height: 8px; display: inline-block; box-shadow: 0 0 0 2px var(--panel-edge); }
+.dh-dot--ok { background: var(--ok); } .dh-dot--warn { background: var(--warn); } .dh-dot--off { background: var(--faint); }
+
+.dh-mood {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 2px;
+  font-family: var(--font-display); font-size: 11px; letter-spacing: .04em; color: var(--panel-edge);
+  box-shadow: 0 0 0 2px var(--panel-edge);
+}
+.dh-mood svg { width: 12px; height: 12px; }
+.dh-mood[data-mood="gaming"] { background: var(--mood-gaming); }
+.dh-mood[data-mood="deeptalk"] { background: var(--mood-deeptalk); }
+.dh-mood[data-mood="music"] { background: var(--mood-music); }
+.dh-mood[data-mood="study"] { background: var(--mood-study); }
+.dh-mood[data-mood="chill"] { background: var(--mood-chill); }
+.dh-mood[data-mood="dnd"] { background: var(--mood-dnd); }
+
+/* ---------- in-world: door nameplate, name tag, speaking ring (world units, scaled with the map) ---------- */
+.dh-nameplate {
+  display: grid; justify-items: center; gap: 2px; pointer-events: none;
+  font-family: var(--font-display);
+}
+.dh-nameplate .board {
+  background: var(--wood); color: var(--cream); padding: 1px 4px 2px; font-size: 7px; letter-spacing: .03em; line-height: 1.2;
+  box-shadow: 0 0 0 1px var(--panel-edge), inset 0 1px 0 var(--wood-hi), inset 0 -1px 0 rgba(0,0,0,.35);
+  display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+}
+.dh-nameplate .board svg { width: 6px; height: 6px; }
+.dh-nameplate .heads { display: inline-flex; gap: 1px; }
+.dh-nameplate .heads span {        /* 8×8 head crop of a character, set background via JS */
+  width: 8px; height: 8px; image-rendering: pixelated; background-repeat: no-repeat;
+  box-shadow: 0 0 0 1px var(--panel-edge); background-color: var(--panel);
+}
+.dh-nameplate .more { font-size: 6px; color: var(--cream); background: var(--panel); padding: 0 2px; box-shadow: 0 0 0 1px var(--panel-edge); }
+.dh-nameplate[data-door="locked"] .board { background: #4a3a57; }
+.dh-nameplate[data-door="knock"] .board { background: var(--lamp-deep); }
+
+.dh-tag {
+  font-family: var(--font-display); font-size: 6px; letter-spacing: .03em; line-height: 1; white-space: nowrap;
+  color: var(--cream); background: rgba(43,32,52,.92); padding: 1px 3px 2px; box-shadow: 0 0 0 1px var(--panel-edge);
+}
+.dh-tag--me { color: var(--lamp); }
+.dh-ring {
+  width: 18px; height: 7px; border-radius: 50%;  /* the only round thing: it's a floor shadow */
+  background: rgba(111,220,140,.35); box-shadow: 0 0 0 1px var(--ok);
+  animation: dh-ring 0.6s steps(2) infinite;
+}
+@keyframes dh-ring { 50% { transform: scale(1.25); opacity: .7; } }
+.dh-bubble {
+  font-family: var(--font-body); font-size: 6px; line-height: 1.25; max-width: 70px; color: var(--panel-edge);
+  background: var(--cream); padding: 2px 4px; box-shadow: 0 0 0 1px var(--panel-edge);
+}
+
+/* ---------- HUD layout (overlay on top of the canvas) ---------- */
+.dh-hud { position: absolute; inset: 0; pointer-events: none; font-family: var(--font-body); }
+.dh-hud > * { pointer-events: auto; }
+.dh-hud-tl { position: absolute; top: calc(14px + var(--safe-t)); left: calc(14px + var(--safe-l)); display: grid; gap: 10px; justify-items: start; }
+.dh-hud-tr { position: absolute; top: calc(14px + var(--safe-t)); right: calc(14px + var(--safe-r)); display: flex; gap: 12px; }
+.dh-hud-br { position: absolute; bottom: calc(18px + var(--safe-b)); right: calc(18px + var(--safe-r)); display: flex; align-items: end; gap: 14px; }
+.dh-hud-bl { position: absolute; bottom: calc(18px + var(--safe-b)); left: calc(18px + var(--safe-l)); }
+.dh-hud-tc { position: absolute; top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: grid; gap: 10px; width: min(92%, 380px); }
+
+/* joystick (touch only) */
+.dh-joy {
+  width: 124px; height: 124px; position: relative; touch-action: none;
+  background: rgba(13,9,18,.45); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 0 0 3px rgba(255,244,224,.12);
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);  /* octagon = pixel circle */
+}
+.dh-joy .knob {
+  position: absolute; left: 36px; top: 36px; width: 52px; height: 52px; background: var(--cream);
+  box-shadow: inset 0 -4px 0 var(--muted);
+  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+}
+
+/* toast (knocks, joins) */
+.dh-toast {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center;
+  background: var(--panel); color: var(--cream); padding: 12px; box-shadow: var(--frame-drop);
+  animation: dh-drop .18s steps(3);
+}
+.dh-toast .who { font-family: var(--font-display); font-size: var(--fs-md); }
+.dh-toast .what { color: var(--muted); font-size: var(--fs-sm); }
+.dh-toast .actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+.dh-toast .actions .dh-btn { flex: 1; min-height: 40px; font-size: var(--fs-sm); }
+.dh-toast--small { grid-template-columns: auto 1fr; padding: 8px 12px; }
+@keyframes dh-drop { from { transform: translateY(-12px); opacity: 0; } }
+
+/* portrait: 16×16 head crop shown at 2× or 3× */
+.dh-portrait {
+  width: 32px; height: 32px; image-rendering: pixelated; background-repeat: no-repeat;
+  background-color: var(--panel-hi); box-shadow: 0 0 0 2px var(--panel-edge); flex: none;
+}
+.dh-portrait--lg { width: 48px; height: 48px; }
+
+/* banner (tap to turn on sound, offline) */
+.dh-banner {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer;
+  background: var(--lamp); color: var(--panel-edge); font-family: var(--font-display); font-size: var(--fs-md);
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 var(--lamp-deep);
+}
+.dh-banner svg { width: 20px; height: 20px; }
+
+/* ---------- sheets: chat, settings (side panel on desktop, bottom sheet on phone) ---------- */
+.dh-sheet {
+  position: absolute; display: grid; grid-template-rows: auto 1fr auto; background: var(--panel); color: var(--cream);
+  box-shadow: 0 0 0 3px var(--panel-edge);
+}
+.dh-sheet--side { top: 0; right: 0; bottom: 0; width: min(340px, 42%); }
+.dh-sheet__head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; box-shadow: 0 3px 0 var(--panel-edge);
+  font-family: var(--font-display); font-size: var(--fs-md);
+}
+.dh-sheet__head .grow { flex: 1; min-width: 0; }
+.dh-sheet__body { overflow-y: auto; padding: 12px 14px; display: grid; align-content: start; gap: 12px; }
+.dh-sheet__foot { padding: 10px; box-shadow: 0 -3px 0 var(--panel-edge); display: flex; gap: 10px; }
+.dh-grip { width: 44px; height: 5px; background: var(--line); justify-self: center; margin: 8px auto 0; }
+
+/* chat */
+.dh-msg { display: grid; grid-template-columns: 32px 1fr; gap: 4px 10px; }
+.dh-msg .meta { display: flex; gap: 8px; align-items: baseline; }
+.dh-msg .name { font-family: var(--font-display); font-size: var(--fs-sm); }
+.dh-msg .time { font-size: 11px; color: var(--faint); }
+.dh-msg .text { grid-column: 2; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.dh-msg--cont { grid-template-columns: 32px 1fr; } .dh-msg--cont .dh-portrait, .dh-msg--cont .meta { visibility: hidden; height: 0; }
+.dh-reacts { grid-column: 2; display: flex; gap: 6px; flex-wrap: wrap; }
+.dh-react {
+  font-size: 13px; padding: 2px 6px; background: var(--panel-edge); color: var(--cream); border: 0; cursor: pointer;
+  box-shadow: inset 0 0 0 2px var(--line); display: inline-flex; gap: 4px; align-items: center;
+}
+.dh-react[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--lamp); }
+.dh-reactbar { display: flex; gap: 4px; padding: 6px; background: var(--panel-edge); box-shadow: 0 0 0 2px var(--line); width: max-content; }
+.dh-reactbar button { font-size: 18px; width: 34px; height: 34px; background: none; border: 0; cursor: pointer; }
+.dh-reactbar button:hover { background: var(--panel-hi); }
+.dh-day { justify-self: center; font-family: var(--font-display); font-size: 11px; color: var(--faint); letter-spacing: .08em; text-transform: uppercase; }
+
+/* form controls */
+.dh-input {
+  font: inherit; font-size: var(--fs-md); color: var(--cream); background: var(--panel-edge);
+  border: 0; border-radius: 0; padding: 11px 12px; width: 100%; box-sizing: border-box; min-height: 44px;
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.dh-input::placeholder { color: var(--faint); }
+.dh-input:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--lamp); }
+select.dh-input { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(-45deg, transparent 50%, var(--muted) 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 32px; }
+.dh-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.dh-row .txt { display: grid; gap: 2px; } .dh-row .txt small { color: var(--muted); font-size: 13px; }
+
+/* pixel switch */
+.dh-switch { appearance: none; width: 44px; height: 24px; margin: 0; cursor: pointer; position: relative; flex: none;
+  background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 16px; height: 16px; background: var(--muted); transition: transform 80ms steps(2); }
+.dh-switch:checked { box-shadow: inset 0 0 0 2px var(--lamp); }
+.dh-switch:checked::after { transform: translateX(20px); background: var(--lamp); }
+.dh-switch:focus-visible { outline: 3px solid var(--cream); outline-offset: 2px; }
+
+/* pixel range */
+.dh-range { appearance: none; width: 100%; height: 24px; background: transparent; cursor: pointer; }
+.dh-range::-webkit-slider-runnable-track { height: 8px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-range::-moz-range-track { height: 8px; background: var(--panel-edge); }
+.dh-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 22px; margin-top: -7px; background: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge), inset 0 -3px 0 var(--lamp-deep); }
+.dh-range::-moz-range-thumb { width: 16px; height: 22px; border: 0; border-radius: 0; background: var(--lamp); }
+
+/* character picker grid */
+.dh-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
+.dh-pick { height: 88px; border: 0; cursor: pointer; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: grid; place-items: center; }
+.dh-pick[aria-checked="true"] { box-shadow: inset 0 0 0 3px var(--lamp); background: #3b2a1f; }
+.dh-pick:focus-visible { outline: 3px solid var(--cream); outline-offset: 2px; }
+
+/* modal scrim */
+.dh-scrim { position: absolute; inset: 0; background: rgba(13,9,18,.7); display: grid; place-items: center; padding: 16px; }
+.dh-scrim > .dh-panel { width: min(100%, 420px); max-height: 100%; overflow: auto; box-sizing: border-box; }
+
+/* ---------- phone layout: switch with a container query on the game wrapper ---------- */
+.dh-game { container-type: size; container-name: game; }
+@container game (max-width: 640px) {
+  .dh-sheet--side { top: auto; left: 0; width: auto; height: 55%; }
+  .dh-hud-br { gap: 12px; }
+  .dh-scrim { place-items: end center; padding: 0; }
+  .dh-scrim > .dh-panel { width: 100%; max-height: 85%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-mic, .dh-ring, .dh-toast, .dh-conn { animation: none !important; }
+}

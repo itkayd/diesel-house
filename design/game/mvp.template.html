@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Diesel House MVP</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+/*THEME*/
+
+/* ---------- reference page only (not part of the game) ---------- */
+:root[data-theme="light"] { color-scheme: dark; }
+html, body { margin: 0; background: var(--night); color: var(--cream); font-family: var(--font-body); }
+* { box-sizing: border-box; }
+.page { max-width: 1180px; margin: 0 auto; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 36px; }
+.mast { display: grid; gap: 8px; }
+.mast h1 { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 5vw, 46px); line-height: 1;
+  text-shadow: 0 0 18px rgba(244,184,96,.45), 3px 3px 0 var(--panel-edge); }
+.mast p { margin: 0; color: var(--muted); max-width: 70ch; line-height: 1.5; }
+.mast .kicker { font-family: var(--font-display); color: var(--lamp); letter-spacing: .1em; text-transform: uppercase; font-size: 13px; }
+h2.sec { font-family: var(--font-display); font-size: 24px; margin: 0 0 6px; }
+.sec-lede { color: var(--muted); margin: 0 0 16px; max-width: 75ch; line-height: 1.5; }
+code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; color: var(--lamp); }
+
+/* stage */
+.stage { display: grid; gap: 14px; justify-items: center; }
+.frame { position: relative; width: 100%; height: min(640px, 72vh); background: var(--panel-edge); box-shadow: 0 0 0 3px var(--panel-edge), 8px 8px 0 3px rgba(0,0,0,.5); }
+.frame[data-device="phone"] { width: 390px; max-width: 100%; height: 760px; max-height: 86vh; }
+.dh-game { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+#view { position: absolute; inset: 0; overflow: hidden; cursor: crosshair; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: pixelated; }
+#world > img.base { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+.it, .ch { position: absolute; image-rendering: pixelated; background-repeat: no-repeat; }
+.ch { width: 16px; height: 32px; }
+.ch.click { cursor: pointer; }
+.wl { position: absolute; }
+#dark { position: absolute; left: 0; top: 0; pointer-events: none; mix-blend-mode: multiply; background: #8a7fae; z-index: 9000; transition: opacity .3s; }
+#glow { position: absolute; left: 0; top: 0; pointer-events: none; mix-blend-mode: screen; z-index: 9001; transition: opacity .3s; }
+.night-off #dark, .night-off #glow { opacity: 0; }
+.dh-tag, .dh-nameplate, .dh-bubble { position: absolute; z-index: 10000; transform: translateX(-50%); }
+.dh-ring { position: absolute; transform: translate(-50%, -50%); }
+
+.dock { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 100%; }
+.dock .dh-btn { min-height: 38px; font-size: 14px; padding: 6px 12px 8px; }
+.hint { color: var(--muted); font-size: 14px; text-align: center; }
+.hint kbd { font-family: var(--font-display); background: var(--panel); padding: 1px 6px; box-shadow: 0 0 0 2px var(--panel-edge); color: var(--cream); }
+
+/* hud bits specific to this demo */
+.vol-pop { position: absolute; width: 230px; z-index: 50; }
+#toasts { z-index: 40; }
+.empty { color: var(--muted); text-align: center; padding: 30px 10px; font-size: 14px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.seg button { min-height: 40px; font-family: var(--font-display); font-size: 14px; border: 0; cursor: pointer; color: var(--cream);
+  background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg button[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--lamp); color: var(--lamp); }
+.seg button svg { width: 15px; height: 15px; }
+.moods { display: flex; flex-wrap: wrap; gap: 8px; }
+.moods .dh-mood { font-size: 13px; padding: 4px 8px 5px; cursor: pointer; border: 0; }
+.moods .dh-mood svg { width: 14px; height: 14px; }
+.moods .dh-mood[aria-pressed="false"] { filter: saturate(.25) brightness(.7); }
+.pickface { width: 48px; height: 96px; image-rendering: pixelated; background-repeat: no-repeat; background-size: 1152px 96px; }
+
+/* docs */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.sw { background: var(--panel); box-shadow: 0 0 0 3px var(--panel-edge); }
+.sw .chip { height: 56px; box-shadow: 0 3px 0 var(--panel-edge); }
+.sw .lab { padding: 8px 10px; display: grid; gap: 2px; font-size: 13px; }
+.sw .lab b { font-family: var(--font-display); font-weight: 500; }
+.sw .lab span { color: var(--muted); }
+.spec { background: var(--panel); box-shadow: 0 0 0 3px var(--panel-edge); padding: 16px; display: grid; gap: 12px; align-content: start; }
+.spec > .lbl { font-family: var(--font-display); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.spec .demo { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 14px; background: var(--night); box-shadow: inset 0 0 0 2px var(--line); position: relative; }
+.spec .demo .dh-pill { white-space: normal; flex-wrap: wrap; max-width: 100%; }
+.spec .note { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0; }
+.worldpre { transform: scale(3); transform-origin: left top; display: flex; gap: 10px; align-items: end; height: 0; }
+.wbox { position: relative; height: 120px; background: #3a3348; box-shadow: inset 0 0 0 2px var(--line); overflow: hidden; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+.t th, .t td { text-align: left; padding: 6px 8px; box-shadow: inset 0 -1px 0 var(--line); vertical-align: middle; }
+.t th { font-family: var(--font-display); font-weight: 500; color: var(--muted); letter-spacing: .05em; }
+.t td .spr { image-rendering: pixelated; background-repeat: no-repeat; display: inline-block; }
+.scroll { max-height: 460px; overflow: auto; background: var(--panel); box-shadow: 0 0 0 3px var(--panel-edge); }
+.rules { display: grid; gap: 8px; margin: 0; padding-left: 20px; line-height: 1.5; }
+.rules li::marker { color: var(--lamp); }
+.files { display: grid; gap: 6px; }
+.files div { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 12px; padding: 8px 0; box-shadow: inset 0 -1px 0 var(--line); font-size: 14px; }
+@media (max-width: 600px) { .files div { grid-template-columns: 1fr; gap: 2px; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="mast">
+  <div class="kicker">MVP reference · for Claude Code</div>
+  <h1>Diesel House</h1>
+  <p>A working mock of the game built from the real LimeZu pixel sheets: a furnished, lit house, the HUD, door nameplates, knocking, room chat, settings and the character picker. Walk around below. Everything on this page uses <code>theme.css</code> and <code>sprites.json</code>, which live next to it in <code>design/game/</code>.</p>
+</header>
+
+<!-- ======================= LIVE MOCK ======================= -->
+<section class="stage" aria-label="Playable mockup">
+  <div class="frame" id="frame" data-device="desktop">
+    <div class="dh-game" id="game">
+      <div id="view"><div id="world"></div></div>
+
+      <div class="dh-hud" id="hud">
+        <div class="dh-hud-tl">
+          <div class="dh-pill" id="zonePill"></div>
+        </div>
+        <div class="dh-hud-tc" id="toasts"></div>
+        <div class="dh-hud-tr">
+          <button class="dh-iconbtn" id="btnProfile" aria-label="Your character"><i data-lucide="user-round"></i></button>
+          <button class="dh-iconbtn" id="btnSettings" aria-label="Settings"><i data-lucide="settings"></i></button>
+        </div>
+        <div class="dh-hud-bl" id="joyWrap" hidden><div class="dh-joy" id="joy"><div class="knob" id="knob"></div></div></div>
+        <div class="dh-hud-br" id="roomBtns" hidden>
+          <button class="dh-iconbtn" id="btnChat" aria-label="Room chat"><i data-lucide="message-square"></i><span class="dh-badge-dot" id="unread"></span></button>
+          <button class="dh-mic" id="mic" data-state="live" aria-label="Mute"><i data-lucide="mic"></i><span class="dh-conn" data-s="ok"></span></button>
+        </div>
+      </div>
+      <div id="layer"></div>
+    </div>
+  </div>
+
+  <div class="hint"><kbd>WASD</kbd> / arrows or hold the mouse to walk · click someone in your room for their volume · <kbd>Space</kbd> = talk in push-to-talk · the joystick appears in phone view</div>
+  <div class="dock">
+    <button class="dh-btn dh-btn--quiet" data-act="device"><i data-lucide="smartphone"></i> Phone view</button>
+    <button class="dh-btn dh-btn--quiet" data-act="night"><i data-lucide="moon"></i> Lighting</button>
+    <button class="dh-btn dh-btn--quiet" data-act="goto-room"><i data-lucide="door-open"></i> Go to Sami's room</button>
+    <button class="dh-btn dh-btn--quiet" data-act="goto-hall"><i data-lucide="house"></i> Hallway</button>
+    <button class="dh-btn dh-btn--quiet" data-act="knock-owner"><i data-lucide="hand"></i> Someone knocks</button>
+    <button class="dh-btn dh-btn--quiet" data-act="mic-card"><i data-lucide="mic"></i> Mic card</button>
+    <button class="dh-btn dh-btn--quiet" data-act="banner"><i data-lucide="volume-2"></i> Sound banner</button>
+    <button class="dh-btn dh-btn--quiet" data-act="picker"><i data-lucide="user-round"></i> Picker</button>
+    <button class="dh-btn dh-btn--quiet" data-act="settings"><i data-lucide="settings"></i> Settings</button>
+  </div>
+</section>
+
+<!-- ======================= HOW TO USE ======================= -->
+<section>
+  <h2 class="sec">How Claude Code should use this</h2>
+  <p class="sec-lede">This page is the target look for Phase 4.6 onwards. Match it; don't redesign it. Where the game and this page differ, this page wins on visuals and <code>NEXT.md</code> wins on behaviour.</p>
+  <div class="grid2">
+    <div class="spec">
+      <div class="lbl">Files in design/game/</div>
+      <div class="files">
+        <div><code>theme.css</code><span>All tokens and HUD components (<code>.dh-*</code>). Copy to <code>src/ui/theme.css</code>, import once, delete the inline styles in <code>src/ui/*</code>.</span></div>
+        <div><code>sprites.json</code><span>Every furniture piece: <code>px</code> = exact rect in <code>limezu_interiors.png</code>, <code>atlas</code> = rect in <code>furniture_atlas.png</code>.</span></div>
+        <div><code>furniture_atlas.png</code><span>Only the pieces we use, packed. Copy to <code>public/assets/furniture/</code>; load as a Phaser atlas from <code>sprites.json</code>.</span></div>
+        <div><code>build_mvp.py</code><span><code>ROOMS</code> and <code>HALL</code> are the furniture recipes (room-local px). Port them into <code>scripts/build-map.mjs</code> as a <code>furniture</code> object layer.</span></div>
+        <div><code>house_furnished.png</code><span>Static preview of the furnished house, for comparing screenshots.</span></div>
+        <div><code>mvp.html</code><span>This page (self-contained). Rebuild with <code>python design/game/build_mvp.py</code>.</span></div>
+      </div>
+    </div>
+    <div class="spec">
+      <div class="lbl">Port to Phaser</div>
+      <ol class="rules">
+        <li><b>Furniture:</b> one sprite per piece. Depth = bottom y (same rule as players), rugs depth 0, wall items depth 1. Collide on the bottom 8 px of solid pieces only, never rugs or wall items.</li>
+        <li><b>Night lighting:</b> full-map rectangle <code>#8a7fae</code> with MULTIPLY blend, then a soft radial light image per lamp with SCREEN/ADD blend (colours in <code>ROOMS</code>). Occupied rooms get an extra warm pool.</li>
+        <li><b>Nameplates:</b> over each doorway. Wood board = name + mood icon; lock/knock icon when not open; up to 4 heads then "+N".</li>
+        <li><b>Name tags and bubbles:</b> world-space, pixel font, never blurred (<code>setResolution(4)</code>).</li>
+        <li><b>HUD:</b> plain DOM over the canvas with the <code>.dh-*</code> classes. Chat is a side sheet on desktop and a bottom sheet under 640 px.</li>
+        <li><b>Characters:</b> this page shows only the 4 LimeZu people. The chibi sheets are left out on purpose (their artist asks that they aren't fed to AI); in the game they use the same tag, ring and portrait styles.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= TOKENS ======================= -->
+<section>
+  <h2 class="sec">Tokens</h2>
+  <p class="sec-lede">One accent (<b>lamp</b>). Everything else is night, plum panels and cream text. Status colours are only for status.</p>
+  <div class="swatches" id="swatches"></div>
+  <div class="grid2" style="margin-top:22px">
+    <div class="spec">
+      <div class="lbl">Type</div>
+      <div style="font-family:var(--font-display);font-size:26px;font-weight:700">Pixelify Sans 700 · Room names</div>
+      <div style="font-family:var(--font-display);font-size:16px;font-weight:500">Pixelify Sans 500 · buttons, labels, pills</div>
+      <div style="font-size:15px">Atkinson Hyperlegible · chat and body text, chosen for legibility at small sizes.</div>
+      <p class="note">Sizes: 12 / 14 / 16 / 20 / 26. In-world text: 6–7 px at map scale (≈ 18–21 px on screen).</p>
+    </div>
+    <div class="spec">
+      <div class="lbl">Frame</div>
+      <div class="demo"><div class="dh-panel" style="width:200px"><div class="dh-title">Pixel card</div><p class="dh-lede">3 px hard outline, inner bevel, offset shadow. No radius, no blur.</p></div></div>
+      <p class="note"><code>box-shadow: var(--frame-drop)</code>. Buttons get <code>inset 0 -4px 0</code> as their "pressable" lip.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= COMPONENTS ======================= -->
+<section>
+  <h2 class="sec">HUD components</h2>
+  <p class="sec-lede">Class names are the contract. All tap targets are at least 48 px.</p>
+  <div class="grid3" id="components"></div>
+</section>
+
+<section>
+  <h2 class="sec">In-world elements</h2>
+  <p class="sec-lede">Drawn at map scale (shown here at 3×). Nameplate states: open, knock, locked.</p>
+  <div class="grid3" id="inworld"></div>
+</section>
+
+<!-- ======================= ROOMS & SPRITES ======================= -->
+<section>
+  <h2 class="sec">Room recipes</h2>
+  <p class="sec-lede">Sample names and moods. Real names come from the <code>rooms</code> table in Phase 5; the furniture recipe stays with the room.</p>
+  <div class="scroll"><table class="t" id="roomsTable"></table></div>
+</section>
+
+<section>
+  <h2 class="sec">Furniture sprites</h2>
+  <p class="sec-lede">From <code>limezu_interiors.png</code>. <code>px</code> = x, y, w, h in the original sheet.</p>
+  <div class="scroll"><table class="t" id="spriteTable"></table></div>
+</section>
+
+</div>
+
+<script>
+(() => {
+const D = "__DATA__";
+const IM = "__IMGS__";
+const T = 16;
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const icons = () => window.lucide && lucide.createIcons();
+
+const MOOD = { gaming: ['gamepad-2', 'Gaming'], deeptalk: ['message-circle-heart', 'Deep talk'], music: ['music', 'Music'],
+  study: ['book-open', 'Study'], chill: ['sofa', 'Chill'], dnd: ['moon', 'Do not disturb'] };
+const DOOR = { open: ['door-open', 'Open'], knock: ['hand', 'Knock'], locked: ['lock', 'Locked'] };
+const CHARS = ['adam', 'alex', 'amelia', 'bob'];
+
+/* ---------- people (sample) ---------- */
+const people = [
+  { id: 'me', name: 'Diesel', ch: 'adam', x: D.spawn[0] + 220, y: D.spawn[1] + 6, dir: 3, me: true },
+  { id: 'sami', name: 'Sami', ch: 'alex', x: 16 + 52, y: 16 + 104, dir: 3 },
+  { id: 'amira', name: 'Amira', ch: 'amelia', x: 16 + 116, y: 16 + 98, dir: 2 },
+  { id: 'yusuf', name: 'Yusuf', ch: 'bob', x: 192 + 40, y: 320 + 120, dir: 0 },
+];
+const owners = { room_01: 'sami', room_02: 'me', room_03: 'zak', room_04: 'hodan', room_05: 'leila', room_06: 'yusuf', room_07: 'amira', room_08: 'omar' };
+const passes = new Set();
+let mic = 'live', ptt = false, talking = false, micAsked = false, night = true;
+
+/* ---------- world ---------- */
+const world = $('#world'), view = $('#view');
+world.style.width = D.W * T + 'px'; world.style.height = D.H * T + 'px';
+const base = el('img', 'base'); base.src = IM.BASE; base.alt = ''; world.append(base);
+
+for (const it of D.items) {
+  const a = D.atlas[it.k], e = el('div', 'it');
+  Object.assign(e.style, { left: it.x + 'px', top: it.y + 'px', width: it.w + 'px', height: it.h + 'px', zIndex: it.z,
+    backgroundImage: `url(${IM.ATLAS})`, backgroundPosition: `-${a[0]}px -${a[1]}px` });
+  e.title = it.k; world.append(e);
+}
+const dark = el('div'); dark.id = 'dark'; const glow = el('div'); glow.id = 'glow';
+for (const d of [dark, glow]) { d.style.width = D.W * T + 'px'; d.style.height = D.H * T + 'px'; world.append(d); }
+
+const hexA = (h, a) => `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${a})`;
+function paintLights() {
+  const g = [];
+  for (const it of D.items) if (it.light) {
+    const fire = it.k === 'fireplace', fairy = it.k === 'fairy_lights';
+    const r = fire ? 70 : fairy ? 26 : 46;
+    g.push(`radial-gradient(circle at ${it.x + it.w / 2}px ${it.y + (fairy ? 6 : it.h * 0.3)}px, ${hexA(it.light, fire ? .75 : .6)} 0, ${hexA(it.light, 0)} ${r}px)`);
+  }
+  for (const [rid, r] of Object.entries(D.rooms)) if (occupants(rid).length) {
+    g.push(`radial-gradient(ellipse 95px 80px at ${r.origin[0] + 80}px ${r.origin[1] + 96}px, rgba(244,184,96,.38) 0, rgba(244,184,96,0) 100%)`);
+  }
+  glow.style.background = g.join(',');
+}
+
+/* characters */
+for (const p of people) {
+  p.el = el('div', 'ch' + (p.me ? '' : ' click')); p.el.dataset.id = p.id;
+  p.tag = el('div', 'dh-tag' + (p.me ? ' dh-tag--me' : ''), p.name);
+  p.ring = el('div', 'dh-ring'); p.ring.hidden = true;
+  world.append(p.ring, p.el, p.tag);
+  p.frame = Math.random() * 6; p.moving = false;
+}
+function drawPerson(p, dt) {
+  p.frame = (p.frame + dt * (p.moving ? 10 : 8)) % 6;
+  const sheet = IM[`${p.ch}_${p.moving ? 'run' : 'idle'}`];
+  const f = p.dir * 6 + Math.floor(p.frame);
+  Object.assign(p.el.style, { left: Math.round(p.x - 8) + 'px', top: Math.round(p.y - 32) + 'px', zIndex: Math.round(p.y),
+    backgroundImage: `url(${sheet})`, backgroundPosition: `-${f * 16}px 0` });
+  Object.assign(p.tag.style, { left: Math.round(p.x) + 'px', top: Math.round(p.y - 41) + 'px' });
+  Object.assign(p.ring.style, { left: p.x + 'px', top: (p.y - 1) + 'px', zIndex: Math.round(p.y) - 1 });
+  if (p.bubble) Object.assign(p.bubble.style, { left: Math.round(p.x) + 'px', top: Math.round(p.y - 41 - p.bubble.offsetHeight - 3) + 'px' });
+}
+function headStyle(ch, size) { // 16x16 crop at (frame 18, y 8), drawn at `size` px
+  const k = size / 16; return `background-image:url(${IM[ch + '_idle']});background-size:${384 * k}px ${32 * k}px;background-position:-${18 * 16 * k}px -${8 * k}px`;
+}
+
+/* nameplates */
+const plates = {};
+function doorCenter(rid) {
+  const o = D.rooms[rid].origin, top = o[1] < 12 * T;
+  return { x: o[0] + 80, y: top ? 12 * T + 3 : 19 * T - 2, top };
+}
+function occupants(rid) { return people.filter(p => zoneAt(p.x, p.y) === rid); }
+function renderPlate(rid) {
+  const r = D.rooms[rid];
+  let pl = plates[rid];
+  if (!pl) { pl = plates[rid] = el('div', 'dh-nameplate'); world.append(pl); }
+  pl.dataset.door = r.door;
+  const occ = occupants(rid);
+  const heads = occ.slice(0, 4).map(p => `<span style="${headStyle(p.ch, 8)}" title="${p.name}"></span>`).join('') + (occ.length > 4 ? `<span class="more">+${occ.length - 4}</span>` : '');
+  const doorIcon = r.door === 'open' ? '' : `<i data-lucide="${DOOR[r.door][0]}"></i>`;
+  pl.innerHTML = (occ.length ? `<div class="heads">${heads}</div>` : '') +
+    `<div class="board">${doorIcon}${r.name}<i data-lucide="${MOOD[r.mood][0]}" style="color:var(--mood-${r.mood})"></i></div>`;
+  const c = doorCenter(rid);
+  Object.assign(pl.style, { left: c.x + 'px', top: c.top ? (c.y - (occ.length ? 10 : 0)) + 'px' : (c.y - 2) + 'px' });
+  icons();
+}
+function renderPlates() { for (const rid in D.rooms) renderPlate(rid); paintLights(); }
+
+/* ---------- collision & zones ---------- */
+const solid = (tx, ty) => tx < 0 || ty < 0 || tx >= D.W || ty >= D.H || D.walls[ty * D.W + tx] === 1;
+function blocked(x, y) {
+  for (const [dx, dy] of [[-5, -6], [5, -6], [-5, 0], [5, 0]]) if (solid(Math.floor((x + dx) / T), Math.floor((y + dy - 0.01) / T))) return true;
+  return false;
+}
+function zoneAt(x, y) {
+  for (const z of D.zones) if (x >= z.x && x < z.x + z.w && y - 3 >= z.y && y - 3 < z.y + z.h) return z.name;
+  return null;
+}
+
+/* ---------- HUD ---------- */
+const pill = $('#zonePill'), roomBtns = $('#roomBtns'), micBtn = $('#mic');
+let zone = null;
+function renderPill() {
+  if (!zone || zone === 'hallway') {
+    pill.innerHTML = `<i data-lucide="house"></i>Hallway <span class="dh-sub"><span class="dh-dot dh-dot--ok"></span> ${people.length} in the house</span>`;
+  } else {
+    const r = D.rooms[zone], n = occupants(zone).length;
+    pill.innerHTML = `<i data-lucide="door-open"></i>${r.name} <span class="dh-mood" data-mood="${r.mood}"><i data-lucide="${MOOD[r.mood][0]}"></i>${MOOD[r.mood][1]}</span><span class="dh-sub">${n} here</span>`;
+  }
+  icons();
+}
+function setMic(s) {
+  mic = s; micBtn.dataset.state = s;
+  const icon = s === 'muted' || s === 'blocked' ? 'mic-off' : 'mic';
+  micBtn.innerHTML = `<i data-lucide="${icon}"></i><span class="dh-conn" data-s="${s === 'blocked' ? 'error' : 'ok'}"></span>`;
+  micBtn.setAttribute('aria-label', { live: 'Mute', muted: 'Unmute', ptt: 'Hold to talk', talking: 'Talking', blocked: 'Mic blocked — listening only' }[s]);
+  icons(); me().ring.hidden = !(s === 'talking');
+}
+micBtn.addEventListener('click', () => { if (ptt) return; if (mic === 'blocked') return showMicCard(); setMic(mic === 'live' ? 'muted' : 'live'); });
+micBtn.addEventListener('pointerdown', () => { if (ptt) setMic('talking'); });
+for (const ev of ['pointerup', 'pointerleave']) micBtn.addEventListener(ev, () => { if (ptt && mic === 'talking') setMic('ptt'); });
+
+const me = () => people[0];
+function onZoneChange(prev) {
+  renderPill(); renderPlates();
+  const inRoom = zone && zone !== 'hallway';
+  roomBtns.hidden = !inRoom;
+  if (!inRoom) closeChat();
+  if (inRoom && !micAsked) { micAsked = true; showMicCard(); }
+  if (inRoom) $('#unread').hidden = zone !== 'room_01';
+  if (inRoom && prev !== zone) toast({ icon: 'door-open', who: D.rooms[zone].name, what: occupants(zone).length > 1 ? 'Voice connected' : 'Nobody else here yet', small: true, ttl: 2200 });
+}
+
+/* toasts */
+function toast({ icon, who, what, actions, small, ttl = 4500, face }) {
+  const t = el('div', 'dh-toast' + (small ? ' dh-toast--small' : ''));
+  const lead = face ? `<div class="dh-portrait dh-portrait--lg" style="${headStyle(face, 48)}"></div>` : `<i data-lucide="${icon}" style="width:24px;height:24px;color:var(--lamp)"></i>`;
+  t.innerHTML = `${lead}<div><div class="who">${who}</div><div class="what">${what}</div></div>`;
+  if (actions) {
+    const a = el('div', 'actions');
+    for (const [label, quiet, fn] of actions) { const b = el('button', 'dh-btn' + (quiet ? ' dh-btn--quiet' : ''), label); b.onclick = () => { t.remove(); fn && fn(); }; a.append(b); }
+    t.append(a);
+  }
+  $('#toasts').append(t); icons();
+  if (ttl) setTimeout(() => t.remove(), ttl);
+  return t;
+}
+
+/* ---------- doors: locked / knock (Phase 6 behaviour) ---------- */
+let lastDoorMsg = 0;
+function doorAllows(rid) {
+  const r = D.rooms[rid];
+  if (!r || r.door === 'open' || owners[rid] === 'me' || passes.has(rid)) return true;
+  const now = performance.now();
+  if (now - lastDoorMsg > 3500) {
+    lastDoorMsg = now;
+    const owner = r.name.split("'")[0];
+    if (r.door === 'locked') toast({ icon: 'lock', who: `${r.name} is locked`, what: `Ask ${owner} to open the door.`, ttl: 2600 });
+    else {
+      toast({ icon: 'hand', who: `You knocked on ${owner}'s door`, what: 'Waiting for them to answer…', ttl: 2400 });
+      setTimeout(() => { passes.add(rid); toast({ icon: 'door-open', who: `${owner} let you in`, what: 'Come in!', small: true, ttl: 2600 }); }, 2500);
+    }
+  }
+  return false;
+}
+
+/* ---------- movement ---------- */
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select')) return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); e.preventDefault(); }
+  if (e.code === 'Space' && ptt && zone && zone !== 'hallway') { e.preventDefault(); if (!e.repeat) setMic('talking'); }
+});
+addEventListener('keyup', e => { keys.delete(e.key.toLowerCase()); if (e.code === 'Space' && ptt && mic === 'talking') setMic('ptt'); });
+let pointerWalk = null;
+view.addEventListener('pointerdown', e => {
+  const t = e.target.closest('.ch.click');
+  if (t) return openVolume(people.find(p => p.id === t.dataset.id), e);
+  if (e.pointerType === 'mouse') { pointerWalk = e; view.setPointerCapture(e.pointerId); }
+});
+view.addEventListener('pointermove', e => { if (pointerWalk) pointerWalk = e; });
+view.addEventListener('pointerup', () => pointerWalk = null);
+
+/* joystick */
+const joy = $('#joy'), knob = $('#knob'); const jv = { x: 0, y: 0 };
+joy.addEventListener('pointerdown', e => { joy.setPointerCapture(e.pointerId); moveJoy(e); });
+joy.addEventListener('pointermove', e => { if (joy.hasPointerCapture(e.pointerId)) moveJoy(e); });
+for (const ev of ['pointerup', 'pointercancel']) joy.addEventListener(ev, () => { jv.x = jv.y = 0; knob.style.transform = ''; });
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect(); let dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
+  const L = Math.hypot(dx, dy), M = 36; if (L > M) { dx *= M / L; dy *= M / L; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`; jv.x = L > 6 ? dx / M : 0; jv.y = L > 6 ? dy / M : 0;
+}
+
+let Z = 3, cam = { x: 0, y: 0 };
+function fit() {
+  const w = view.clientWidth, h = view.clientHeight;
+  Z = Math.max(2, Math.min(4, Math.min(w / (19 * T), h / (12 * T))));
+  const phone = $('#frame').dataset.device === 'phone' || matchMedia('(pointer: coarse)').matches;
+  $('#joyWrap').hidden = !phone;
+}
+new ResizeObserver(fit).observe(view);
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const p = me(); let vx = 0, vy = 0;
+  if (!modalOpen()) {
+    if (keys.has('a') || keys.has('arrowleft')) vx--; if (keys.has('d') || keys.has('arrowright')) vx++;
+    if (keys.has('w') || keys.has('arrowup')) vy--; if (keys.has('s') || keys.has('arrowdown')) vy++;
+    if (jv.x || jv.y) { vx = jv.x; vy = jv.y; }
+    else if (!vx && !vy && pointerWalk) {
+      const r = view.getBoundingClientRect();
+      const wx = (pointerWalk.clientX - r.left) / Z + cam.x, wy = (pointerWalk.clientY - r.top) / Z + cam.y;
+      const dx = wx - p.x, dy = wy - (p.y - 8); if (Math.hypot(dx, dy) > 4) { vx = dx; vy = dy; }
+    }
+  }
+  const L = Math.hypot(vx, vy);
+  if (L > 0) {
+    const k = (jv.x || jv.y ? Math.min(1, L) : 1) * 80 * dt / L;
+    const nx = p.x + vx * k, ny = p.y + vy * k;
+    const tryMove = (x, y) => { const zz = zoneAt(x, y); if (blocked(x, y)) return false; if (zz && zz !== zone && zz !== 'hallway' && !doorAllows(zz)) return false; p.x = x; p.y = y; return true; };
+    if (!tryMove(nx, ny)) { tryMove(nx, p.y) || tryMove(p.x, ny); }
+    p.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 0 : 2) : (vy > 0 ? 3 : 1);
+  }
+  p.moving = L > 0;
+  const z = zoneAt(p.x, p.y);
+  if (z !== zone) { const prev = zone; zone = z; onZoneChange(prev); }
+  for (const q of people) drawPerson(q, dt);
+  // camera
+  const vw = view.clientWidth / Z, vh = view.clientHeight / Z;
+  const tx = Math.max(0, Math.min(D.W * T - vw, p.x - vw / 2)), ty = Math.max(0, Math.min(D.H * T - vh, p.y - 16 - vh / 2));
+  cam.x += (tx - cam.x) * Math.min(1, dt * 8); cam.y += (ty - cam.y) * Math.min(1, dt * 8);
+  if (D.W * T < vw) cam.x = (D.W * T - vw) / 2; if (D.H * T < vh) cam.y = (D.H * T - vh) / 2;
+  world.style.transform = `translate(${-Math.round(cam.x * Z)}px,${-Math.round(cam.y * Z)}px) scale(${Z})`;
+  requestAnimationFrame(loop);
+}
+
+/* speaking demo: Sami and Amira chat */
+setInterval(() => {
+  for (const id of ['sami', 'amira', 'yusuf']) { const q = people.find(p => p.id === id); q.ring.hidden = id === 'yusuf' ? true : Math.random() > 0.45; }
+}, 900);
+
+/* ---------- layers: chat, modals, popovers ---------- */
+const layer = $('#layer'); const game = $('#game');
+const modalOpen = () => !!game.querySelector('.dh-scrim');
+function closeModals() { game.querySelectorAll('.dh-scrim, .vol-pop').forEach(n => n.remove()); }
+function modal(inner) {
+  closeModals(); const s = el('div', 'dh-scrim'); const pnl = el('div', 'dh-panel', inner);
+  s.append(pnl); s.addEventListener('pointerdown', e => { if (e.target === s) s.remove(); }); game.append(s); icons(); return pnl;
+}
+
+function showMicCard() {
+  const p = modal(`<h2>Your mic, your call</h2><p class="dh-lede">Diesel House needs your microphone so people in this room can hear you. You can mute any time, and nothing is recorded.</p>
+    <div style="display:grid;gap:10px"><button class="dh-btn" data-r="on"><i data-lucide="mic"></i> Turn on mic</button>
+    <button class="dh-btn dh-btn--quiet" data-r="listen"><i data-lucide="headphones"></i> Just listen</button></div>`);
+  p.querySelector('[data-r="on"]').onclick = () => { closeModals(); setMic(ptt ? 'ptt' : 'live'); };
+  p.querySelector('[data-r="listen"]').onclick = () => { closeModals(); setMic('blocked'); toast({ icon: 'headphones', who: 'Listening only', what: 'Tap the mic button to turn it on later.', small: true, ttl: 2600 }); };
+}
+
+function showPicker() {
+  const p = modal(`<h2>Who are you?</h2><div style="display:grid;gap:6px"><label class="dh-label" for="pkName">Your name</label>
+    <input class="dh-input" id="pkName" maxlength="24" value="${me().name}" autocomplete="nickname"></div>
+    <div class="dh-label">Pick your character</div><div class="dh-picks" role="radiogroup" id="picks"></div>
+    <p class="dh-lede">In the game this grid has all 20 characters (16 chibis + these 4).</p>
+    <button class="dh-btn" id="pkDone"><i data-lucide="check"></i> Done</button>`);
+  const grid = p.querySelector('#picks'); let sel = me().ch;
+  for (const c of CHARS) {
+    const b = el('button', 'dh-pick'); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(c === sel)); b.setAttribute('aria-label', c);
+    b.innerHTML = `<div class="pickface" style="background-image:url(${IM[c + '_idle']});background-position:-${18 * 48}px 0"></div>`;
+    b.onclick = () => { sel = c; grid.querySelectorAll('.dh-pick').forEach(n => n.setAttribute('aria-checked', String(n === b))); };
+    grid.append(b);
+  }
+  p.querySelector('#pkDone').onclick = () => {
+    const n = p.querySelector('#pkName').value.trim();
+    if (!n) { p.querySelector('#pkName').focus(); return; }
+    me().name = n; me().ch = sel; me().tag.textContent = n; closeModals(); renderPlates();
+  };
+}
+
+function showSettings() {
+  const r = D.rooms.room_02;
+  const p = modal(`<div class="dh-row"><h2>Settings</h2><button class="dh-iconbtn" data-x aria-label="Close"><i data-lucide="x"></i></button></div>
+    <div style="display:grid;gap:6px"><label class="dh-label" for="stMic">Microphone</label>
+      <select class="dh-input" id="stMic"><option>Default — Laptop microphone</option><option>AirPods Pro</option><option>USB headset</option></select></div>
+    <label class="dh-row"><span class="txt">Push to talk<small>Hold the mic button or Space to talk</small></span><input type="checkbox" class="dh-switch" id="stPtt" ${ptt ? 'checked' : ''}></label>
+    <label class="dh-row"><span class="txt">Sound effects<small>Knocks, doors, people joining</small></span><input type="checkbox" class="dh-switch" checked></label>
+    <div style="display:grid;gap:6px"><span class="dh-label">Master volume</span><input type="range" class="dh-range" value="80"></div>
+    <div class="dh-divider"></div>
+    <div class="dh-title" style="font-size:17px">Your room</div>
+    <div style="display:grid;gap:6px"><label class="dh-label" for="stName">Room name</label><input class="dh-input" id="stName" maxlength="32" value="${r.name}"></div>
+    <div style="display:grid;gap:6px"><span class="dh-label">Door</span><div class="seg" id="stDoor"></div></div>
+    <div style="display:grid;gap:6px"><span class="dh-label">Mood</span><div class="moods" id="stMood"></div></div>
+    <div class="dh-divider"></div>
+    <div class="dh-row"><button class="dh-btn dh-btn--quiet" style="flex:1">Credits</button><button class="dh-btn dh-btn--quiet" style="flex:1"><i data-lucide="log-out"></i> Sign out</button></div>`);
+  p.querySelector('[data-x]').onclick = closeModals;
+  p.querySelector('#stPtt').onchange = e => { ptt = e.target.checked; setMic(ptt ? 'ptt' : 'live'); };
+  p.querySelector('#stName').oninput = e => { r.name = e.target.value || 'My room'; renderPlates(); };
+  const seg = p.querySelector('#stDoor');
+  for (const [k, [ic, lab]] of Object.entries(DOOR)) {
+    const b = el('button', '', `<i data-lucide="${ic}"></i>${lab}`); b.setAttribute('aria-pressed', String(r.door === k));
+    b.onclick = () => { r.door = k; seg.querySelectorAll('button').forEach(n => n.setAttribute('aria-pressed', String(n === b))); renderPlates(); };
+    seg.append(b);
+  }
+  const moods = p.querySelector('#stMood');
+  for (const [k, [ic, lab]] of Object.entries(MOOD)) {
+    const b = el('button', 'dh-mood', `<i data-lucide="${ic}"></i>${lab}`); b.dataset.mood = k; b.setAttribute('aria-pressed', String(r.mood === k));
+    b.onclick = () => { r.mood = k; moods.querySelectorAll('button').forEach(n => n.setAttribute('aria-pressed', String(n === b))); renderPlates(); renderPill(); };
+    moods.append(b);
+  }
+  icons();
+}
+
+function openVolume(p, e) {
+  if (!zone || zone === 'hallway' || zoneAt(p.x, p.y) !== zone) { toast({ icon: 'volume-x', who: p.name, what: 'Walk into their room to hear them.', small: true, ttl: 2000 }); return; }
+  closeModals();
+  const g = game.getBoundingClientRect(); const pop = el('div', 'dh-panel vol-pop');
+  pop.innerHTML = `<div class="dh-row" style="min-height:0"><div style="display:flex;gap:10px;align-items:center"><div class="dh-portrait" style="${headStyle(p.ch, 32)}"></div><b style="font-family:var(--font-display)">${p.name}</b></div>
+    <button class="dh-iconbtn" style="width:36px;height:36px" aria-label="Close"><i data-lucide="x"></i></button></div>
+    <div style="display:flex;gap:10px;align-items:center"><i data-lucide="volume-1" style="width:18px"></i><input type="range" class="dh-range" value="100" aria-label="${p.name}'s volume"><i data-lucide="volume-2" style="width:18px"></i></div>`;
+  pop.style.left = Math.min(g.width - 240, Math.max(10, e.clientX - g.left - 115)) + 'px';
+  pop.style.top = Math.max(70, e.clientY - g.top - 150) + 'px';
+  pop.querySelector('button').onclick = () => pop.remove();
+  game.append(pop); icons();
+}
+
+/* chat */
+const chatLog = {
+  room_01: [
+    { who: 'sami', t: '21:02', text: 'Who’s on tonight?', reacts: { '👀': 2 } },
+    { who: 'amira', t: '21:03', text: 'Me! Just made tea' },
+    { who: 'amira', t: '21:03', text: 'Diesel are you coming in or just lurking in the hallway' , reacts: { '😂': 3 } },
+    { who: 'sami', t: '21:05', text: 'Bringing the board game to Yusuf’s room after' },
+  ],
+};
+let chatEl = null;
+function closeChat() { if (chatEl) { chatEl.remove(); chatEl = null; } }
+function openChat() {
+  if (chatEl) return closeChat();
+  $('#unread').hidden = true;
+  const r = D.rooms[zone];
+  chatEl = el('div', 'dh-sheet dh-sheet--side');
+  chatEl.innerHTML = `<div><div class="dh-grip" hidden></div><div class="dh-sheet__head"><i data-lucide="message-square" style="width:18px"></i><span class="grow">${r.name}</span>
+    <button class="dh-iconbtn" style="width:36px;height:36px" aria-label="Close chat"><i data-lucide="x"></i></button></div></div>
+    <div class="dh-sheet__body" id="msgs"></div>
+    <form class="dh-sheet__foot"><input class="dh-input" placeholder="Message ${r.name}" maxlength="500" aria-label="Message"><button class="dh-iconbtn" aria-label="Send" style="background:var(--lamp);color:var(--panel-edge)"><i data-lucide="send"></i></button></form>`;
+  chatEl.querySelector('.dh-sheet__head button').onclick = closeChat;
+  const box = chatEl.querySelector('#msgs'); const log = chatLog[zone] ||= [];
+  const draw = () => {
+    box.innerHTML = log.length ? '<div class="dh-day">Today</div>' : '<div class="empty">No messages yet. Say hi.</div>';
+    let prev = null;
+    log.forEach((m, i) => {
+      const p = people.find(q => q.id === m.who);
+      const row = el('div', 'dh-msg' + (prev === m.who ? ' dh-msg--cont' : ''));
+      row.innerHTML = `<div class="dh-portrait" style="${headStyle(p.ch, 32)}"></div><div class="meta"><span class="name">${p.name}</span><span class="time">${m.t}</span></div><div class="text"></div>`;
+      row.querySelector('.text').textContent = m.text;
+      if (m.reacts && Object.keys(m.reacts).length) {
+        const rs = el('div', 'dh-reacts');
+        for (const [em, n] of Object.entries(m.reacts)) { const b = el('button', 'dh-react', `${em}<span>${n}</span>`); b.setAttribute('aria-pressed', String(!!(m.mine && m.mine[em]))); b.onclick = ev => { ev.stopPropagation(); react(m, em); }; rs.append(b); }
+        row.append(rs);
+      }
+      row.onclick = () => {
+        box.querySelectorAll('.dh-reactbar').forEach(n => n.remove());
+        const bar = el('div', 'dh-reactbar'); bar.style.gridColumn = '2';
+        for (const em of ['👍', '😂', '🔥', '❤️', '😮', '👀']) { const b = el('button', '', em); b.onclick = ev => { ev.stopPropagation(); react(m, em); }; bar.append(b); }
+        row.append(bar);
+      };
+      box.append(row); prev = m.who;
+    });
+    box.scrollTop = box.scrollHeight;
+  };
+  const react = (m, em) => { m.reacts ||= {}; m.mine ||= {}; if (m.mine[em]) { m.mine[em] = 0; m.reacts[em]--; if (!m.reacts[em]) delete m.reacts[em]; } else { m.mine[em] = 1; m.reacts[em] = (m.reacts[em] || 0) + 1; } draw(); };
+  chatEl.querySelector('form').onsubmit = e => {
+    e.preventDefault(); const inp = e.target.querySelector('input'); const text = inp.value.trim(); if (!text) return;
+    const d = new Date(); log.push({ who: 'me', t: d.toTimeString().slice(0, 5), text }); inp.value = ''; draw();
+    if (text.length <= 40) bubble(me(), text);
+  };
+  game.append(chatEl); draw(); icons();
+  const phone = game.clientWidth <= 640; chatEl.querySelector('.dh-grip').hidden = !phone;
+}
+function bubble(p, text) {
+  p.bubble?.remove(); p.bubble = el('div', 'dh-bubble'); p.bubble.textContent = text; world.append(p.bubble);
+  setTimeout(() => { p.bubble?.remove(); p.bubble = null; }, 4000);
+}
+$('#btnChat').onclick = openChat;
+$('#btnSettings').onclick = showSettings;
+$('#btnProfile').onclick = showPicker;
+
+/* dock */
+function teleport(x, y) { const p = me(); p.x = x; p.y = y; }
+document.querySelector('.dock').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const a = b.dataset.act;
+  if (a === 'device') { const f = $('#frame'); f.dataset.device = f.dataset.device === 'phone' ? 'desktop' : 'phone'; b.lastChild.textContent = f.dataset.device === 'phone' ? ' Desktop view' : ' Phone view'; closeChat(); setTimeout(fit, 0); }
+  if (a === 'night') { night = !night; game.classList.toggle('night-off', !night); }
+  if (a === 'goto-room') teleport(16 + 84, 16 + 128);
+  if (a === 'goto-hall') teleport(D.spawn[0] + 220, D.spawn[1] + 6);
+  if (a === 'knock-owner') toast({ face: 'bob', who: 'Yusuf is knocking', what: `at ${D.rooms.room_02.name}`, ttl: 0,
+    actions: [['Let in', false, () => toast({ icon: 'door-open', who: 'Yusuf can come in', what: 'Their pass lasts 12 hours.', small: true, ttl: 2400 })], ['Not now', true]] });
+  if (a === 'mic-card') showMicCard();
+  if (a === 'banner') { const t = el('button', 'dh-banner', '<i data-lucide="volume-2"></i>Tap to turn on sound'); t.onclick = () => t.remove(); $('#toasts').prepend(t); icons(); }
+  if (a === 'picker') showPicker();
+  if (a === 'settings') showSettings();
+});
+
+/* ---------- docs sections ---------- */
+const TOK = [['--night', 'page, darkness'], ['--panel', 'cards, sheets'], ['--panel-hi', 'raised, hover'], ['--panel-edge', 'pixel outline'],
+  ['--line', 'inputs, dividers'], ['--wood', 'nameplates'], ['--lamp', 'the accent'], ['--lamp-deep', 'button lip'], ['--cream', 'text'],
+  ['--muted', 'secondary text'], ['--faint', 'placeholder'], ['--ok', 'speaking, live'], ['--error', 'muted, blocked'],
+  ['--mood-gaming', 'mood'], ['--mood-deeptalk', 'mood'], ['--mood-music', 'mood'], ['--mood-study', 'mood'], ['--mood-chill', 'mood'], ['--mood-dnd', 'do not disturb']];
+const cs = getComputedStyle(document.documentElement);
+$('#swatches').innerHTML = TOK.map(([v, use]) => `<div class="sw"><div class="chip" style="background:var(${v})"></div><div class="lab"><b>${v}</b><span>${cs.getPropertyValue(v).trim()} · ${use}</span></div></div>`).join('');
+
+const comp = (title, demo, note) => `<div class="spec"><div class="lbl">${title}</div><div class="demo">${demo}</div><p class="note">${note}</p></div>`;
+$('#components').innerHTML = [
+  comp('Buttons', `<button class="dh-btn">Knock</button><button class="dh-btn dh-btn--quiet">Not now</button><button class="dh-btn dh-btn--danger">Remove</button>`,
+    '<code>.dh-btn</code>, <code>--quiet</code>, <code>--danger</code>. Primary = one per view.'),
+  comp('Icon buttons', `<button class="dh-iconbtn" aria-label="Settings"><i data-lucide="settings"></i></button><button class="dh-iconbtn" aria-label="Chat"><i data-lucide="message-square"></i><span class="dh-badge-dot"></span></button>`,
+    '<code>.dh-iconbtn</code> 48×48, Lucide 22 px. <code>.dh-badge-dot</code> = unread.'),
+  comp('Mic button states', ['live', 'muted', 'ptt', 'talking', 'blocked'].map(s => `<button class="dh-mic" data-state="${s}" title="${s}" style="width:56px;height:56px"><i data-lucide="${s === 'muted' || s === 'blocked' ? 'mic-off' : 'mic'}"></i><span class="dh-conn" data-s="${s === 'blocked' ? 'error' : s === 'ptt' ? 'warn' : 'ok'}"></span></button>`).join(''),
+    '<code>data-state</code>: live · muted · ptt · talking · blocked. Corner square = voice connection (ok / warn / error).'),
+  comp('Zone pill', `<div class="dh-pill"><i data-lucide="house"></i>Hallway <span class="dh-sub"><span class="dh-dot dh-dot--ok"></span> 4 in the house</span></div><div class="dh-pill"><i data-lucide="door-open"></i>Sami's room <span class="dh-mood" data-mood="chill"><i data-lucide="sofa"></i>Chill</span><span class="dh-sub">2 here</span></div>`,
+    'Top-left. Replaces the old zone + status badges.'),
+  comp('Mood badges', Object.entries(MOOD).map(([k, [ic, l]]) => `<span class="dh-mood" data-mood="${k}"><i data-lucide="${ic}"></i>${l}</span>`).join(''),
+    'Values match <code>rooms.mood</code>. <code>dnd</code> = do not disturb.'),
+  comp('Toasts', `<div class="dh-toast" style="width:100%"><div class="dh-portrait dh-portrait--lg" style="${headStyle('bob', 48)}"></div><div><div class="who">Yusuf is knocking</div><div class="what">at Diesel's den</div></div><div class="actions"><button class="dh-btn">Let in</button><button class="dh-btn dh-btn--quiet">Not now</button></div></div>`,
+    'Top-centre stack. Knock toasts stay until answered; info toasts fade after 2–4 s.'),
+  comp('Banner', `<button class="dh-banner"><i data-lucide="volume-2"></i>Tap to turn on sound</button>`, 'iPhone audio unlock. Top-centre, above toasts.'),
+  comp('Form controls', `<input class="dh-input" placeholder="Message Sami's room" style="flex:1;min-width:160px"><input type="checkbox" class="dh-switch" checked aria-label="switch"><input type="range" class="dh-range" style="width:140px" aria-label="volume">`,
+    '<code>.dh-input</code>, <code>.dh-switch</code>, <code>.dh-range</code>. Focus = lamp outline.'),
+  comp('Chat message', `<div style="display:grid;gap:10px;width:100%"><div class="dh-msg"><div class="dh-portrait" style="${headStyle('alex', 32)}"></div><div class="meta"><span class="name">Sami</span><span class="time">21:02</span></div><div class="text">Who's on tonight?</div><div class="dh-reacts"><button class="dh-react" aria-pressed="true">👀<span>2</span></button></div></div></div>`,
+    'Portrait = 16×16 head crop (frame 18, y 8). Consecutive messages from one person hide the header. Use OpenMoji SVGs in the game.'),
+  comp('Joystick', `<div class="dh-joy" style="transform:scale(.8)"><div class="knob" style="transform:translate(14px,-10px)"></div></div>`, 'Bottom-left, touch only. Octagon = pixel circle.'),
+].join('');
+
+const wbox = (inner, h = 120) => `<div class="wbox" style="height:${h}px"><div class="worldpre" style="padding:4px 6px">${inner}</div></div>`;
+const plateHTML = (door, name, mood, heads) => `<div class="dh-nameplate" data-door="${door}" style="position:static;transform:none">${heads ? `<div class="heads">${heads}</div>` : ''}<div class="board">${door === 'open' ? '' : `<i data-lucide="${DOOR[door][0]}"></i>`}${name}<i data-lucide="${MOOD[mood][0]}" style="color:var(--mood-${mood})"></i></div></div>`;
+const hd = c => `<span style="${headStyle(c, 8)}"></span>`;
+$('#inworld').innerHTML = [
+  comp('Nameplates', wbox(plateHTML('open', "Sami's room", 'chill', hd('alex') + hd('amelia')) + plateHTML('knock', "Zak's room", 'gaming') + plateHTML('locked', "Hodan's", 'study'), 110),
+    'Over each doorway. Heads = who is inside (max 4, then +N). Knock = amber board, locked = grey board + lock.'),
+  comp('Name tag, speaking ring, bubble', wbox(`<div style="position:relative;width:60px;height:30px"><div class="dh-bubble" style="position:absolute;left:0;top:-4px">brb tea</div></div><div style="display:grid;justify-items:center;gap:1px"><div class="dh-tag">Sami</div><div style="position:relative;width:16px;height:32px"><div class="dh-ring" style="position:absolute;left:8px;top:31px;transform:translate(-50%,-50%)"></div><div style="position:absolute;inset:0;background:url(${IM.alex_idle}) -288px 0"></div></div></div><div style="display:grid;justify-items:center;gap:1px"><div class="dh-tag dh-tag--me">Diesel</div><div style="width:16px;height:32px;background:url(${IM.adam_idle}) -288px 0"></div></div>`, 120),
+    'Your own tag is lamp-coloured. Ring pulses while someone talks. Bubble shows short chat messages (≤ 40 chars) for 4 s.'),
+  comp('Night lighting', `<div style="font-size:14px;line-height:1.5;color:var(--muted)">Toggle <b style="color:var(--cream)">Lighting</b> above the mock to compare. Darkness: <code>#8a7fae</code> multiply. Lamps: warm <code>#f4b860</code>, fire <code>#ff8a3d</code>, cool <code>#9ec9ff</code>, pink <code>#ffb3c7</code>. Occupied rooms: extra warm pool, so you can see where people are from the hallway.</div>`,
+    'Keep it subtle: the art must still read clearly.'),
+].join('');
+
+const R = D.rooms;
+$('#roomsTable').innerHTML = '<tr><th>Room</th><th>Sample name</th><th>Mood</th><th>Door</th><th>Theme</th><th>Furniture (key, x, y, flag)</th></tr>' +
+  Object.entries(R).map(([id, r]) => `<tr><td class="mono">${id}</td><td>${r.name}</td><td><span class="dh-mood" data-mood="${r.mood}"><i data-lucide="${MOOD[r.mood][0]}"></i>${MOOD[r.mood][1]}</span></td><td>${DOOR[r.door][1]}</td><td>${r.theme}</td><td class="mono" style="font-size:12px">${r.recipe.map(i => i.join(' ')).join(' · ')}</td></tr>`).join('');
+$('#spriteTable').innerHTML = '<tr><th>Sprite</th><th>Key</th><th>px in sheet</th><th>atlas</th><th>Size</th></tr>' +
+  Object.keys(D.sheet).sort().map(k => { const a = D.atlas[k], s = 2; return `<tr><td><span class="spr" style="width:${a[2] * s}px;height:${a[3] * s}px;background-image:url(${IM.ATLAS});background-size:${256 * s}px auto;background-position:-${a[0] * s}px -${a[1] * s}px"></span></td><td class="mono">${k}</td><td class="mono">${D.sheet[k].join(', ')}</td><td class="mono">${a.join(', ')}</td><td>${a[2]}×${a[3]}</td></tr>`; }).join('');
+
+/* ---------- start ---------- */
+fit(); renderPlates(); setMic('live'); zone = zoneAt(me().x, me().y); renderPill(); icons();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

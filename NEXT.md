@@ -75,6 +75,8 @@ In `scripts/build-map.mjs` the "flat" floors (`grey 198`, `rose 99`, `mauve 133`
 
 ## 4. Phase 4.6 — Visual pass
 
+**Visual target: `design/game/mvp.html`** (open it in a browser). It's a playable mock built from the real sprites, with `theme.css` (copy to `src/ui/theme.css`), `sprites.json` + `furniture_atlas.png` (furniture rects), and the room furniture recipes in `build_mvp.py`. Match it; where it differs from the text below, the mock wins on looks.
+
 The login screen (`design/login/login.html`) is cosy and pixel-styled; the game itself is bare floors with `system-ui` labels and emoji dots. Make the game match the login.
 
 ### 4.1 Design tokens (copy from the login design — single source of truth)

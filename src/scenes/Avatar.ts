@@ -4,45 +4,46 @@ import { animKey, type Dir } from '../characters';
 const PANEL = 0x2b2034;
 const EDGE = 0x0d0912;
 const CREAM = '#fff4e0';
+const LAMP = '#f4b860';
 const OK = 0x6fdc8c;
-const TAG_GAP = 33; // px above the feet
+const TAG_GAP = 32; // tag sits just above the head (feet - 32)
 
-// A character sprite with a name tag and a speaking ring. Position is the character's feet.
+// A character sprite with a name tag and a speaking ring (design/game/mvp.html .dh-tag / .dh-ring).
+// Position is the character's feet.
 export class Avatar {
   readonly sprite: Phaser.GameObjects.Sprite;
   private tag: Phaser.GameObjects.Container;
   private tagText: Phaser.GameObjects.Text;
   private tagBg: Phaser.GameObjects.Graphics;
   private ring: Phaser.GameObjects.Ellipse;
-  private pulse: Phaser.Tweens.Tween;
+  private pulse: Phaser.Time.TimerEvent;
   private character: number;
   private tagWanted = true;
   private isSpeaking = false;
   facing: Dir = 'down';
 
-  constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string) {
+  constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string, isMe = false) {
     this.character = character;
     this.sprite = scene.add.sprite(x, y, 'chibis_a').setOrigin(0.5, 1);
 
-    // Soft ring at the feet while talking: pulses gently (or sits still if reduced motion is on).
-    this.ring = scene.add.ellipse(x, y - 1, 20, 8, OK, 0.25).setStrokeStyle(1.5, OK, 0.95).setVisible(false);
+    // Floor ring while talking: a soft green oval that steps bigger and back (or sits still).
+    this.ring = scene.add.ellipse(x, y - 1, 18, 7, OK, 0.35).setStrokeStyle(1, OK, 1).setVisible(false);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.pulse = scene.tweens.add({
-      targets: this.ring,
-      scaleX: reduce ? 1 : 1.2,
-      scaleY: reduce ? 1 : 1.2,
-      alpha: reduce ? 1 : 0.55,
-      duration: 450,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
+    let big = false;
+    this.pulse = scene.time.addEvent({
+      delay: 300,
+      loop: true,
       paused: true,
+      callback: () => {
+        big = !big && !reduce;
+        this.ring.setScale(big ? 1.25 : 1).setAlpha(big ? 0.7 : 1);
+      },
     });
 
     this.tagText = scene.add
-      .text(0, 0, name, { fontFamily: '"Pixelify Sans", monospace', fontSize: '8px', color: CREAM })
+      .text(0, 0, name, { fontFamily: '"Pixelify Sans", monospace', fontSize: '6px', color: isMe ? LAMP : CREAM })
       .setOrigin(0.5, 1)
-      .setResolution(6);
+      .setResolution(8);
     this.tagBg = scene.add.graphics();
     this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText]).setDepth(100000);
     this.drawTagBg();
@@ -51,11 +52,11 @@ export class Avatar {
 
   private drawTagBg() {
     const w = Math.ceil(this.tagText.width) + 6;
-    const h = Math.ceil(this.tagText.height) + 1;
+    const h = Math.ceil(this.tagText.height) + 2;
     this.tagBg.clear();
-    this.tagBg.fillStyle(EDGE, 1).fillRoundedRect(-w / 2 - 1, -h - 1, w + 2, h + 2, 2.5);
-    this.tagBg.fillStyle(PANEL, 0.95).fillRoundedRect(-w / 2, -h, w, h, 2);
-    this.tagText.setPosition(0, 0.5);
+    this.tagBg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
+    this.tagBg.fillStyle(PANEL, 0.92).fillRect(-w / 2, -h, w, h);
+    this.tagText.setPosition(0, -1);
   }
 
   setCharacter(index: number) {
@@ -99,8 +100,7 @@ export class Avatar {
   setSpeaking(on: boolean) {
     this.isSpeaking = on && this.sprite.visible;
     this.ring.setVisible(this.isSpeaking);
-    if (this.isSpeaking) this.pulse.resume();
-    else this.pulse.pause();
+    this.pulse.paused = !this.isSpeaking;
   }
 
   get speaking() {

@@ -1,8 +1,12 @@
 import { unlockAudio } from '../net/audio';
-import { overlay } from './overlay';
+import { icon } from './icons';
+import { el, openModal } from './modal';
 
 const OK_KEY = 'diesel-house.mic-ok';
 let declinedThisVisit = false;
+
+// Tapping a blocked mic button asks again.
+export const resetMicDecline = () => (declinedThisVisit = false);
 
 // True if the browser will hand over the mic without asking (already allowed, or allowed here before).
 async function micAlreadyAllowed() {
@@ -19,47 +23,36 @@ async function micAlreadyAllowed() {
   }
 }
 
-// Explains why we want the mic before the browser's own prompt appears. Resolves true to go ahead,
-// false to just listen. `cancelled` resolves when the player walks out before answering.
+// "Your mic, your call" (design/game/mvp.html `showMicCard`), before the browser's own prompt.
+// Resolves true to go ahead, false to just listen. `cancelled` resolves if you walk out first.
 export async function askForMic(cancelled: Promise<void>): Promise<boolean> {
   if (await micAlreadyAllowed()) return true;
   if (declinedThisVisit) return false;
 
   return new Promise((resolve) => {
-    const card = document.createElement('div');
-    card.id = 'mic-prompt';
-    card.setAttribute('role', 'dialog');
-    card.setAttribute('aria-labelledby', 'mic-prompt-title');
-    card.className = 'dh-card dh-popover';
-    card.style.cssText = 'bottom:calc(120px + env(safe-area-inset-bottom));display:grid;gap:10px;text-align:center';
-    const title = document.createElement('div');
+    const { panel, scrim } = openModal('mic-prompt', { label: 'mic-prompt-title' });
+    const title = el('h2', '', 'Your mic, your call');
     title.id = 'mic-prompt-title';
-    title.textContent = 'Diesel House needs your mic to talk in rooms';
-    title.className = 'dh-title';
-    title.style.fontSize = '18px';
-    const body = document.createElement('div');
-    body.textContent = 'Your voice only goes to people in the same room. You can mute any time.';
-    body.className = 'dh-muted';
-    body.style.fontSize = '14px';
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:4px';
-    const button = (text: string, primary: boolean) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = text;
-      b.className = primary ? 'dh-btn primary' : 'dh-btn';
-      return b;
-    };
-    const yes = button('Turn on mic', true);
+    const body = el(
+      'p',
+      'dh-lede',
+      'Diesel House needs your microphone so people in this room can hear you. You can mute any time, and nothing is recorded.',
+    );
+    const buttons = el('div');
+    buttons.style.cssText = 'display:grid;gap:10px';
+    const yes = el('button', 'dh-btn');
+    yes.type = 'button';
     yes.id = 'mic-prompt-yes';
-    const no = button('Just listen', false);
+    yes.append(icon('mic'), 'Turn on mic');
+    const no = el('button', 'dh-btn dh-btn--quiet');
+    no.type = 'button';
     no.id = 'mic-prompt-no';
-    row.append(no, yes);
-    card.append(title, body, row);
-    overlay().appendChild(card);
+    no.append(icon('headphones'), 'Just listen');
+    buttons.append(yes, no);
+    panel.append(title, body, buttons);
 
     const done = (ok: boolean) => {
-      card.remove();
+      scrim.remove();
       resolve(ok);
     };
     yes.addEventListener('click', () => {
@@ -76,6 +69,6 @@ export async function askForMic(cancelled: Promise<void>): Promise<boolean> {
       declinedThisVisit = true;
       done(false);
     });
-    void cancelled.then(() => card.isConnected && done(false));
+    void cancelled.then(() => scrim.isConnected && done(false));
   });
 }

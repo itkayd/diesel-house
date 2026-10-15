@@ -1,20 +1,26 @@
 import Phaser from 'phaser';
 import { portraitFrame } from '../characters';
 import type { RoomId } from '../config';
+import { DOORS, iconDataUrl, MOOD_COLOURS, MOODS, type DoorState, type IconName, type Mood } from '../ui/icons';
+import { faceTop } from '../ui/portrait';
 
-// The look of the house: night tint with warm light pools, door frames, and nameplates over each door
-// showing the room's name and who's inside. Matches design/login/login.html.
+// The look of the house, after design/game/mvp.html: furniture sprites depth-sorted with people, a night
+// tint with warm light pools (and occupied rooms glowing), and a wooden nameplate over each door with
+// the room's name, door state, mood, and the faces of who's inside.
 
-const NIGHT_TINT = 0xb7aecd; // multiplied over everything: a ~25% dusk, like the login scene's night
-const LIGHT_DEPTH = 70_000; // above people and furniture tops (50 000), below name tags (100 000)
+const NIGHT = 0x8a7fae; // multiplied over everything, like the mock's #dark layer
+const LIGHT_DEPTH = 70_000; // above people (depth = feet y) and furniture, below name tags (100 000)
 const PLATE_DEPTH = 80_000;
-const ROOM_LIVE_ALPHA = 0.09; // extra warmth in rooms with people in them
+const ROOM_LIVE_ALPHA = 0.32;
 const WOOD = 0x7a4b31;
-const WOOD_DARK = 0x4d2e1e;
+const WOOD_HI = 0x9a6440;
+const LOCKED = 0x4a3a57;
+const KNOCK = 0xc9822f;
 const EDGE = 0x0d0912;
-const PANEL = 0x2b2034;
 const CREAM = '#fff4e0';
 const MAX_HEADS = 4;
+// Sit-on things you can walk over; everything else (not rugs or wall hangings) blocks at its base.
+const WALK_OVER = new Set(['stool', 'chair_a', 'chair_b', 'chair_c']);
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 const prop = (o: Obj, name: string) => (o.properties as { name: string; value: unknown }[] | undefined)?.find((p) => p.name === name)?.value;
@@ -26,16 +32,34 @@ function glowTexture(scene: Phaser.Scene) {
   const g = t.getContext();
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.45, 'rgba(255,255,255,0.45)');
   grad.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
   t.refresh();
 }
 
+// Lucide icons as small textures for the in-world nameplates (loaded once, async).
+const iconWaiters = new Map<string, (() => void)[]>();
+function iconTexture(scene: Phaser.Scene, name: IconName, colour: string, ready: () => void) {
+  const key = `icon-${name}-${colour}`;
+  if (scene.textures.exists(key)) return key;
+  if (!iconWaiters.has(key)) {
+    iconWaiters.set(key, []);
+    const img = new Image();
+    img.onload = () => {
+      if (!scene.textures.exists(key)) scene.textures.addImage(key, img);
+      iconWaiters.get(key)!.forEach((f) => f());
+    };
+    img.src = iconDataUrl(name, colour);
+  }
+  iconWaiters.get(key)!.push(ready);
+  return null;
+}
+
 export class HouseLook {
-  private roomGlow = new Map<RoomId, Phaser.GameObjects.Rectangle>();
+  private roomGlow = new Map<RoomId, Phaser.GameObjects.Image>();
   private plates = new Map<RoomId, Nameplate>();
+  readonly solids: Phaser.Physics.Arcade.StaticGroup;
 
   constructor(
     private scene: Phaser.Scene,
@@ -44,65 +68,74 @@ export class HouseLook {
   ) {
     glowTexture(scene);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.solids = scene.physics.add.staticGroup();
+    const sheet = scene.textures.get('limezu_interiors');
 
-    // Night: tint the whole house (people included), then add warm light back.
+    for (const o of map.getObjectLayer('furniture')?.objects ?? []) {
+      const key = o.name;
+      if (!sheet.has(key)) sheet.add(key, 0, Number(prop(o, 'sx')), Number(prop(o, 'sy')), o.width!, o.height!);
+      const x = o.x!;
+      const y = o.y!;
+      const w = o.width!;
+      const h = o.height!;
+      // Rugs under everyone; wall hangings just above the walls; the rest sorted with people by base.
+      const depth = o.type === 'rug' ? 1 : o.type === 'wall' ? 2 : y + h;
+      scene.add.image(x, y, 'limezu_interiors', key).setOrigin(0).setDepth(depth);
+      if (o.type === 'thing' && !WALK_OVER.has(key)) {
+        // Block only the base, so you can stand "behind" the top of tall things.
+        const bh = w <= 16 ? 5 : Math.max(6, Math.round(h * 0.45));
+        const block = scene.add.rectangle(x + 1, y + h - bh, w - 2, bh).setOrigin(0).setVisible(false);
+        this.solids.add(block);
+      }
+      const light = prop(o, 'light');
+      if (light) this.addLight(o, String(light), reduce);
+    }
+    this.solids.refresh();
+
+    // Night: tint everything (people included), then add warm light back.
     scene.add
-      .rectangle(0, 0, map.widthInPixels, map.heightInPixels, NIGHT_TINT)
+      .rectangle(0, 0, map.widthInPixels, map.heightInPixels, NIGHT)
       .setOrigin(0)
       .setBlendMode(Phaser.BlendModes.MULTIPLY)
       .setDepth(LIGHT_DEPTH);
     for (const r of rooms) {
+      // A warm wash over rooms with people in them: you can see which rooms are lively from the hallway.
+      const top = r.rect.y < 12 * 16;
+      const ox = r.rect.x;
+      const oy = top ? r.rect.y : r.rect.y + 16;
       const glow = scene.add
-        .rectangle(r.rect.x, r.rect.y, r.rect.width, r.rect.height, 0xf4b860, 1)
-        .setOrigin(0)
+        .image(ox + 80, oy + 96, 'glow')
+        .setDisplaySize(190, 160)
+        .setTint(0xf4b860)
         .setAlpha(0)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setDepth(LIGHT_DEPTH + 1);
       this.roomGlow.set(r.name, glow);
     }
-    for (const l of map.getObjectLayer('lights')?.objects ?? []) {
-      const radius = Number(prop(l, 'radius') ?? 32);
-      const colour = Phaser.Display.Color.HexStringToColor(String(prop(l, 'color') ?? '#f4b860')).color;
-      const img = scene.add
-        .image(l.x!, l.y!, 'glow')
-        .setDisplaySize(radius * 2, radius * 2)
-        .setTint(colour)
-        .setAlpha(0.32)
-        .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(LIGHT_DEPTH + 2);
-      // Fire and fairy lights flicker a little, like the login screen.
-      if (!reduce && (radius >= 60 || radius === 30))
-        scene.tweens.add({ targets: img, alpha: 0.2, duration: 600 + Math.random() * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    }
 
-    for (const d of map.getObjectLayer('doors')?.objects ?? []) {
-      this.drawDoorFrame(d);
-      this.plates.set(d.name as RoomId, new Nameplate(scene, d));
-    }
+    for (const d of map.getObjectLayer('doors')?.objects ?? []) this.plates.set(d.name as RoomId, new Nameplate(scene, d));
   }
 
-  // Open doorway: wooden posts either side of the gap through the wall face, and a threshold strip.
-  private drawDoorFrame(d: Obj) {
-    const g = this.scene.add.graphics().setDepth(1); // above floor/walls, below people
-    const x = d.x!;
-    const w = d.width!;
-    const faceTop = d.y! + 16; // the gap's wall-face part starts below the dark wall row
-    const faceH = 32;
-    for (const px of [x - 3, x + w]) {
-      g.fillStyle(EDGE).fillRect(px, faceTop - 2, 3, faceH + 2);
-      g.fillStyle(WOOD).fillRect(px + (px < x ? 0 : 1), faceTop - 1, 2, faceH);
-    }
-    g.fillStyle(EDGE).fillRect(x - 3, faceTop - 3, w + 6, 3);
-    g.fillStyle(WOOD).fillRect(x - 2, faceTop - 2, w + 4, 1);
-    const sillY = prop(d, 'side') === 'north' ? faceTop + faceH - 2 : d.y! + 14;
-    g.fillStyle(WOOD_DARK, 0.8).fillRect(x, sillY, w, 2);
+  private addLight(o: Obj, colour: string, reduce: boolean) {
+    const fire = o.name === 'fireplace';
+    const fairy = o.name === 'fairy_lights';
+    const r = fire ? 70 : fairy ? 26 : 46;
+    const img = this.scene.add
+      .image(o.x! + o.width! / 2, o.y! + (fairy ? 6 : o.height! * 0.3), 'glow')
+      .setDisplaySize(r * 2, r * 2)
+      .setTint(Phaser.Display.Color.HexStringToColor(colour).color)
+      .setAlpha(fire ? 0.6 : 0.45)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(LIGHT_DEPTH + 2);
+    if (!reduce && (fire || fairy))
+      this.scene.tweens.add({ targets: img, alpha: fire ? 0.4 : 0.25, duration: fire ? 180 + Math.random() * 200 : 900 + Math.random() * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
-  setRoomName(room: RoomId, name: string) {
-    this.plates.get(room)?.setName(name);
+  setRoom(room: RoomId, info: { name: string; mood: Mood | null; door: DoorState }) {
+    this.plates.get(room)?.setInfo(info);
   }
 
-  // Who's in each room: lights it up a little and shows faces on the door's nameplate.
+  // Who's in each room: warms it up and shows faces on the door's nameplate.
   setOccupants(room: RoomId, characters: number[]) {
     const glow = this.roomGlow.get(room);
     if (glow) {
@@ -120,33 +153,40 @@ export class HouseLook {
   }
 }
 
-// A pixel sign hung on the wall above a door: "Room 3" plus up to 4 faces, then "+2".
+// A wooden board hung over a door (top rooms: on the hallway wall; bottom rooms: by the doorway), with up
+// to 4 faces above it, then "+2". Locked doors get a dark board, knock-first doors an amber one.
 class Nameplate {
   private box: Phaser.GameObjects.Container;
-  private bg: Phaser.GameObjects.Graphics;
+  private board: Phaser.GameObjects.Graphics;
   private text: Phaser.GameObjects.Text;
-  private more: Phaser.GameObjects.Text;
-  private heads: Phaser.GameObjects.Image[] = [];
+  private doorIcon: Phaser.GameObjects.Image | null = null;
+  private moodIcon: Phaser.GameObjects.Image | null = null;
+  private heads: Phaser.GameObjects.GameObject[] = [];
   private headKey = '';
+  private info: { name: string; mood: Mood | null; door: DoorState };
+  private count = 0;
+  private readonly topY: number;
+  private readonly north: boolean;
 
   constructor(
     private scene: Phaser.Scene,
     door: Obj,
   ) {
+    const north = prop(door, 'side') === 'north';
+    this.north = north;
     const cx = door.x! + door.width! / 2;
-    const cy = door.y! + 8; // centred on the dark wall row above the doorway
-    this.bg = scene.add.graphics();
+    // Same anchor points as the mock: just under the dark band on the hallway's north wall, or at the
+    // hallway's south edge for the bottom rooms.
+    this.topY = north ? 12 * 16 + 3 : 19 * 16 - 4;
+    this.board = scene.add.graphics();
     this.text = scene.add
-      .text(0, 0, '', { fontFamily: '"Pixelify Sans", monospace', fontSize: '8px', color: CREAM })
+      .text(0, 0, '', { fontFamily: '"Pixelify Sans", monospace', fontSize: '7px', color: CREAM })
       .setOrigin(0, 0.5)
-      .setResolution(6);
-    this.more = scene.add
-      .text(0, 0, '', { fontFamily: '"Pixelify Sans", monospace', fontSize: '7px', color: '#f4b860' })
-      .setOrigin(0, 0.5)
-      .setResolution(6);
-    this.box = scene.add.container(cx, cy, [this.bg, this.text, this.more]).setDepth(PLATE_DEPTH);
+      .setResolution(8);
+    this.box = scene.add.container(cx, this.topY, [this.board, this.text]).setDepth(PLATE_DEPTH);
     this.box.setName(`plate-${door.name}`);
-    this.setName(`Room ${Number(String(door.name).slice(-2))}`);
+    this.info = { name: `Room ${Number(String(door.name).slice(-2))}`, mood: null, door: 'open' };
+    this.render();
   }
 
   get label() {
@@ -154,47 +194,88 @@ class Nameplate {
   }
 
   get headCount() {
-    return this.heads.length + (this.more.text ? Number(this.more.text.slice(1)) : 0);
+    return this.count;
   }
 
-  setName(name: string) {
-    this.text.setText(name);
-    this.layout();
+  get door() {
+    return this.info.door;
+  }
+
+  setInfo(info: { name: string; mood: Mood | null; door: DoorState }) {
+    this.info = info;
+    this.render();
   }
 
   setHeads(characters: number[]) {
     const key = characters.join(',');
     if (key === this.headKey) return;
     this.headKey = key;
+    this.count = characters.length;
     this.heads.forEach((h) => h.destroy());
-    this.heads = characters.slice(0, MAX_HEADS).map((c) => {
-      // Face only: a 10x10 crop of the character's front-facing pose.
+    this.heads = [];
+    const shown = characters.slice(0, MAX_HEADS);
+    const more = characters.length - shown.length;
+    const total = shown.length * 9 + (more ? 10 : 0) - 1;
+    let x = -total / 2;
+    for (const c of shown) {
+      // 8x8 face: a 16x16 crop of the front-facing pose at half size, on a dark tile.
+      const bg = this.scene.add.rectangle(x - 1, -1, 10, 10, EDGE).setOrigin(0);
       const { key: tex, frame } = portraitFrame(c);
-      const img = this.scene.add.image(0, 0, tex, frame).setOrigin(0, 0).setCrop(3, 3, 10, 10);
-      this.box.add(img);
-      return img;
-    });
-    this.more.setText(characters.length > MAX_HEADS ? `+${characters.length - MAX_HEADS}` : '');
-    this.layout();
-  }
-
-  private layout() {
-    const gap = 2;
-    const headsW = this.heads.length * 9 + (this.more.text ? Math.ceil(this.more.width) + 1 : 0);
-    const w = Math.ceil(this.text.width) + 8 + (headsW ? headsW + gap : 0);
-    const h = 12;
-    this.bg.clear();
-    this.bg.fillStyle(EDGE).fillRoundedRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2, 2);
-    this.bg.fillStyle(PANEL).fillRoundedRect(-w / 2, -h / 2, w, h, 2);
-    this.bg.fillStyle(0xf4b860, 0.85).fillRect(-w / 2 + 2, -h / 2, w - 4, 1); // lamp-lit top edge
-    let x = -w / 2 + 4;
-    this.text.setPosition(x, 0.5);
-    x += Math.ceil(this.text.width) + gap;
-    for (const img of this.heads) {
-      // Crop keeps the frame's origin, so shift by the crop offset to line the face up.
-      img.setPosition(x - 3, -h / 2 + 1 - 3);
+      const img = this.scene.add
+        .image(x, 0, tex, frame)
+        .setOrigin(0)
+        .setCrop(0, faceTop(c), 16, 16)
+        .setScale(0.5);
+      img.y = -faceTop(c) * 0.5; // the crop keeps the frame's origin
+      this.box.add([bg, img]);
+      this.heads.push(bg, img);
       x += 9;
     }
-    this.more.setPosition(x, 0.5);
+    if (more) {
+      const t = this.scene.add
+        .text(x + 4, 4, `+${more}`, { fontFamily: '"Pixelify Sans", monospace', fontSize: '6px', color: CREAM, backgroundColor: '#2b2034' })
+        .setOrigin(0.5)
+        .setResolution(8);
+      this.box.add(t);
+      this.heads.push(t);
+    }
+    this.render();
+  }
+
+  private render() {
+    const { name, mood, door } = this.info;
+    this.text.setText(name);
+    this.doorIcon?.destroy();
+    this.moodIcon?.destroy();
+    this.doorIcon = this.moodIcon = null;
+    const again = () => this.render();
+    const dKey = door === 'open' ? null : iconTexture(this.scene, DOORS[door][0], '#fff4e0', again);
+    const mKey = mood ? iconTexture(this.scene, MOODS[mood][0], MOOD_COLOURS[mood], again) : null;
+    const iconW = 6;
+    const pad = 4;
+    const w = pad + (dKey ? iconW + 3 : 0) + Math.ceil(this.text.width) + (mKey ? 3 + iconW : 0) + pad;
+    const h = 10;
+    // Faces sit above the board: on the north wall the plate grows upwards, on the south side downwards.
+    const by = this.count ? 10 : 0;
+    this.box.y = this.north && this.count ? this.topY - 10 : this.topY;
+    this.board.clear();
+    this.board.fillStyle(EDGE).fillRect(-w / 2 - 1, by - 1, w + 2, h + 2);
+    this.board.fillStyle(door === 'locked' ? LOCKED : door === 'knock' ? KNOCK : WOOD).fillRect(-w / 2, by, w, h);
+    this.board.fillStyle(WOOD_HI, door === 'open' ? 1 : 0.4).fillRect(-w / 2, by, w, 1);
+    this.board.fillStyle(0x000000, 0.35).fillRect(-w / 2, by + h - 1, w, 1);
+    let x = -w / 2 + pad;
+    const cy = by + h / 2;
+    if (dKey) {
+      this.doorIcon = this.scene.add.image(x + iconW / 2, cy, dKey).setDisplaySize(iconW, iconW);
+      this.box.add(this.doorIcon);
+      x += iconW + 3;
+    }
+    this.text.setPosition(x, cy + 0.5);
+    x += Math.ceil(this.text.width) + 3;
+    if (mKey) {
+      this.moodIcon = this.scene.add.image(x + iconW / 2, cy, mKey).setDisplaySize(iconW, iconW);
+      this.box.add(this.moodIcon);
+    }
+    this.box.bringToTop(this.text);
   }
 }

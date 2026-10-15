@@ -40,9 +40,10 @@ const theme = await A.page.evaluate(() => ({
   googleFonts: performance.getEntriesByType('resource').some((r) => r.name.includes('fonts.g')),
 }));
 check('fonts load locally (no Google call) and the page is night-coloured', theme, theme.pixel && theme.body && theme.bg === 'rgb(20, 15, 28)' && !theme.googleFonts);
-const pill = () => A.page.locator('#where').textContent();
-await A.page.waitForFunction(() => /in the house/.test(document.getElementById('where')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
-check('HUD pill in the hallway: "Hallway · N in the house"', await pill(), /^Hallway·\d+ in the house$/.test((await pill()).replace(/\s/g, ' ').replace(/ ?· ?/, '·')));
+const pill = async () => ({ zone: (await A.page.locator('#where-zone').textContent()).trim(), status: (await A.page.locator('#status').textContent()).trim() });
+await A.page.waitForFunction(() => /in the house/.test(document.getElementById('status')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
+const hallPill = await pill();
+check('HUD pill in the hallway: "Hallway · N in the house"', hallPill, hallPill.zone === 'Hallway' && /^\d+ in the house$/.test(hallPill.status));
 const plates = await A.page.evaluate(() => window.__house.children.list.filter((o) => o.name?.startsWith('plate-')).map((o) => o.name));
 check('a nameplate over each of the 8 doors', { plates: plates.length }, plates.length === 8);
 
@@ -65,17 +66,17 @@ const room3 = await A.page.evaluate(() => {
   };
 });
 check('from the hallway: B\'s face on room 3\'s door, and room 3 is lit up', room3, room3.heads >= 1 && room3.allMatch && room3.emptyRoomsDark && room3.warmth > 0.05);
-await B.page.waitForFunction(() => /^Room 3/.test(document.getElementById('where').textContent), null, { timeout: 5000 }).catch(() => {});
-const bPill = await B.page.locator('#where').textContent();
-check('HUD pill in a room: "Room 3 · 1 here"', bPill, /^Room 3\s*·\s*1 here$/.test(bPill.trim()));
+await B.page.waitForFunction(() => document.getElementById('where-zone')?.textContent === 'Room 3', null, { timeout: 5000 }).catch(() => {});
+const bPill = { zone: await B.page.locator('#where-zone').textContent(), status: (await B.page.locator('#status').textContent()).trim() };
+check('HUD pill in a room: "Room 3 · 1 here"', bPill, bPill.zone === 'Room 3' && bPill.status === '1 here');
 
-// Furniture blocks: walking up into room 4's coffee table (tiles 35-37, rows 5-6) stops you below it.
-await tp(A, 584, 150);
+// Furniture blocks: walking up into room 1's sofa stops you at its base.
+await tp(A, 96, 120);
 await A.page.keyboard.down('ArrowUp');
 await A.page.waitForTimeout(1500);
 await A.page.keyboard.up('ArrowUp');
 const aPos = await A.page.evaluate(() => ({ x: window.__house.player.x, y: window.__house.player.y }));
-check('furniture blocks: walking up into room 4\'s coffee table stops you', aPos, aPos.y >= 115 && aPos.y <= 122);
+check('furniture blocks: walking up into room 1\'s sofa stops you at its base', aPos, aPos.y === 82);
 
 // Settings: mic picker, push to talk and "show my name tag" all live there.
 await A.page.click('#settings-button');

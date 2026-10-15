@@ -10,7 +10,6 @@ export class PreloadScene extends Phaser.Scene {
   preload() {
     this.load.image('limezu_room_builder', 'assets/tiles/limezu_room_builder.png');
     this.load.image('limezu_interiors', 'assets/furniture/limezu_interiors.png');
-    this.load.image('kenney_indoor', 'assets/furniture/kenney_roguelike_indoor.png');
     this.load.tilemapTiledJSON('house', JSON.parse(houseMap));
     loadCharacterSheets(this.load);
   }

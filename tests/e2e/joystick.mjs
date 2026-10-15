@@ -6,7 +6,7 @@ const out = fileURLToPath(new URL('./output', import.meta.url));
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
-await ctx.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
+await ctx.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone'), localStorage.setItem('diesel-house.mic-ok', '1')));
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
 await page.goto('http://localhost:5173/');
@@ -34,7 +34,7 @@ check('small push walks slowly left', e, e.x < d.x && d.x - e.x < 50);
 // Up through a door into room 1
 await page.evaluate(() => window.__house.body.reset(96, 240));
 await touch('touchStart', box.x, box.y); await touch('touchMove', box.x, box.y - 60); await page.waitForTimeout(3500); await touch('touchEnd');
-const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 70); // stopped by the TV
+const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 82); // stopped by the sofa
 // Desktop: no joystick
 const dp = await browser.newPage({ viewport: { width: 1366, height: 768 } }); await dp.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
 await dp.goto('http://localhost:5173/'); await dp.waitForFunction(() => window.__house?.player);

@@ -7,10 +7,13 @@ import { installAudioUnlock } from '../net/audio';
 import { msgStats } from '../net/stats';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
-import { showStatus, showZone } from '../ui/overlay';
+import { showWhere, zoneLabel } from '../ui/overlay';
+import { setPortraitSource } from '../ui/portrait';
+import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addProfileButton, pickCharacter } from '../ui/picker';
-import { askForMic } from '../ui/micPrompt';
+import { askForMic, resetMicDecline } from '../ui/micPrompt';
+import { modalOpen } from '../ui/modal';
 import { addSettingsSection, switchRow } from '../ui/settings';
 import { addVoiceSettings } from '../ui/voiceSettings';
 import { showVolumePopover, volumePopoverOpen } from '../ui/volumePopover';
@@ -79,19 +82,11 @@ export class HouseScene extends Phaser.Scene {
 
   create() {
     const map = this.make.tilemap({ key: 'house' });
-    const tiles = [
-      map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!,
-      map.addTilesetImage('limezu_interiors', 'limezu_interiors', 16, 16, 0, 0)!,
-      map.addTilesetImage('kenney_indoor', 'kenney_indoor', 16, 16, 0, 1)!,
-    ];
+    setPortraitSource(this.textures);
+    const tiles = map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!;
     const floor = map.createLayer('floor', tiles)!;
     const walls = map.createLayer('walls', tiles)!;
     walls.setCollisionByExclusion([-1]);
-    map.createLayer('decor', tiles);
-    map.createLayer('furniture', tiles);
-    map.createLayer('furniture_top', tiles)!.setDepth(50_000); // tops of plants and lamps: over people behind them
-    const solid = map.createLayer('collision', tiles)!.setVisible(false);
-    solid.setCollisionByExclusion([-1]);
 
     for (const obj of map.getObjectLayer('zones')!.objects) {
       if (obj.name === 'hallway' || (ROOM_IDS as readonly string[]).includes(obj.name))
@@ -118,13 +113,13 @@ export class HouseScene extends Phaser.Scene {
     const name = savedName();
     this.character = saved ?? 0;
     this.name = name ?? '';
-    this.me = new Avatar(this, spawn.x!, spawn.y!, this.character, this.name);
+    this.me = new Avatar(this, spawn.x!, spawn.y!, this.character, this.name, true);
     this.player = this.me.sprite;
     this.physics.add.existing(this.player);
     this.body = this.player.body as Phaser.Physics.Arcade.Body;
     this.body.setSize(10, 6).setOffset(3, 26);
     this.physics.add.collider(this.player, walls);
-    this.physics.add.collider(this.player, solid);
+    this.physics.add.collider(this.player, this.look.solids); // furniture bases
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.body.setCollideWorldBounds(true);
 
@@ -143,7 +138,7 @@ export class HouseScene extends Phaser.Scene {
     if (!savedShowOwnTag()) this.me.setTagVisible(false);
     addSettingsSection(30, (box) =>
       box.append(
-        switchRow('show-own-tag', 'Show my name tag', savedShowOwnTag(), (on) => {
+        switchRow('show-own-tag', 'Show my name tag', 'Others always see it', savedShowOwnTag(), (on) => {
           saveShowOwnTag(on);
           this.me.setTagVisible(on);
         }),
@@ -179,7 +174,7 @@ export class HouseScene extends Phaser.Scene {
     this.canMove = true;
     if (this.starting) return;
     this.starting = true;
-    showStatus('Connecting…', 'warn');
+    showWhere(this.zone, 'Connecting…', 'warn');
     const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
     this.presence = new Presence(
       { name: this.name, character: this.character, zone: this.zone },
@@ -210,6 +205,13 @@ export class HouseScene extends Phaser.Scene {
       onMute: (m) => this.voice!.setMuted(m),
       onPushToTalk: (on) => this.voice!.setPushToTalk(on),
       onTalking: (t) => this.voice!.setTalking(t),
+      onBlockedTap: () => {
+        // Mic blocked: ask again (rejoining the room re-runs the mic card and the browser prompt).
+        resetMicDecline();
+        const room = this.voice!.room;
+        this.voice!.leave();
+        if (room) void this.voice!.join(room);
+      },
     });
     addVoiceSettings(this.voice, this.voiceControls);
     this.updateVoice();
@@ -238,10 +240,10 @@ export class HouseScene extends Phaser.Scene {
   private showPresenceStatus(s: 'connecting' | 'online' | 'offline') {
     this.presenceState = s;
     this.refreshRooms();
-    if (s === 'connecting') showStatus('Connecting…', 'warn');
-    else if (s === 'offline') showStatus('Offline', 'bad');
-    else if (this.zone && this.zone !== 'hallway') showStatus(`${this.countIn(this.zone)} here`, 'ok');
-    else showStatus(`${this.activeCount()} in the house`, 'ok');
+    if (s === 'connecting') showWhere(this.zone, 'Connecting…', 'warn');
+    else if (s === 'offline') showWhere(this.zone, 'Offline', 'off');
+    else if (this.zone && this.zone !== 'hallway') showWhere(this.zone, `${this.countIn(this.zone)} here`, 'ok');
+    else showWhere(this.zone, `${this.activeCount()} in the house`, 'ok');
   }
 
   // Nameplate faces and room warmth, from who's where.
@@ -285,7 +287,7 @@ export class HouseScene extends Phaser.Scene {
     const r = this.remotes.get(id);
     if (!r || !this.voice?.hasPeer(id)) return;
     const name = r.info.name;
-    showVolumePopover(name, savedVolume(name), (v) => {
+    showVolumePopover(name, r.info.character, savedVolume(name), (v) => {
       saveVolume(name, v);
       this.voice?.setVolume(id, v);
     });
@@ -387,19 +389,16 @@ export class HouseScene extends Phaser.Scene {
     }
   }
 
-  // About 18x14 tiles in view, never so far out that the house stops filling the screen.
+  // About 19x12 tiles in view, zoom 2-4 (design/game/mvp.html `fit`).
   private fitCamera() {
     const { width, height } = this.scale;
-    const bounds = this.cameras.main.getBounds();
-    const fit = Math.min(width / (18 * TILE_SIZE), height / (14 * TILE_SIZE));
-    const fill = Math.max(width / bounds.width, height / bounds.height);
-    const zoom = Phaser.Math.Clamp(Math.max(fit, fill), 1.5, 4);
+    const zoom = Phaser.Math.Clamp(Math.min(width / (19 * TILE_SIZE), height / (12 * TILE_SIZE)), 2, 4);
     this.cameras.main.setZoom(zoom);
   }
 
 
   update() {
-    const v = this.canMove ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
+    const v = this.canMove && !modalOpen() ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
     this.body.setVelocity(v.x, v.y);
 
     const moving = v.lengthSq() > 0;
@@ -417,9 +416,11 @@ export class HouseScene extends Phaser.Scene {
 
     const zone = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y - 3))?.name ?? null;
     if (zone !== this.zone) {
+      const was = this.zone;
       this.zone = zone;
-      showZone(zone);
       this.showPresenceStatus(this.presenceState);
+      if (zone && zone !== 'hallway' && zone !== was && this.presence)
+        toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
       this.presence?.update({ zone });
       this.sendMove(true);
       this.updateVoice();

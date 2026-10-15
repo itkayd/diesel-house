@@ -10,7 +10,7 @@ const errors = [];
 const warnings = [];
 async function player(name, character) {
   const ctx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
-  await ctx.addInitScript(([n, c]) => { localStorage.setItem('diesel-house.name', n); localStorage.setItem('diesel-house.character', c); }, [name, String(character)]);
+  await ctx.addInitScript(([n, c]) => { localStorage.setItem('diesel-house.name', n); localStorage.setItem('diesel-house.character', c); localStorage.setItem('diesel-house.mic-ok', '1'); }, [name, String(character)]);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
@@ -71,7 +71,7 @@ check('B learns A entered room 1 within 1 second', { ms: zoneLag }, zoneLag !== 
 await A.page.waitForTimeout(2000); await A.page.keyboard.up('ArrowUp');
 await B.page.waitForTimeout(800);
 r = await remoteA(); const az = await A.page.evaluate(() => window.__house.zone);
-check('zone tracked: B knows A is in room_01', { aZone: az, seenByB: r.zone, onB: r }, az === 'room_01' && r.zone === 'room_01' && r.y < 80);
+check('zone tracked: B knows A is in room_01', { aZone: az, seenByB: r.zone, onB: r }, az === 'room_01' && r.zone === 'room_01' && r.y < 90);
 await B.page.evaluate((id) => { const s = window.__house.remotes.get(id).avatar.sprite; window.__house.body.reset(s.x, s.y + 70); }, aId);
 await B.page.waitForTimeout(400);
 await B.page.screenshot({ path: `${out}/p3_b_view.png` });

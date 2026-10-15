@@ -1,6 +1,6 @@
 // Generates maps/house.tmj (Tiled JSON). Run: npm run map
 // Layout: 4 rooms on top, a hallway, 4 rooms below. Each room has one door onto the hallway.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const COLS = 17; // limezu_room_builder.png is 17 tiles wide
 const ROOM_W = 10; // interior width in tiles
@@ -118,117 +118,55 @@ for (let i = 0; i < 8; i++) {
 }
 
 // ---- Furniture ------------------------------------------------------------------------------
-// Pieces from limezu_interiors.png (16 tiles wide) and, where LimeZu's free pack has nothing (music),
-// Kenney's roguelike-indoors sheet (27 wide, 1 px spacing). [sheet, top-left index, w, h] in tiles.
-const INT_GID = 392; // after the 391 room-builder tiles
-const KEN_GID = INT_GID + 16 * 89;
-const P = {
-  bedGreen: ['int', 16, 3, 3], bedWhite: ['int', 96, 3, 3],
-  sofaLight: ['int', 1156, 3, 2], sofaGrey: ['int', 1153, 3, 2], sofaRed: ['int', 296, 2, 2],
-  armchairL: ['int', 1188, 1, 2], armchairR: ['int', 1189, 1, 2], armchairGreyL: ['int', 1185, 1, 2], armchairGreyR: ['int', 1186, 1, 2],
-  pouf: ['int', 1187, 1, 2], poufLight: ['int', 1190, 1, 2],
-  shelfLow: ['int', 229, 2, 2], shelfLow2: ['int', 261, 2, 2],
-  shelfPink: ['int', 1098, 2, 3], shelfBrown: ['int', 1100, 2, 3], shelfYellow: ['int', 1102, 2, 3], shelfGames: ['int', 1148, 2, 3],
-  fireplace: ['int', 1092, 2, 3],
-  rugRed: ['int', 247, 4, 3], rugBlue: ['int', 189, 3, 4], rugRedGold: ['int', 269, 3, 4], rugGreenSq: ['int', 458, 2, 2],
-  rugSmBlue: ['int', 267, 2, 1], rugSmRed: ['int', 331, 2, 1], rugBeige: ['int', 672, 3, 2], rugGrey: ['int', 675, 3, 2],
-  table: ['int', 166, 2, 2], coffee: ['int', 215, 3, 2], stool: ['int', 214, 1, 1],
-  deskBook: ['int', 581, 2, 2], tv: ['int', 650, 2, 2], globe: ['int', 1068, 1, 2],
-  chair: ['int', 500, 1, 1], chairDark: ['int', 517, 1, 1], chairSideR: ['int', 505, 1, 2], chairSideL: ['int', 543, 1, 2],
-  tree: ['int', 714, 2, 3], palm: ['int', 717, 2, 3], bush: ['int', 732, 1, 2], plant: ['int', 784, 1, 1], planter: ['int', 896, 1, 1],
-  lampBlue: ['int', 925, 1, 2], lampCream: ['int', 924, 1, 2], lampTable: ['int', 828, 1, 2],
-  wardrobe: ['int', 775, 2, 3], wardrobeBig: ['int', 823, 2, 3], cabinet: ['int', 912, 3, 2],
-  winCurtain: ['int', 388, 3, 2], win: ['int', 391, 2, 2], winGrey: ['int', 393, 2, 2], frontDoor: ['int', 395, 2, 2], fairy: ['int', 762, 2, 1],
-  paint1: ['int', 1136, 1, 1], paint2: ['int', 1137, 1, 1], paint3: ['int', 1138, 1, 1], paintTall: ['int', 1152, 1, 2], paintTall2: ['int', 1184, 1, 2],
-  map: ['int', 1082, 2, 1], pinboard: ['int', 621, 2, 2],
-  piano: ['ken', 239, 2, 2], speaker: ['ken', 446, 1, 2], speaker2: ['ken', 447, 1, 2],
+// From the design mock (design/game/build_mvp.py recipes, design/game/sprites.json pixel rects on
+// limezu_interiors.png). Each piece is a map object; the game draws it as a sprite, depth-sorted with
+// people by its bottom edge. Recipe x,y are px from the room's wall-face top-left (room 160 wide; face
+// y 0-32, floor 32-160). Flags: 'wall' hangs on the wall, 'flat' is a rug, '#rrggbb' gives off light.
+const SPRITES = JSON.parse(readFileSync(new URL('../design/game/sprites.json', import.meta.url), 'utf8')).items;
+const WARM = '#f4b860', FIRE = '#ff8a3d', COOL = '#9ec9ff', PINK = '#ffb3c7';
+const RECIPES = {
+  room_01: [['window_curtain', 22, 4, 'wall'], ['picture_land', 120, 10, 'wall'], ['sofa_grey', 56, 33], ['rug_blue', 60, 62, 'flat'],
+    ['plant_palm', 4, 30], ['lamp_cream', 140, 33, WARM], ['armchair_red', 14, 78], ['plant_small', 142, 128]],
+  room_02: [['fireplace', 64, 10, FIRE], ['picture_a', 24, 10, 'wall'], ['picture_b', 124, 10, 'wall'], ['rug_red', 50, 58, 'flat'],
+    ['armchair_red', 34, 62], ['armchair_red', 110, 62], ['sofa_red', 64, 94], ['lamp_red', 8, 36, WARM], ['plant_tree', 138, 130]],
+  room_03: [['map_world', 14, 8, 'wall'], ['aquarium', 70, 14, COOL], ['desk_study', 8, 36], ['desk_study', 124, 36], ['rug_green', 68, 72, 'flat'],
+    ['stool', 40, 72], ['stool', 106, 72], ['sofa_brown', 64, 92], ['lamp_blue', 8, 100, COOL], ['plant_small', 142, 130]],
+  room_04: [['bookshelf', 6, 8], ['bookshelf_2', 40, 8], ['map_world', 112, 10, 'wall'], ['desk_study', 112, 40], ['globe', 143, 38],
+    ['rug_beige', 42, 82, 'flat'], ['armchair_red', 22, 80], ['lamp_cream', 90, 60, WARM], ['plant_tree', 140, 128]],
+  room_05: [['window_red', 16, 6, 'wall'], ['picture_c', 124, 10, 'wall'], ['plant_small', 8, 40], ['rug_olive', 68, 92, 'flat'],
+    ['sofa_brown', 14, 124], ['sofa_white', 54, 126], ['lamp_red', 140, 40, PINK], ['plant_palm', 132, 126]],
+  room_06: [['picture_a', 24, 10, 'wall'], ['bookshelf_2', 122, 8], ['rug_red', 50, 88, 'flat'], ['table_wood', 61, 90], ['chair_a', 42, 96],
+    ['chair_c', 103, 96], ['lamp_cream', 8, 40, WARM], ['plant_pot', 12, 140]],
+  room_07: [['bed_big', 8, 38], ['wardrobe', 128, 4], ['mirror', 106, 8, 'wall'], ['rug_small_red', 60, 118, 'flat'], ['dresser', 120, 132],
+    ['plant_pot', 10, 140], ['lamp_table', 52, 40, WARM]],
+  room_08: [['picture_land', 24, 10, 'wall'], ['window_curtain', 120, 4, 'wall'], ['dresser', 10, 36], ['bed_blue', 118, 40],
+    ['rug_small_blue', 68, 110, 'flat'], ['plant_palm', 130, 124], ['lamp_blue', 8, 120, COOL]],
 };
-const decorData = new Array(W * H).fill(0); // rugs and things on walls: below everyone, walk-through
-const furnData = new Array(W * H).fill(0); // furniture: below everyone
-const topData = new Array(W * H).fill(0); // tops of tall things: drawn over people walking behind them
-const solidData = new Array(W * H).fill(0); // invisible collision cells
-// Light sources (warm lamps, fire, fairy lights; cool moonlight at windows). Radius in px.
-const LIGHTS = { lampBlue: [44, '#f4b860'], lampCream: [44, '#f4b860'], lampTable: [34, '#f4b860'], fireplace: [64, '#f4963c'],
-  fairy: [30, '#ffe2aa'], win: [36, '#96b4ff'], winGrey: [36, '#96b4ff'], winCurtain: [40, '#96b4ff'], tv: [30, '#7fd1ff'] };
-const lights = [];
+// Hallway decor, world px (hallway face y 192-224, floor 224-304).
+const HALL = [['door_double', 20, 196, 'wall'], ['fairy_lights', 128, 194, WARM], ['fairy_lights', 190, 194, WARM], ['fairy_lights', 304, 194, WARM],
+  ['fairy_lights', 366, 194, WARM], ['fairy_lights', 480, 194, WARM], ['fairy_lights', 542, 194, WARM], ['fairy_lights', 656, 194, WARM],
+  ['picture_land', 166, 206, 'wall'], ['picture_c', 520, 206, 'wall'], ['picture_b', 340, 206, 'wall'],
+  ['rug_small_red', 188, 250, 'flat'], ['rug_small_red', 368, 250, 'flat'], ['rug_small_red', 548, 250, 'flat'],
+  ['plant_palm', 130, 272], ['plant_tree', 330, 279], ['plant_palm', 500, 272], ['plant_tree', 680, 279],
+  ['lamp_cream', 226, 226, WARM], ['lamp_cream', 586, 226, WARM]];
 
-function pieceGid(sheet, idx, tx, ty) {
-  return sheet === 'int' ? INT_GID + idx + tx + ty * 16 : KEN_GID + idx + tx + ty * 27;
+const furniture = [];
+function place(key, x, y, flag) {
+  const [sx, sy, w, h] = SPRITES[key].px;
+  const kind = flag === 'wall' ? 'wall' : flag === 'flat' ? 'rug' : 'thing';
+  const props = [
+    { name: 'sx', type: 'int', value: sx },
+    { name: 'sy', type: 'int', value: sy },
+  ];
+  if (flag?.startsWith('#')) props.push({ name: 'light', type: 'color', value: flag });
+  furniture.push({ id: nextId++, name: key, type: kind, x, y, width: w, height: h, rotation: 0, visible: true, properties: props });
 }
-
-// kind: 'rug' | 'wall' (decor, walk-through) | 'thing' (furniture). top: rows from the top drawn above
-// people. solid: rows from the bottom that block (default: all rows not in `top`; 0 = walk over, e.g. chairs).
-function place(name, x, y, { kind = 'thing', top = 0, solid } = {}) {
-  const [sheet, idx, w, h] = P[name];
-  const solidRows = solid ?? h - top;
-  // Lights sit on the floor in front of wall things (windows, fairy lights), so no glow lands on the dark ceiling.
-  const onWall = kind === 'wall';
-  if (LIGHTS[name]) lights.push({ x: (x + w / 2) * 16, y: (y + (name === 'fireplace' ? 2.2 : onWall ? h + 1 : h / 2)) * 16, r: LIGHTS[name][0], color: LIGHTS[name][1] });
-  for (let ty = 0; ty < h; ty++)
-    for (let tx = 0; tx < w; tx++) {
-      const cx = x + tx;
-      const cy = y + ty;
-      const gid = pieceGid(sheet, idx, tx, ty);
-      const i = cy * W + cx;
-      if (kind !== 'thing') decorData[i] = gid;
-      else if (ty < top) topData[i] = gid;
-      else furnData[i] = gid;
-      if (kind === 'thing' && ty >= h - solidRows && wallData[i] === 0) solidData[i] = WALL_TOP + 1;
-    }
-}
-
-// Room layouts, in tiles from each room's top-left (rows 0-1 are the wall face, 2-9 the floor).
-// Rooms 1-4 have their door at the bottom (keep columns 4-5 of rows 7-9 clear); rooms 5-8 at the top
-// (columns 4-5 of rows 0-3 clear).
-const LAYOUTS = [
-  // 1 gaming
-  [['win', 1, 0, { kind: 'wall' }], ['paint2', 7, 0, { kind: 'wall' }], ['tv', 4, 1], ['shelfGames', 8, 0],
-   ['rugSmBlue', 4, 4, { kind: 'rug' }], ['pouf', 3, 3, { solid: 0 }], ['poufLight', 6, 3, { solid: 0 }],
-   ['palm', 0, 6, { top: 2, solid: 1 }], ['lampBlue', 9, 7, { top: 1, solid: 1 }], ['plant', 1, 2]],
-  // 2 music
-  [['fairy', 3, 0, { kind: 'wall' }], ['paintTall', 7, 0, { kind: 'wall' }], ['piano', 1, 1], ['speaker', 6, 1], ['speaker2', 9, 1],
-   ['rugRed', 3, 4, { kind: 'rug' }], ['armchairL', 2, 5], ['armchairR', 7, 5], ['stool', 5, 5],
-   ['bush', 0, 7, { top: 1, solid: 1 }], ['lampCream', 9, 7, { top: 1, solid: 1 }]],
-  // 3 study
-  [['shelfBrown', 0, 0], ['shelfYellow', 2, 0], ['pinboard', 4, 0, { kind: 'wall' }], ['deskBook', 6, 1], ['chair', 7, 3, { solid: 0 }],
-   ['globe', 9, 1], ['rugBeige', 1, 5, { kind: 'rug' }], ['lampCream', 0, 7, { top: 1, solid: 1 }], ['plant', 9, 8]],
-  // 4 chill
-  [['fairy', 0, 0, { kind: 'wall' }], ['winCurtain', 4, 0, { kind: 'wall' }], ['sofaLight', 1, 1], ['rugBlue', 1, 3, { kind: 'rug' }],
-   ['coffee', 1, 4], ['tree', 7, 0], ['plant', 9, 2], ['lampTable', 0, 7], ['sofaRed', 7, 6]],
-  // 5 deep talk
-  [['fireplace', 1, 0], ['paint1', 7, 0, { kind: 'wall' }], ['shelfPink', 8, 0], ['rugRed', 5, 5, { kind: 'rug' }],
-   ['armchairL', 5, 5], ['armchairR', 8, 5], ['stool', 6, 6], ['stool', 7, 6], ['lampCream', 0, 8, { top: 1, solid: 1 }],
-   ['planter', 3, 2]],
-  // 6 D&D
-  [['map', 1, 0, { kind: 'wall' }], ['pinboard', 7, 0, { kind: 'wall' }], ['shelfYellow', 8, 1],
-   ['rugRedGold', 3, 4, { kind: 'rug' }], ['table', 4, 5], ['chairSideR', 3, 5, { solid: 0 }], ['chairSideL', 6, 5, { solid: 0 }],
-   ['chair', 4, 4, { solid: 0 }], ['chairDark', 5, 7, { solid: 0 }], ['globe', 0, 7], ['plant', 0, 2]],
-  // 7 blank
-  [['wardrobe', 0, 0], ['win', 7, 0, { kind: 'wall' }], ['bedWhite', 7, 2], ['plant', 6, 2], ['rugBlue', 1, 4, { kind: 'rug' }],
-   ['lampTable', 9, 7]],
-  // 8 blank
-  [['winGrey', 1, 0, { kind: 'wall' }], ['bedGreen', 0, 2], ['bush', 3, 2, { top: 1, solid: 1 }], ['wardrobeBig', 8, 0],
-   ['rugRedGold', 6, 4, { kind: 'rug' }], ['lampTable', 9, 8]],
-];
 for (let i = 0; i < 8; i++) {
-  const x = roomX(i % 4);
-  const y = i < 4 ? TOP_Y : BOT_Y;
-  for (const [name, cx, cy, opts] of LAYOUTS[i]) place(name, x + cx, y + cy, opts);
+  const x = roomX(i % 4) * 16;
+  const y = (i < 4 ? TOP_Y : BOT_Y) * 16; // the room's wall-face top-left
+  for (const [key, rx, ry, flag] of RECIPES[`room_${String(i + 1).padStart(2, '0')}`]) place(key, x + rx, y + ry, flag);
 }
-
-// Hallway: front door by the spawn, a rug runner, pictures between doors, plants, a shoe cabinet, a lamp.
-place('frontDoor', 1, HALL_Y, { kind: 'wall' });
-const RUG_Y = HALL_Y + 3;
-for (let x = 4; x <= W - 5; x++) {
-  const col = x === 4 ? 0 : x === W - 5 ? 2 : 1;
-  decorData[RUG_Y * W + x] = INT_GID + 672 + col;
-  decorData[(RUG_Y + 1) * W + x] = INT_GID + 688 + col;
-}
-for (const [name, x] of [['paint1', 11], ['paintTall2', 22], ['paint3', 33], ['fairy', 8], ['fairy', 30]]) place(name, x, HALL_Y, { kind: 'wall' });
-place('cabinet', 1, HALL_Y + 5); // shoe cabinet
-place('tree', W - 4, HALL_Y, { top: 0 });
-place('lampCream', W - 2, HALL_Y + 1, { top: 1, solid: 1 });
-for (const x of [12, 23, 34]) place('planter', x, HALL_Y + HALL_H - 1);
+for (const [key, x, y, flag] of HALL) place(key, x, y, flag);
 
 // Doors: one object per doorway (the gap through the wall), for door frames now and door states later.
 const doors = [];
@@ -243,12 +181,6 @@ for (let i = 0; i < 8; i++) {
     properties: [{ name: 'side', type: 'string', value: top ? 'north' : 'south' }],
   });
 }
-
-for (const d of doors) lights.push({ x: d.x + 16, y: d.y + 40, r: 26, color: '#f4b860' }); // in the doorway, not on the wall top
-const lightObjects = lights.map((l) => ({
-  id: nextId++, name: 'light', type: 'light', x: l.x, y: l.y, width: 0, height: 0, point: true, rotation: 0, visible: true,
-  properties: [{ name: 'radius', type: 'int', value: l.r }, { name: 'color', type: 'color', value: l.color }],
-}));
 
 // Spawn: west end of the hallway, just below its wall face.
 zones.push({ id: nextId++, name: 'spawn', type: 'spawn', x: 3 * 16, y: (HALL_Y + 4) * 16, width: 0, height: 0, point: true, rotation: 0, visible: true });
@@ -273,13 +205,9 @@ const map = {
   layers: [
     tileLayer(1, 'floor', floorData),
     tileLayer(2, 'walls', wallData, [{ name: 'collides', type: 'bool', value: true }]),
-    tileLayer(4, 'decor', decorData),
-    tileLayer(5, 'furniture', furnData),
-    tileLayer(6, 'furniture_top', topData),
-    { ...tileLayer(7, 'collision', solidData, [{ name: 'collides', type: 'bool', value: true }]), visible: false },
     { id: 3, name: 'zones', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: zones },
     { id: 8, name: 'doors', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: doors },
-    { id: 9, name: 'lights', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: lightObjects },
+    { id: 9, name: 'furniture', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: furniture },
   ],
   tilesets: [
     {
@@ -294,32 +222,6 @@ const map = {
       tilecount: 391,
       margin: 0,
       spacing: 0,
-    },
-    {
-      firstgid: INT_GID,
-      name: 'limezu_interiors',
-      image: '../public/assets/furniture/limezu_interiors.png',
-      imagewidth: 256,
-      imageheight: 1424,
-      tilewidth: 16,
-      tileheight: 16,
-      columns: 16,
-      tilecount: 16 * 89,
-      margin: 0,
-      spacing: 0,
-    },
-    {
-      firstgid: KEN_GID,
-      name: 'kenney_indoor',
-      image: '../public/assets/furniture/kenney_roguelike_indoor.png',
-      imagewidth: 458,
-      imageheight: 305,
-      tilewidth: 16,
-      tileheight: 16,
-      columns: 27,
-      tilecount: 27 * 18,
-      margin: 0,
-      spacing: 1,
     },
   ],
 };

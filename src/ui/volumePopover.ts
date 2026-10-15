@@ -1,48 +1,44 @@
-import { createElement, Volume1, Volume2, VolumeX } from 'lucide';
+import { icon } from './icons';
+import { el } from './modal';
 import { overlay } from './overlay';
+import { portrait } from './portrait';
 
 let pop: HTMLDivElement | null = null;
 
-// Small card with a volume slider for one person. Tap the character again, or anywhere else, to close.
-export function showVolumePopover(name: string, value: number, onChange: (v: number) => void) {
+// Per-person volume card (design/game/mvp.html `openVolume`): face, name, close, slider.
+// Tap anywhere else to close.
+export function showVolumePopover(name: string, character: number, value: number, onChange: (v: number) => void) {
   closeVolumePopover();
-  pop = document.createElement('div');
+  pop = el('div', 'dh-panel vol-pop');
   pop.id = 'volume-popover';
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', `Volume for ${name}`);
-  pop.className = 'dh-card dh-popover';
-  pop.style.top = 'calc(max(12px, env(safe-area-inset-top)) + 60px)';
-  const title = document.createElement('div');
-  title.textContent = name;
-  title.className = 'dh-title';
-  title.style.cssText = 'font-size:17px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:10px';
-  const icon = document.createElement('span');
-  icon.style.cssText = 'display:flex;flex:none';
-  const slider = document.createElement('input');
+  const head = el('div', 'dh-row');
+  head.style.minHeight = '0';
+  const who = el('div');
+  who.style.cssText = 'display:flex;gap:10px;align-items:center;min-width:0';
+  const b = el('b', '', name);
+  b.style.cssText = 'font-family:var(--font-display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  who.append(portrait(character, 32), b);
+  const x = el('button', 'dh-iconbtn');
+  x.type = 'button';
+  x.style.cssText = 'width:36px;height:36px';
+  x.setAttribute('aria-label', 'Close');
+  x.append(icon('x'));
+  x.addEventListener('click', closeVolumePopover);
+  head.append(who, x);
+  const row = el('div');
+  row.style.cssText = 'display:flex;gap:10px;align-items:center';
+  const slider = el('input', 'dh-range');
   slider.type = 'range';
   slider.min = '0';
   slider.max = '100';
   slider.value = String(Math.round(value * 100));
   slider.id = 'volume-slider';
-  slider.setAttribute('aria-label', `Volume for ${name}`);
-  slider.className = 'dh-range';
-  slider.style.flex = '1';
-  const pct = document.createElement('span');
-  pct.style.cssText = 'width:40px;text-align:right;font-variant-numeric:tabular-nums';
-  const render = () => {
-    const v = Number(slider.value);
-    pct.textContent = `${v}%`;
-    icon.replaceChildren(createElement(v === 0 ? VolumeX : v < 50 ? Volume1 : Volume2, { width: 20, height: 20 }));
-  };
-  slider.addEventListener('input', () => {
-    render();
-    onChange(Number(slider.value) / 100);
-  });
-  render();
-  row.append(icon, slider, pct);
-  pop.append(title, row);
+  slider.setAttribute('aria-label', `${name}'s volume`);
+  slider.addEventListener('input', () => onChange(Number(slider.value) / 100));
+  row.append(icon('volume-1', { width: 18 }), slider, icon('volume-2', { width: 18 }));
+  pop.append(head, row);
   overlay().appendChild(pop);
   // Close on the next tap outside the card (after this tap has finished).
   setTimeout(() => window.addEventListener('pointerdown', outside, true), 0);

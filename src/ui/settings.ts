@@ -1,70 +1,62 @@
-import { createElement, Settings, X } from 'lucide';
-import { hudButtons, overlay } from './overlay';
+import { icon } from './icons';
+import { el, openModal } from './modal';
+import { hudButtons } from './overlay';
 
-// Settings: a gear button (top-right) opening a bottom sheet. Each feature adds its own section with
-// addSettingsSection(); sections render fresh every time the sheet opens.
-type Section = { order: number; render: (box: HTMLElement) => void | Promise<void> };
+// Settings: a gear button (top-right) opening a modal card (design/game/mvp.html `showSettings`).
+// Each feature adds its own section with addSettingsSection(); sections render fresh on every open, in
+// `order` (10s voice, 30s you, 50s your room, 90s credits/sign out). `divider` draws a line above it.
+type Section = { order: number; divider: boolean; render: (box: HTMLElement) => void | Promise<void> };
 const sections: Section[] = [];
 let added = false;
 
-export function addSettingsSection(order: number, render: Section['render']) {
-  sections.push({ order, render });
+export function addSettingsSection(order: number, render: Section['render'], divider = false) {
+  sections.push({ order, render, divider });
   sections.sort((a, b) => a.order - b.order);
   if (!added) addButton();
 }
 
 function addButton() {
   added = true;
-  const btn = document.createElement('button');
+  const btn = el('button', 'dh-iconbtn');
   btn.type = 'button';
   btn.id = 'settings-button';
-  btn.className = 'dh-icon-btn';
   btn.setAttribute('aria-label', 'Settings');
-  btn.append(createElement(Settings, { width: 22, height: 22 }));
+  btn.append(icon('settings'));
   btn.addEventListener('click', () => void openSettings());
   hudButtons().appendChild(btn);
 }
 
 export async function openSettings() {
   if (document.getElementById('settings-sheet')) return;
-  const sheet = document.createElement('div');
-  sheet.id = 'settings-sheet';
-  sheet.className = 'dh-card dh-sheet';
-  sheet.setAttribute('role', 'dialog');
-  sheet.setAttribute('aria-labelledby', 'settings-title');
-  const head = document.createElement('div');
-  head.className = 'dh-sheet-head';
-  const title = document.createElement('h2');
+  const { panel, close } = openModal('settings-sheet', { dismissable: true, label: 'settings-title' });
+  const head = el('div', 'dh-row');
+  const title = el('h2', '', 'Settings');
   title.id = 'settings-title';
-  title.className = 'dh-title';
-  title.textContent = 'Settings';
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.id = 'settings-close';
-  close.className = 'dh-icon-btn dh-sheet-close';
-  close.setAttribute('aria-label', 'Close settings');
-  close.append(createElement(X, { width: 22, height: 22 }));
-  close.addEventListener('click', () => sheet.remove());
-  head.append(title, close);
-  sheet.append(head);
-  overlay().appendChild(sheet);
+  const x = el('button', 'dh-iconbtn');
+  x.type = 'button';
+  x.id = 'settings-close';
+  x.setAttribute('aria-label', 'Close settings');
+  x.append(icon('x'));
+  x.addEventListener('click', close);
+  head.append(title, x);
+  panel.append(head);
   for (const s of sections) {
-    const box = document.createElement('section');
-    box.style.display = 'grid';
-    box.style.gap = '6px';
-    sheet.append(box);
+    if (s.divider) panel.append(el('div', 'dh-divider'));
+    const box = el('div');
+    box.style.cssText = 'display:grid;gap:6px';
+    panel.append(box);
     await s.render(box);
+    if (!box.childElementCount) box.remove();
   }
 }
 
-// Helpers for sections.
-export function switchRow(id: string, label: string, checked: boolean, onChange: (on: boolean) => void) {
-  const row = document.createElement('label');
-  row.className = 'dh-switch';
+// A labelled pixel switch row: "Push to talk / Hold the mic button or Space to talk   [==]".
+export function switchRow(id: string, label: string, hint: string, checked: boolean, onChange: (on: boolean) => void) {
+  const row = el('label', 'dh-row');
   row.htmlFor = id;
-  const text = document.createElement('span');
-  text.textContent = label;
-  const input = document.createElement('input');
+  const txt = el('span', 'txt', label);
+  if (hint) txt.append(el('small', '', hint));
+  const input = el('input', 'dh-switch');
   input.type = 'checkbox';
   input.id = id;
   input.checked = checked;
@@ -72,14 +64,12 @@ export function switchRow(id: string, label: string, checked: boolean, onChange:
     onChange(input.checked);
     input.blur(); // so Space (push to talk) doesn't toggle it again
   });
-  row.append(text, input);
+  row.append(txt, input);
   return row;
 }
 
 export function sectionLabel(text: string, forId?: string) {
-  const l = document.createElement('label');
-  l.className = 'dh-label';
-  l.textContent = text;
+  const l = el('label', 'dh-label', text);
   if (forId) l.htmlFor = forId;
   return l;
 }

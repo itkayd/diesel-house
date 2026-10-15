@@ -1,26 +1,36 @@
-import { createElement, Mic, MicOff } from 'lucide';
 import type { VoiceStatus } from '../net/voice';
+import { icon } from './icons';
 import { hudBottomRight } from './overlay';
 
 type Callbacks = {
   onMute: (muted: boolean) => void;
   onPushToTalk: (on: boolean) => void;
   onTalking: (talking: boolean) => void;
+  onBlockedTap: () => void; // mic is blocked: ask again
 };
 
 const PTT_KEY = 'diesel-house.ptt';
 const LONG_PRESS = 500; // ms
+type MicState = 'live' | 'muted' | 'ptt' | 'talking' | 'blocked';
+const LABELS: Record<MicState, string> = {
+  live: 'Mute',
+  muted: 'Unmute',
+  ptt: 'Hold to talk',
+  talking: 'Talking',
+  blocked: 'Mic blocked — listening only',
+};
 
-// The big mic button (bottom-right, only inside a room). A dot on it shows voice status: green connected,
-// amber connecting, red mic blocked. Long-press (or hover) shows the detail. Push-to-talk lives in settings.
+// The big mic button (bottom-right, only inside a room), as in design/game/mvp.html. Its corner square
+// shows the voice connection (green ok, amber connecting, red blocked); long-press or hover for detail.
 export class VoiceControls {
   private box: HTMLDivElement;
   private micBtn: HTMLButtonElement;
-  private dot: HTMLSpanElement;
   private detail: HTMLDivElement;
+  private conn: 'ok' | 'warn' | 'error' = 'warn';
   private muted = false;
   private ptt = false;
   private talking = false;
+  private blocked = false;
   private pressTimer = 0;
   private longPressed = false;
 
@@ -28,28 +38,22 @@ export class VoiceControls {
     this.box = document.createElement('div');
     this.box.id = 'voice-controls';
     this.box.style.cssText = 'position:relative;display:none';
-
     this.detail = document.createElement('div');
     this.detail.id = 'voice-status';
-    this.detail.className = 'dh-pill';
-    this.detail.style.cssText = 'position:absolute;right:0;bottom:calc(100% + 12px);visibility:hidden;font-family:var(--font-body);font-size:13px';
-
+    this.detail.className = 'dh-pill dh-voice-detail';
     this.micBtn = document.createElement('button');
     this.micBtn.type = 'button';
     this.micBtn.id = 'mic-button';
-    this.micBtn.className = 'dh-icon-btn';
-    this.micBtn.style.cssText = 'width:72px;height:72px;touch-action:none;user-select:none;-webkit-user-select:none;position:relative';
-    this.dot = document.createElement('span');
-    this.dot.className = 'dh-dot';
-    this.dot.style.cssText = 'position:absolute;top:7px;right:7px;width:12px;height:12px';
+    this.micBtn.className = 'dh-mic';
 
     this.micBtn.addEventListener('click', () => {
       if (this.longPressed) return; // that press only showed the detail
+      if (this.blocked) return this.cb.onBlockedTap();
       if (!this.ptt) this.setMuted(!this.muted);
     });
     this.micBtn.addEventListener('pointerdown', (e) => {
       this.longPressed = false;
-      if (this.ptt) {
+      if (this.ptt && !this.blocked) {
         this.micBtn.setPointerCapture(e.pointerId);
         this.setTalking(true);
         return;
@@ -135,26 +139,37 @@ export class VoiceControls {
     this.render();
   }
 
+  private get state(): MicState {
+    if (this.blocked) return 'blocked';
+    if (this.ptt) return this.talking ? 'talking' : 'ptt';
+    return this.muted ? 'muted' : 'live';
+  }
+
   private render() {
-    const live = this.ptt ? this.talking : !this.muted;
-    this.micBtn.replaceChildren(createElement(live ? Mic : MicOff, { width: 32, height: 32 }), this.dot);
-    this.micBtn.style.background = live ? '#2f7d4a' : this.ptt ? 'var(--panel)' : '#8a2f3a';
-    const label = this.ptt ? (this.talking ? 'Talking' : 'Hold to talk') : this.muted ? 'Unmute' : 'Mute';
-    this.micBtn.setAttribute('aria-label', label);
-    this.micBtn.title = this.ptt ? 'Hold to talk (or hold Space)' : label;
+    const s = this.state;
+    this.micBtn.dataset.state = s;
+    const conn = document.createElement('span');
+    conn.className = 'dh-conn';
+    conn.dataset.s = this.conn;
+    this.micBtn.replaceChildren(icon(s === 'muted' || s === 'blocked' ? 'mic-off' : 'mic'), conn);
+    this.micBtn.setAttribute('aria-label', LABELS[s]);
+    this.micBtn.title = this.ptt && !this.blocked ? 'Hold to talk (or hold Space)' : LABELS[s];
   }
 
   show(status: VoiceStatus) {
     this.box.style.display = status.state === 'off' ? 'none' : 'block';
     if (status.state === 'joining') {
       this.detail.textContent = 'Joining voice…';
-      this.dot.className = 'dh-dot warn';
+      this.conn = 'warn';
     } else if (status.state === 'in-room') {
       const others = status.total === 0 ? 'nobody else here' : `${status.connected}/${status.total} connected`;
-      this.detail.textContent = status.mic === 'blocked' ? `Mic blocked · listening · ${others}` : `Voice · ${others}`;
-      this.dot.className = `dh-dot ${status.mic === 'blocked' ? 'bad' : status.connected < status.total ? 'warn' : 'ok'}`;
+      this.blocked = status.mic === 'blocked';
+      this.detail.textContent = this.blocked ? `Mic blocked · listening · ${others}` : `Voice · ${others}`;
+      this.conn = this.blocked ? 'error' : status.connected < status.total ? 'warn' : 'ok';
     }
+    this.render();
   }
 }
 
-const isTyping = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+const isTyping = (e: KeyboardEvent) =>
+  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;

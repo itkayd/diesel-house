@@ -8,6 +8,7 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const res = []; const check = (n, p, ok) => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}  -> ${JSON.stringify(p)}`);
 const errors = [];
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+await ctx.addInitScript(() => localStorage.setItem('diesel-house.mic-ok', '1')); // mic card is tested in audio.mjs
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(e.message)); page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await page.goto('http://localhost:5173/');
@@ -52,9 +53,9 @@ for (const [key, dir] of [['ArrowRight', 'right'], ['ArrowDown', 'down'], ['Arro
 // Collision with feet-based body
 await tp(48, 256);
 let r = await hold('ArrowUp'); check('hallway wall blocks (feet stop below the wall)', r.after, r.after.y === 230 && r.after.zone === 'hallway');
-await tp(96, 250); r = await hold('ArrowUp', 3500); check('door into room 1, stops at the TV (furniture blocks)', r.after, r.after.zone === 'room_01' && r.after.y === 70);
+await tp(96, 250); r = await hold('ArrowUp', 3500); check('door into room 1, stops at the sofa (furniture blocks)', r.after, r.after.zone === 'room_01' && r.after.y === 82);
 r = await hold('ArrowRight', 3000); check('room 1 side wall blocks', r.after, r.after.x === 171);
-await tp(88, 250); r = await hold('ArrowDown', 4500); check('door into room 5 (clear column), stops at bottom wall', r.after, r.after.zone === 'room_05' && r.after.y === 480);
+await tp(120, 380); r = await hold('ArrowDown', 2500); check('room 5 (clear column), stops at bottom wall', r.after, r.after.zone === 'room_05' && r.after.y === 480);
 
 // Reload: remembered, no picker
 await page.reload(); await page.waitForFunction(() => window.__house?.player);

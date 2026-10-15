@@ -187,3 +187,24 @@
     transition: none;
   }
 }
+#login-screen input[type='text'],
+#login-screen input[type='password'] {
+  font: inherit;
+  font-size: 17px;
+  color: var(--cream);
+  background: var(--panel-edge);
+  border: 0;
+  padding: 12px 12px;
+  box-shadow: inset 0 0 0 2px #4a3a57;
+  border-radius: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+#login-screen input[type='text']:focus-visible,
+#login-screen input[type='password']:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--lamp);
+}
+#login-screen .fine .linkish {
+  font-size: 13px;
+}

@@ -3,7 +3,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Runs the Vercel functions in api/ during `npm run dev` (Vercel runs them in production).
 // Until logins exist (Phase 5), /api/turn requests from this computer may skip the sign-in check.
-const API: Record<string, string> = { turn: 'handleTurn', ping: 'handle', admin: 'handle' }; // file -> exported handler
+const API: Record<string, string> = { turn: 'handleTurn', ping: 'handle', admin: 'handle', join: 'handle' }; // file -> exported handler
 
 function devApi(env: Record<string, string>): Plugin {
   return {

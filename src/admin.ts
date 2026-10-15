@@ -4,15 +4,16 @@ import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
 import './ui/theme.css';
 import { el } from './ui/modal';
+import { PASSWORD_MIN } from './shared/members';
 
-// Diesel's door list (/admin.html): who's knocking, a sign-in link for each to email from your own
-// address, and the guest list. Talks to /api/admin with the passcode (ADMIN_PASSCODE on the server).
+// Diesel's door list (/admin.html): make single-use invite codes for the 8 friends, see who has joined,
+// reset a forgotten password, remove someone. Talks to /api/admin with the passcode (ADMIN_PASSCODE).
 
-type Req = { id: number; email: string; created_at: string; status: 'pending' | 'sent' | 'dismissed'; handled_at: string | null };
-type Guest = { email: string; added_at: string };
+type Code = { id: number; label: string | null; created_at: string; used_at: string | null; usedByName: string | null; revoked_at: string | null };
+type Member = { id: string; name: string; joined: string; lastSeen: string | null };
 const KEY = 'diesel-house.admin-passcode';
 const root = document.getElementById('admin')!;
-root.style.cssText = 'max-width:640px;margin:0 auto;padding:24px 16px 48px;display:grid;gap:22px;color:var(--cream);font-family:var(--font-body)';
+root.style.cssText = 'max-width:640px;margin:0 auto;padding:24px 16px 48px;display:grid;gap:24px;color:var(--cream);font-family:var(--font-body)';
 document.body.style.overflow = 'auto';
 document.documentElement.style.overflow = 'auto';
 
@@ -33,15 +34,22 @@ async function api<T>(action: string, extra: Record<string, unknown> = {}): Prom
   return body as T;
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function header() {
   const h = el('header');
   h.style.cssText = 'display:grid;gap:4px';
   const t = el('h1', '', 'Door list');
   t.style.cssText = 'margin:0;font-family:var(--font-display);font-size:34px;text-shadow:0 0 18px rgba(244,184,96,.45),3px 3px 0 var(--panel-edge)';
-  h.append(t, el('p', 'dh-lede', 'Who’s knocking at Diesel House, and who’s on the guest list.'));
+  h.append(t, el('p', 'dh-lede', 'Invite codes for your 8 friends, and who has joined Diesel House.'));
   return h;
+}
+
+function section(title: string, ...children: Node[]) {
+  const s = el('section');
+  s.style.cssText = 'display:grid;gap:10px';
+  s.append(el('h2', 'dh-title', title), ...children);
+  return s;
 }
 
 function showLock(error = '') {
@@ -69,149 +77,170 @@ function showLock(error = '') {
   input.focus();
 }
 
-function emailHref(to: string, link: string) {
-  const subject = 'Your key to Diesel House';
-  const body = `Hi!\n\nHere's your link into Diesel House. Tap it on the phone or computer you'll use, and the door opens:\n\n${link}\n\nIt works once and runs out after a while, so use it soon. If it has expired, knock again on the login page and I'll send a new one.\n\nSee you inside.`;
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-function linkBox(email: string, link: string) {
-  const box = el('div');
-  box.className = 'link-box';
-  box.style.cssText = 'display:grid;gap:8px;padding:10px;background:var(--panel-edge);box-shadow:inset 0 0 0 2px var(--lamp)';
-  const field = el('input', 'dh-input');
-  field.readOnly = true;
-  field.value = link;
-  field.setAttribute('aria-label', `Sign-in link for ${email}`);
+// The new code, shown once: copy it into your group chat or a message.
+function codeCard(code: string, label: string) {
+  const box = el('div', 'dh-panel');
+  box.id = 'new-code';
+  box.style.boxShadow = 'var(--frame-drop), inset 0 0 0 2px var(--lamp)';
+  const big = el('div', '', code);
+  big.style.cssText = 'font-family:var(--font-display);font-size:34px;letter-spacing:.08em;color:var(--lamp);text-align:center';
   const row = el('div');
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap';
-  const mail = el('a', 'dh-btn', 'Write the email');
-  mail.href = emailHref(email, link);
-  const copy = el('button', 'dh-btn dh-btn--quiet', 'Copy link');
+  const copy = el('button', 'dh-btn', 'Copy code');
   copy.type = 'button';
   copy.addEventListener('click', async () => {
-    field.select();
-    await navigator.clipboard?.writeText(link).catch(() => document.execCommand('copy'));
+    await navigator.clipboard?.writeText(code).catch(() => {});
     copy.textContent = 'Copied';
   });
-  row.append(mail, copy);
-  box.append(field, row, el('small', 'dh-lede', 'Send it from your own email. The link works once.'));
+  const message = `Your invite to Diesel House${label ? `, ${label}` : ''}: open ${location.origin}, tap "Join the house" and use the code ${code}. It works once.`;
+  const copyMsg = el('button', 'dh-btn dh-btn--quiet', 'Copy a message with it');
+  copyMsg.type = 'button';
+  copyMsg.addEventListener('click', async () => {
+    await navigator.clipboard?.writeText(message).catch(() => {});
+    copyMsg.textContent = 'Copied';
+  });
+  row.append(copy, copyMsg);
+  box.append(el('div', 'dh-label', label ? `Code for ${label}` : 'New code'), big, row, el('small', 'dh-lede', "Shown only now. It works once; if it's lost, cancel it and make another."));
   return box;
 }
 
-function requestRow(r: Req) {
-  const row = el('div', 'dh-panel');
-  row.dataset.request = String(r.id);
-  row.style.cssText = 'padding:12px 14px;gap:10px';
-  const top = el('div', 'dh-row');
-  const who = el('div', 'txt');
-  const strong = el('b', '', r.email);
-  strong.style.cssText = 'font-family:var(--font-display);overflow-wrap:anywhere';
-  who.append(strong, el('small', '', `knocked ${when(r.created_at)}`));
-  const actions = el('div');
-  actions.style.cssText = 'display:flex;gap:8px;flex:none';
-  const get = el('button', 'dh-btn', 'Get link');
-  get.type = 'button';
-  const dismiss = el('button', 'dh-btn dh-btn--quiet', 'Dismiss');
-  dismiss.type = 'button';
-  actions.append(get, dismiss);
-  top.append(who, actions);
-  row.append(top);
-  get.addEventListener('click', async () => {
-    get.disabled = true;
-    get.textContent = 'Making link…';
-    try {
-      const { link } = await api<{ link: string }>('link', { email: r.email, redirectTo: location.origin });
-      actions.remove();
-      row.append(linkBox(r.email, link));
-    } catch (e) {
-      get.disabled = false;
-      get.textContent = 'Get link';
-      row.append(el('p', 'dh-error', (e as Error).message));
-    }
-  });
-  dismiss.addEventListener('click', async () => {
-    await api('dismiss', { id: r.id }).catch(() => {});
-    row.remove();
-  });
-  return row;
-}
-
-function section(title: string, ...children: Node[]) {
-  const s = el('section');
-  s.style.cssText = 'display:grid;gap:10px';
-  const h = el('h2', 'dh-title', title);
-  s.append(h, ...children);
-  return s;
-}
-
 async function load() {
-  let data: { requests: Req[]; guests: Guest[] };
+  let data: { codes: Code[]; members: Member[]; guests: number };
   try {
     data = await api('list');
   } catch (e) {
     return showLock((e as Error).message);
   }
   root.replaceChildren(header());
-  const pending = data.requests.filter((r) => r.status === 'pending');
-  const knocking = pending.length ? pending.map(requestRow) : [el('p', 'dh-lede', 'Nobody knocking right now.')];
-  const refresh = el('button', 'dh-btn dh-btn--quiet', 'Refresh');
-  refresh.type = 'button';
-  refresh.addEventListener('click', () => void load());
-  root.append(section(`Knocking (${pending.length})`, ...knocking, refresh));
 
-  // A link for anyone, without them knocking first.
-  const direct = el('form');
-  direct.id = 'direct-link';
-  direct.style.cssText = 'display:flex;gap:10px';
-  const de = el('input', 'dh-input');
-  de.type = 'email';
-  de.placeholder = 'friend@example.com';
-  de.setAttribute('aria-label', 'Email for a sign-in link');
-  const dg = el('button', 'dh-btn', 'Get link');
-  dg.type = 'submit';
-  direct.append(de, dg);
-  const directOut = el('div');
-  directOut.style.cssText = 'display:grid;gap:8px';
-  direct.addEventListener('submit', async (e) => {
+  // Make a code.
+  const make = el('form');
+  make.id = 'make-code';
+  make.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap';
+  const label = el('input', 'dh-input');
+  label.placeholder = 'Who is it for? (optional)';
+  label.maxLength = 40;
+  label.style.flex = '1 1 200px';
+  label.setAttribute('aria-label', 'Who the code is for');
+  const go = el('button', 'dh-btn', 'Make an invite code');
+  go.type = 'submit';
+  make.append(label, go);
+  const out = el('div');
+  make.addEventListener('submit', async (e) => {
     e.preventDefault();
-    directOut.replaceChildren();
+    go.disabled = true;
     try {
-      const { link, email } = await api<{ link: string; email: string }>('link', { email: de.value, redirectTo: location.origin });
-      directOut.append(linkBox(email, link));
+      const { code } = await api<{ code: string }>('make-code', { label: label.value });
+      out.replaceChildren(codeCard(code, label.value.trim()));
+      label.value = '';
+      void refreshLists();
     } catch (err) {
-      directOut.append(el('p', 'dh-error', (err as Error).message));
+      out.replaceChildren(el('p', 'dh-error', (err as Error).message));
+    } finally {
+      go.disabled = false;
     }
   });
-  root.append(section('Send a link to someone', el('p', 'dh-lede', 'Adds them to the guest list too.'), direct, directOut));
+  root.append(section('Invite a friend', el('p', 'dh-lede', 'Each code makes one account. Friends pick their own name and password.'), make, out));
 
-  const guests = data.guests.map((g) => {
-    const row = el('div', 'dh-row');
-    row.dataset.guest = g.email;
-    row.style.cssText = 'padding:4px 0;box-shadow:inset 0 -1px 0 var(--line)';
-    const t = el('span', '', g.email);
-    t.style.overflowWrap = 'anywhere';
-    const rm = el('button', 'dh-btn dh-btn--quiet', 'Remove');
-    rm.type = 'button';
-    rm.style.cssText = 'min-height:36px;font-size:14px;padding:4px 10px 6px';
-    rm.addEventListener('click', async () => {
-      if (!confirm(`Take ${g.email} off the guest list? They won't get back in.`)) return;
-      await api('guest-remove', { email: g.email }).catch(() => {});
-      void load();
+  const lists = el('div');
+  lists.style.cssText = 'display:grid;gap:24px';
+  root.append(lists);
+  render(data);
+
+  async function refreshLists() {
+    try {
+      render(await api('list'));
+    } catch {
+      // keep what's shown
+    }
+  }
+
+  function render(d: typeof data) {
+    const open = d.codes.filter((c) => !c.used_at && !c.revoked_at);
+    const openRows = open.map((c) => {
+      const row = el('div', 'dh-row');
+      row.dataset.code = String(c.id);
+      row.style.boxShadow = 'inset 0 -1px 0 var(--line)';
+      const t = el('span', 'txt', c.label || 'Unnamed code');
+      t.append(el('small', '', `made ${when(c.created_at)}, not used yet`));
+      const cancel = el('button', 'dh-btn dh-btn--quiet', 'Cancel');
+      cancel.type = 'button';
+      cancel.style.cssText = 'min-height:36px;font-size:14px;padding:4px 10px 6px';
+      cancel.addEventListener('click', async () => {
+        await api('revoke-code', { id: c.id }).catch(() => {});
+        void refreshLists();
+      });
+      row.append(t, cancel);
+      return row;
     });
-    row.append(t, rm);
-    return row;
-  });
-  root.append(section(`Guest list (${data.guests.length})`, ...guests));
 
-  const done = data.requests.filter((r) => r.status !== 'pending').slice(0, 15);
-  if (done.length)
-    root.append(
+    const memberRows = d.members.map((m) => {
+      const row = el('div');
+      row.dataset.member = m.id;
+      row.style.cssText = 'display:grid;gap:8px;padding:6px 0;box-shadow:inset 0 -1px 0 var(--line)';
+      const top = el('div', 'dh-row');
+      const t = el('span', 'txt');
+      const b = el('b', '', m.name);
+      b.style.fontFamily = 'var(--font-display)';
+      t.append(b, el('small', '', m.lastSeen ? `last in ${when(m.lastSeen)}` : `joined ${when(m.joined)}`));
+      const acts = el('div');
+      acts.style.cssText = 'display:flex;gap:8px;flex:none';
+      const small = 'min-height:36px;font-size:14px;padding:4px 10px 6px';
+      const reset = el('button', 'dh-btn dh-btn--quiet', 'Reset password');
+      reset.type = 'button';
+      reset.style.cssText = small;
+      const remove = el('button', 'dh-btn dh-btn--quiet', 'Remove');
+      remove.type = 'button';
+      remove.style.cssText = small;
+      acts.append(reset, remove);
+      top.append(t, acts);
+      row.append(top);
+      reset.addEventListener('click', () => {
+        if (row.querySelector('form')) return;
+        const f = el('form');
+        f.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+        const p = el('input', 'dh-input');
+        p.type = 'text';
+        p.placeholder = `New password (${PASSWORD_MIN}+ characters)`;
+        p.style.flex = '1 1 180px';
+        p.setAttribute('aria-label', `New password for ${m.name}`);
+        const save = el('button', 'dh-btn', 'Set');
+        save.type = 'submit';
+        const msg = el('small', 'dh-lede');
+        f.append(p, save, msg);
+        f.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            await api('reset-password', { userId: m.id, password: p.value });
+            msg.textContent = `Done. Tell ${m.name} their new password.`;
+          } catch (err) {
+            msg.textContent = (err as Error).message;
+          }
+        });
+        row.append(f);
+        p.focus();
+      });
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Remove ${m.name} from Diesel House? Their account and profile are deleted; any room they own becomes empty.`)) return;
+        await api('remove-member', { userId: m.id }).catch((e) => alert((e as Error).message));
+        void refreshLists();
+      });
+      return row;
+    });
+
+    const used = d.codes.filter((c) => c.used_at || c.revoked_at).slice(0, 10);
+    lists.replaceChildren(
+      section(`Codes not used yet (${open.length})`, ...(openRows.length ? openRows : [el('p', 'dh-lede', 'None.')])),
+      section(`Members (${d.members.length} of 8)`, ...(memberRows.length ? memberRows : [el('p', 'dh-lede', 'Nobody has joined yet.')])),
       section(
-        'Recently handled',
-        ...done.map((r) => el('div', 'dh-lede', `${r.email} · ${r.status === 'sent' ? 'link made' : 'dismissed'} ${when(r.handled_at ?? r.created_at)}`)),
+        'History',
+        ...used.map((c) =>
+          el('div', 'dh-lede', c.revoked_at ? `${c.label || 'A code'} was cancelled` : `${c.label || 'A code'} was used by ${c.usedByName ?? 'someone'} on ${when(c.used_at!)}`),
+        ),
+        el('div', 'dh-lede', `Guest visits so far: ${d.guests}`),
       ),
     );
+  }
 }
 
 if (passcode) void load();

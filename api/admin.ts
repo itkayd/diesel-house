@@ -1,87 +1,70 @@
-// Vercel function: POST /api/admin, used by admin.html (Diesel only).
-// Lists knock requests, makes sign-in links for Diesel to email himself, and manages the guest list.
-// Protected by ADMIN_PASSCODE; talks to Supabase with the secret key (SUPABASE_SERVICE_ROLE_KEY),
-// which stays on the server and is never sent to a browser.
-import { createClient } from '@supabase/supabase-js';
-import { timingSafeEqual } from 'node:crypto';
+// Vercel function: POST /api/admin, used by admin.html (Diesel's door list) only.
+// Makes single-use invite codes, lists members, resets forgotten passwords, removes members.
+// Protected by ADMIN_PASSCODE; uses the server-side secret key (never sent to a browser).
+import { isMemberLogin, PASSWORD_MIN } from '../src/shared/members';
+import { adminDb, hashCode, json, newCode, same, slowDown, type Env } from './_server';
 
-type Env = Record<string, string | undefined>;
-type Body = { passcode?: string; action?: string; email?: string; id?: number; redirectTo?: string };
-
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-function passcodeOk(given: string | undefined, expected: string) {
-  const a = Buffer.from(given ?? '');
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+type Body = { passcode?: string; action?: string; label?: string; id?: number; userId?: string; password?: string };
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
   const expected = env.ADMIN_PASSCODE ?? '';
   if (expected.length < 8) return json({ error: 'Set ADMIN_PASSCODE (8+ characters) in the server settings first.' }, 503);
-  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return json({ error: 'Set SUPABASE_SERVICE_ROLE_KEY in the server settings first.' }, 503);
-
+  const db = adminDb(env);
+  if (!db) return json({ error: 'Set SUPABASE_SERVICE_ROLE_KEY in the server settings first.' }, 503);
   let body: Body;
   try {
     body = (await request.json()) as Body;
   } catch {
     return json({ error: 'bad request' }, 400);
   }
-  if (!passcodeOk(body.passcode, expected)) {
-    await new Promise((r) => setTimeout(r, 600)); // slow down guessing
+  if (!same(body.passcode, expected)) {
+    await slowDown();
     return json({ error: 'Wrong passcode.' }, 401);
   }
 
-  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-  const email = body.email?.trim().toLowerCase();
-
   switch (body.action) {
     case 'list': {
-      const [requests, guests] = await Promise.all([
-        db.from('access_requests').select('id, email, created_at, status, handled_at').order('created_at', { ascending: false }).limit(100),
-        db.from('allowed_emails').select('email, added_at').order('added_at'),
+      const [codes, profiles, users] = await Promise.all([
+        db.from('invite_codes').select('id, label, created_at, used_at, used_by, revoked_at').order('created_at', { ascending: false }).limit(50),
+        db.from('profiles').select('id, display_name'),
+        db.auth.admin.listUsers({ perPage: 200 }),
       ]);
-      if (requests.error || guests.error) return json({ error: (requests.error ?? guests.error)!.message }, 500);
-      return json({ requests: requests.data, guests: guests.data });
+      const err = codes.error ?? profiles.error ?? users.error;
+      if (err) return json({ error: err.message }, 500);
+      const names = new Map((profiles.data ?? []).map((p) => [p.id, p.display_name]));
+      const members = users.data.users
+        .filter((u) => isMemberLogin(u.email))
+        .map((u) => ({ id: u.id, name: names.get(u.id) ?? String(u.user_metadata?.display_name ?? '?'), joined: u.created_at, lastSeen: u.last_sign_in_at ?? null }));
+      const guests = users.data.users.filter((u) => u.is_anonymous).length;
+      return json({ codes: (codes.data ?? []).map((c) => ({ ...c, usedByName: c.used_by ? (names.get(c.used_by) ?? null) : null })), members, guests });
     }
 
-    // Puts them on the guest list (if needed) and makes a one-time sign-in link for Diesel to send.
-    case 'link': {
-      if (!email || !EMAIL.test(email)) return json({ error: 'That is not an email address.' }, 400);
-      const guest = await db.from('allowed_emails').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true });
-      if (guest.error) return json({ error: guest.error.message }, 500);
-      const redirectTo = body.redirectTo && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : new URL(request.url).origin;
-      let link = await db.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo } });
-      if (link.error) {
-        // First time: make their account, then the link.
-        const made = await db.auth.admin.createUser({ email, email_confirm: true });
-        if (made.error && !/already/i.test(made.error.message)) return json({ error: made.error.message }, 500);
-        link = await db.auth.admin.generateLink({ type: 'magiclink', email, options: { redirectTo } });
-      }
-      if (link.error) return json({ error: link.error.message }, 500);
-      await db.from('access_requests').update({ status: 'sent', handled_at: new Date().toISOString() }).eq('email', email).eq('status', 'pending');
-      return json({ link: link.data.properties.action_link, email });
+    case 'make-code': {
+      const code = newCode();
+      const r = await db.from('invite_codes').insert({ code_hash: hashCode(code), label: body.label?.trim().slice(0, 40) || null });
+      return r.error ? json({ error: r.error.message }, 500) : json({ code });
     }
 
-    case 'dismiss': {
-      if (typeof body.id !== 'number') return json({ error: 'which request?' }, 400);
-      const r = await db.from('access_requests').update({ status: 'dismissed', handled_at: new Date().toISOString() }).eq('id', body.id);
+    case 'revoke-code': {
+      if (typeof body.id !== 'number') return json({ error: 'which code?' }, 400);
+      const r = await db.from('invite_codes').update({ revoked_at: new Date().toISOString() }).eq('id', body.id).is('used_at', null);
       return r.error ? json({ error: r.error.message }, 500) : json({ ok: true });
     }
 
-    case 'guest-add': {
-      if (!email || !EMAIL.test(email)) return json({ error: 'That is not an email address.' }, 400);
-      const r = await db.from('allowed_emails').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true });
+    case 'reset-password': {
+      if (!body.userId || (body.password ?? '').length < PASSWORD_MIN)
+        return json({ error: `New password needs at least ${PASSWORD_MIN} characters.` }, 400);
+      const r = await db.auth.admin.updateUserById(body.userId, { password: body.password });
       return r.error ? json({ error: r.error.message }, 500) : json({ ok: true });
     }
 
-    case 'guest-remove': {
-      if (!email) return json({ error: 'which email?' }, 400);
-      const r = await db.from('allowed_emails').delete().eq('email', email);
+    case 'remove-member': {
+      if (!body.userId) return json({ error: 'which member?' }, 400);
+      const u = await db.auth.admin.getUserById(body.userId);
+      if (u.error || !isMemberLogin(u.data.user?.email)) return json({ error: 'Not a member.' }, 400);
+      await db.from('allowed_emails').delete().eq('email', u.data.user!.email!);
+      const r = await db.auth.admin.deleteUser(body.userId); // their profile goes too; rooms they owned become unowned
       return r.error ? json({ error: r.error.message }, 500) : json({ ok: true });
     }
 

@@ -1,9 +1,10 @@
 import './login.css';
-import { requestAccess } from '../net/auth';
+import { houseIsOpen, joinWithCode, signInMember, visitAsGuest } from '../net/auth';
+import { NAME_MAX, PASSWORD_MIN } from '../shared/members';
 
-// The front door: design/login/login.html ported as-is (same copy, fonts, colours, animated living room).
-// Shown before the game when nobody is signed in. Resolves never by itself: the magic link brings the
-// player back signed in, and main.ts takes over from there.
+// The front door: design/login/login.html (same look, fonts, colours, animated living room), with three
+// ways in and no emails: members sign in with name + password; new members join with Diesel's invite
+// code; anyone can visit as a guest. main.ts takes over once there's a session.
 
 const SRC = {
   scene: 'assets/ui/login_scene.png',
@@ -23,28 +24,64 @@ const HTML = `
     <p>8 rooms · walk in to talk</p>
   </header>
   <section class="card" aria-live="polite">
-    <form id="login" novalidate style="display:grid;gap:14px">
+    <form id="signin" data-mode="signin" novalidate style="display:grid;gap:14px">
       <h2>Knock to come in</h2>
       <p class="lede">Step into a room and you hear everyone inside. Step back into the hallway and it goes quiet.</p>
       <div class="field">
-        <label for="email">Your email</label>
-        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+        <label for="si-name">Your name</label>
+        <input id="si-name" name="username" type="text" autocomplete="username" maxlength="${NAME_MAX}" required>
       </div>
-      <p id="err" class="error" hidden></p>
-      <button id="go" class="knock" type="submit">Knock on the door</button>
-      <p class="fine">Invite only. Diesel emails you a link that opens the door, so there's no password to remember.</p>
+      <div class="field">
+        <label for="si-pass">Password</label>
+        <input id="si-pass" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <p class="error" hidden></p>
+      <button class="knock" type="submit">Knock on the door</button>
+      <p class="fine">Got an invite code? <button class="linkish" type="button" data-go="join">Join the house</button><br>
+        Just visiting? <button class="linkish" type="button" data-go="guest">Come in as a guest</button></p>
     </form>
-    <div id="sent" hidden style="display:grid;gap:12px">
-      <h2>Knock knock!</h2>
-      <p class="lede">Diesel heard you. He'll email a link to <span id="sentTo" class="email-out"></span>. Open it and the door opens.</p>
-      <p class="fine">He sends them himself, so it can take a little while. Check spam if it doesn't turn up.</p>
-      <button id="again" class="linkish" type="button">Use a different email</button>
-    </div>
+
+    <form id="join" data-mode="join" hidden novalidate style="display:grid;gap:14px">
+      <h2>Join the house</h2>
+      <p class="lede">Use the invite code Diesel gave you. Pick a name and password: that's how you'll get back in, on any device.</p>
+      <div class="field">
+        <label for="jn-code">Invite code</label>
+        <input id="jn-code" name="code" type="text" autocomplete="one-time-code" autocapitalize="characters" placeholder="ABCD-1234" required>
+      </div>
+      <div class="field">
+        <label for="jn-name">Your name</label>
+        <input id="jn-name" name="username" type="text" autocomplete="username" maxlength="${NAME_MAX}" required>
+      </div>
+      <div class="field">
+        <label for="jn-pass">Password</label>
+        <input id="jn-pass" name="new-password" type="password" autocomplete="new-password" minlength="${PASSWORD_MIN}" required>
+      </div>
+      <p class="error" hidden></p>
+      <button class="knock" type="submit">Join</button>
+      <p class="fine"><button class="linkish" type="button" data-go="signin">I already have a name and password</button></p>
+    </form>
+
+    <form id="guest" data-mode="guest" hidden novalidate style="display:grid;gap:14px">
+      <h2>Visit as a guest</h2>
+      <p class="lede">Ask a friend in the house for their invite code. Guests can look around and talk in rooms with open doors for 12 hours; you'll pick a name and character inside.</p>
+      <div class="field">
+        <label for="gs-code">Friend's invite code</label>
+        <input id="gs-code" name="code" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABCD-1234">
+      </div>
+      <p id="open-house" class="fine" hidden>The house is open right now: you can come in without a code.</p>
+      <p class="error" hidden></p>
+      <button class="knock" type="submit">Come in as a guest</button>
+      <p class="fine"><button class="linkish" type="button" data-go="signin">Back</button></p>
+    </form>
   </section>
 </main>`;
 
 let root: HTMLDivElement | null = null;
 let raf = 0;
+let done: (() => void) | null = null;
+
+// Resolves once someone has come in through one of the forms (signed in, joined, or admitted as a guest).
+export const loginDone = () => new Promise<void>((resolve) => (done = resolve));
 
 export function showLogin(error?: string) {
   if (root) {
@@ -58,56 +95,81 @@ export function showLogin(error?: string) {
   const $ = <E extends HTMLElement>(sel: string) => root!.querySelector(sel) as E;
   startScene($<HTMLCanvasElement>('#scene'));
 
-  const form = $<HTMLFormElement>('#login');
-  const email = $<HTMLInputElement>('#email');
-  const go = $<HTMLButtonElement>('#go');
-  const sent = $<HTMLDivElement>('#sent');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  root.querySelectorAll<HTMLButtonElement>('[data-go]').forEach((b) => b.addEventListener('click', () => show(b.dataset.go!)));
+
+  const busy = async (form: HTMLFormElement, label: string, work: () => Promise<void>) => {
+    const btn = form.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    const was = btn.textContent;
     hideError();
-    const address = email.value.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-      showError('Type the email address your invite went to, like you@example.com.');
-      email.focus();
-      return;
-    }
-    go.disabled = true;
-    go.textContent = 'Knocking…';
+    btn.disabled = true;
+    btn.textContent = label;
+    doorTarget = 1;
     try {
-      await requestAccess(address);
-      $('#sentTo').textContent = address;
-      form.hidden = true;
-      sent.hidden = false;
-      doorTarget = 1;
+      await work();
+      done?.(); // in: main.ts takes over
     } catch (ex) {
-      showError(ex instanceof Error ? ex.message : "The link didn't send. Check your connection and try again.");
+      doorTarget = 0;
+      showError(ex instanceof Error ? ex.message : "Couldn't come in. Try again.");
     } finally {
-      go.disabled = false;
-      go.textContent = 'Knock on the door';
+      btn.disabled = false;
+      btn.textContent = was;
     }
+  };
+
+  const signin = $<HTMLFormElement>('#signin');
+  signin.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = $<HTMLInputElement>('#si-name').value;
+    const pass = $<HTMLInputElement>('#si-pass').value;
+    if (!name.trim() || !pass) return showError('Type your name and password.');
+    void busy(signin, 'Knocking…', () => signInMember(name, pass));
   });
-  $('#again').addEventListener('click', () => {
-    sent.hidden = true;
-    form.hidden = false;
-    doorTarget = 0;
-    email.select();
+
+  const join = $<HTMLFormElement>('#join');
+  join.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $<HTMLInputElement>('#jn-code').value;
+    const name = $<HTMLInputElement>('#jn-name').value;
+    const pass = $<HTMLInputElement>('#jn-pass').value;
+    if (!code.trim()) return showError('Type the invite code Diesel gave you.');
+    if (!name.trim()) return showError('Pick a name.');
+    if (pass.length < PASSWORD_MIN) return showError(`Your password needs at least ${PASSWORD_MIN} characters.`);
+    void busy(join, 'Joining…', () => joinWithCode(code, name, pass));
   });
+
+  const guest = $<HTMLFormElement>('#guest');
+  guest.addEventListener('submit', (e) => {
+    e.preventDefault();
+    void busy(guest, 'Coming in…', () => visitAsGuest($<HTMLInputElement>('#gs-code').value));
+  });
+
   if (error) showError(error);
 }
 
+function show(mode: string) {
+  root?.querySelectorAll<HTMLFormElement>('form[data-mode]').forEach((f) => (f.hidden = f.dataset.mode !== mode));
+  hideError();
+  if (mode === 'guest')
+    void houseIsOpen().then((open) => {
+      const note = root?.querySelector<HTMLParagraphElement>('#open-house');
+      if (note) note.hidden = !open;
+    });
+  root?.querySelector<HTMLInputElement>(`form[data-mode="${mode}"] input`)?.focus();
+}
+
+function visibleForm() {
+  return root?.querySelector<HTMLFormElement>('form[data-mode]:not([hidden])') ?? null;
+}
+
 function showError(text: string) {
-  const err = root?.querySelector<HTMLParagraphElement>('#err');
-  const form = root?.querySelector<HTMLFormElement>('#login');
-  if (!err || !form) return;
-  form.hidden = false;
-  root!.querySelector<HTMLDivElement>('#sent')!.hidden = true;
+  const err = visibleForm()?.querySelector<HTMLParagraphElement>('.error');
+  if (!err) return;
   err.textContent = text;
   err.hidden = false;
 }
 
 function hideError() {
-  const err = root?.querySelector<HTMLParagraphElement>('#err');
-  if (err) err.hidden = true;
+  root?.querySelectorAll<HTMLParagraphElement>('.error').forEach((e) => (e.hidden = true));
 }
 
 export function hideLogin() {

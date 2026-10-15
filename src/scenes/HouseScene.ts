@@ -12,6 +12,7 @@ import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
 import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
+import { addGuestSettings } from '../ui/guestSettings';
 import { el } from '../ui/modal';
 import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
@@ -155,18 +156,19 @@ export class HouseScene extends Phaser.Scene {
     addSettingsSection(
       90,
       (box) => {
-        if (!currentUser()) return;
+        const user = currentUser();
+        if (!user) return;
         const out = el('button', 'dh-btn dh-btn--quiet');
         out.type = 'button';
         out.id = 'sign-out';
-        out.textContent = 'Sign out';
+        out.textContent = user.guest ? 'Leave' : 'Sign out';
         out.addEventListener('click', async () => {
           this.voice?.leave();
           this.presence?.leave();
           await signOut();
           location.reload();
         });
-        const who = el('small', 'dh-lede', `Signed in as ${currentUser()!.email}`);
+        const who = el('small', 'dh-lede', user.guest ? `Visiting as a guest (${this.name})` : `Signed in as ${this.name}`);
         box.append(who, out);
       },
       true,
@@ -179,7 +181,7 @@ export class HouseScene extends Phaser.Scene {
   // Who are you? Your profile if you have one; otherwise the picker, once, saved to your profile.
   private async identify(saved: number | null, name: string | null) {
     const user = currentUser();
-    if (user) {
+    if (user && !user.guest) {
       const profile = await loadProfile(user.id);
       if (profile) {
         this.applyIdentity(profile.character_index, profile.display_name);
@@ -212,7 +214,7 @@ export class HouseScene extends Phaser.Scene {
     const { character, name } = choice;
     this.applyIdentity(character, name);
     const user = currentUser();
-    if (user) await saveProfile(user.id, name, character);
+    if (user && !user.guest) await saveProfile(user.id, name, character);
     if (this.presence) this.presence.update({ character, name });
     void this.start();
   }
@@ -226,7 +228,7 @@ export class HouseScene extends Phaser.Scene {
     const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
     this.presence = new Presence(
       currentUser()?.id ?? crypto.randomUUID(),
-      { name: this.name, character: this.character, zone: this.zone },
+      { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest },
       {
         onJoin: (p) => this.addRemote(p),
         onLeave: (id) => this.removeRemote(id),
@@ -275,6 +277,10 @@ export class HouseScene extends Phaser.Scene {
         return err;
       },
     );
+    addGuestSettings(() => {
+      const u = currentUser();
+      return u && !u.guest ? u.id : null;
+    });
     void this.loadRooms();
     this.updateVoice();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
@@ -393,6 +399,7 @@ export class HouseScene extends Phaser.Scene {
   private addRemote(p: PlayerInfo) {
     const avatar = new Avatar(this, 0, 0, p.character, p.name);
     avatar.setVisible(false); // shown once we know where they are
+    avatar.setGuest(!!p.guest);
     avatar.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapAvatar(p.id));
     this.remotes.set(p.id, { avatar, info: p, motion: null, glide: { dx: 0, dy: 0, at: 0 }, clockOffset: Infinity, lastHeard: 0, active: false });
     this.sendMove(true); // so the newcomer sees us straight away
@@ -426,6 +433,7 @@ export class HouseScene extends Phaser.Scene {
     if (!r) return;
     if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
     if (r.info.name !== p.name) r.avatar.setName(p.name);
+    r.avatar.setGuest(!!p.guest);
     r.info = { ...p, zone: r.info.zone }; // zone from position updates is fresher than presence
   }
 

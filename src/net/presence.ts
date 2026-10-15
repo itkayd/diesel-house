@@ -2,12 +2,12 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Dir } from '../characters';
 import type { Zone } from '../config';
 import type { Room } from './rooms';
-import { devGuest } from './mode';
+import { devTest } from './mode';
 import { countMessage } from './stats';
 import { supabase } from './supabase';
 
 // Who someone is (shared via Realtime presence; changes rarely). `id` is their account id.
-export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null };
+export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -53,7 +53,7 @@ export class Presence {
     }
     this.h.onStatus('connecting');
     // Private: only signed-in people on the guest list may join (see supabase/migrations/*_realtime_auth.sql).
-    const ch = supabase.channel(CHANNEL, { config: { private: !devGuest, broadcast: { self: false }, presence: { key: this.id } } });
+    const ch = supabase.channel(CHANNEL, { config: { private: !devTest, broadcast: { self: false }, presence: { key: this.id } } });
     ch.on('broadcast', { event: 'move' }, ({ payload }) => {
       countMessage('received', 'move');
       if (this.replaced) return;
@@ -92,12 +92,12 @@ export class Presence {
         continue;
       }
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
-      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone };
+      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);
       if (!old) this.h.onJoin(p);
-      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone) this.h.onInfo(p);
+      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest) this.h.onInfo(p);
     }
     for (const id of [...this.known.keys()]) {
       if (!seen.has(id)) {

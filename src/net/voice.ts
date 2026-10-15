@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { RoomId } from '../config';
 import { audioContext, audioLocked } from './audio';
 import { savedMicDevice, saveMicDevice } from '../prefs';
-import { devGuest } from './mode';
+import { devTest } from './mode';
 import { countMessage } from './stats';
 import { supabase } from './supabase';
 
@@ -151,7 +151,7 @@ export class Voice {
 
     if (!supabase) return;
     // Private: guest-list members only (and from Phase 6, only people the door lets in).
-    const ch = supabase.channel(`voice:${room}`, { config: { private: !devGuest, broadcast: { self: false }, presence: { key: this.myId } } });
+    const ch = supabase.channel(`voice:${room}`, { config: { private: !devTest, broadcast: { self: false }, presence: { key: this.myId } } });
     ch.on('broadcast', { event: 'signal' }, ({ payload }) => {
       countMessage('received', 'signal');
       void this.onSignal(payload as Signal);

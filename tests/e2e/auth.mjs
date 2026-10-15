@@ -19,21 +19,43 @@ const login = await page.evaluate(() => ({
   shown: !!document.getElementById('login-screen'),
   title: document.querySelector('#login-screen h1')?.textContent,
   tagline: document.querySelector('#login-screen .sign p')?.textContent,
-  card: document.querySelector('#login-screen .card h2')?.textContent,
-  button: document.querySelector('#login-screen #go')?.textContent,
+  card: document.querySelector('#login-screen #signin h2')?.textContent,
+  button: document.querySelector('#login-screen #signin .knock')?.textContent,
   gameStarted: !!window.__house,
 }));
 check('no session: the login screen shows, the game does not start', login,
   login.shown && login.title === 'Diesel House' && login.card === 'Knock to come in' && login.button === 'Knock on the door' && !login.gameStarted);
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${out}/auth_login_phone.png` });
+const errorOf = (form) => page.locator(`#${form} .error`).textContent();
 
-// 2. A typo in the email is caught before anything is sent.
-await page.fill('#email', 'not-an-email');
-await page.click('#go');
-const err = await page.locator('#err').textContent();
-check('bad email: friendly message, nothing sent', { err }, /Type the email address your invite went to/.test(err ?? ''));
-// 3. Diesel's door list is passcode-locked (wrong passcode, or not set up yet, either way: no list).
+// 2. Members: a wrong name/password is turned away kindly.
+await page.fill('#si-name', 'Nobody Here');
+await page.fill('#si-pass', 'not-the-password');
+await page.click('#signin .knock');
+await page.waitForSelector('#signin .error:not([hidden])', { timeout: 10000 }).catch(() => {});
+const memberErr = await errorOf('signin');
+check('wrong name or password: friendly message, still at the door', { memberErr }, /don't match/.test(memberErr ?? '') && !(await page.evaluate(() => !!window.__house)));
+
+// 3. Joining needs a real invite code from Diesel.
+await page.click('#signin [data-go="join"]');
+await page.fill('#jn-code', 'ZZZZ-ZZZZ');
+await page.fill('#jn-name', 'Test Person');
+await page.fill('#jn-pass', 'long-enough-pass');
+await page.click('#join .knock');
+await page.waitForSelector('#join .error:not([hidden])', { timeout: 10000 }).catch(() => {});
+const joinErr = await errorOf('join');
+check('join with a made-up code: refused', { joinErr }, /doesn't work|switched off/.test(joinErr ?? ''));
+
+// 4. Guests need a friend's invite code (or an open house).
+await page.click('#join [data-go="signin"]');
+await page.click('#signin [data-go="guest"]');
+await page.fill('#gs-code', 'ZZZZ-ZZZZ');
+await page.click('#guest .knock');
+await page.waitForSelector('#guest .error:not([hidden])', { timeout: 10000 }).catch(() => {});
+const guestErr = await errorOf('guest');
+check('guest with a made-up code: refused, no way in', { guestErr }, /doesn't work|switched off|need an invite code/.test(guestErr ?? '') && !(await page.evaluate(() => !!window.__house)));
+// 5. Diesel's door list is passcode-locked (wrong passcode, or not set up yet, either way: no list).
 const admin = await browser.newPage();
 await admin.goto('http://localhost:5173/admin.html');
 await admin.waitForSelector('#passcode');
@@ -41,11 +63,11 @@ await admin.fill('#passcode', 'definitely-not-it');
 await admin.click('#lock button');
 await admin.waitForSelector('#lock .dh-error:not([hidden])', { timeout: 8000 }).catch(() => {});
 const lockMsg = await admin.locator('#lock .dh-error').textContent().catch(() => null);
-const listed = await admin.locator('[data-request], [data-guest]').count();
+const listed = await admin.locator('[data-member], [data-code]').count();
 check('door list: a wrong passcode shows nothing', { lockMsg, listed }, listed === 0 && /Wrong passcode|Set ADMIN_PASSCODE/.test(lockMsg ?? ''));
 await browser.close();
 
-// 4. A client holding only the publishable key (no login) cannot join the private channels.
+// 6. A client holding only the publishable key (no login) cannot join the private channels.
 const env = Object.fromEntries(
   readFileSync(new URL('../../.env', import.meta.url), 'utf8')
     .split(/\r?\n/)

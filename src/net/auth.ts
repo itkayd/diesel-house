@@ -1,23 +1,73 @@
 import type { Session } from '@supabase/supabase-js';
+import { memberLogin } from '../shared/members';
 import { supabase } from './supabase';
 
-// Sign-in with a magic link (sent by Diesel, see requestAccess); only people on the guest list (public.allowed_emails, checked by
-// public.is_member()) get into the house.
+// Three ways in, no emails anywhere:
+//  - members (the 8 friends) sign in with the name + password they chose when they joined;
+//  - joining: a single-use invite code from Diesel makes a member account (api/join.ts);
+//  - guests: no account; they need a member's guest invite code (or a member's "open house"), checked
+//    in the database by public.admit_guest(). A visit lasts 12 hours.
 
-export const NOT_ON_LIST = "That email isn't on the guest list. Ask Diesel to add you.";
+export const NOT_A_MEMBER = "That account isn't part of this house any more. Ask Diesel.";
+export const VISIT_OVER = "Your guest visit has ended. Ask a friend in the house for their invite code.";
+const BAD_GUEST_CODE = "That invite code doesn't work. Ask a friend in the house for theirs.";
 
 export async function currentSession(): Promise<Session | null> {
   if (!supabase) return null;
   return (await supabase.auth.getSession()).data.session;
 }
 
-// Knocking: records the email for Diesel (public.access_requests). He gets each person a sign-in link
-// from /admin.html and emails it himself, so the house doesn't depend on Supabase's few-an-hour sender.
-export async function requestAccess(email: string) {
+export async function signInMember(name: string, password: string) {
   if (!supabase) throw new Error('The house is offline right now. Try again later.');
-  const { error } = await supabase.from('access_requests').insert({ email });
-  if (error && error.code !== '23505') // 23505: already knocking, that's fine
-    throw new Error("The knock didn't go through. Check your connection and try again.");
+  const { error } = await supabase.auth.signInWithPassword({ email: memberLogin(name), password });
+  if (error)
+    throw new Error(
+      error.status === 400 || /invalid/i.test(error.message)
+        ? "That name and password don't match. Check them, or ask Diesel to reset your password."
+        : error.status === 429
+          ? 'Too many tries just now. Wait a minute and try again.'
+          : "Couldn't sign in. Check your connection and try again.",
+    );
+}
+
+export async function joinWithCode(code: string, name: string, password: string) {
+  const res = await fetch('/api/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, name, password }),
+  }).catch(() => null);
+  if (!res) throw new Error("Couldn't reach the house. Check your connection and try again.");
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error ?? "Couldn't join. Try again.");
+  await signInMember(name, password);
+}
+
+export async function visitAsGuest(code: string) {
+  if (!supabase) throw new Error('The house is offline right now. Try again later.');
+  const session = await currentSession();
+  if (!session) {
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) throw new Error(/disabled|not allowed/i.test(error.message) ? 'Guest visits are switched off right now.' : "Couldn't come in. Try again.");
+  }
+  const { data, error } = await supabase.rpc('admit_guest', { invite: code });
+  if (error || data !== true) {
+    await signOut();
+    throw new Error(code.trim() ? BAD_GUEST_CODE : 'You need an invite code from a friend in the house.');
+  }
+  await authoriseRealtime(); // the guest's permissions changed; refresh what Realtime knows
+}
+
+// Is any member letting guests in without a code right now?
+export async function houseIsOpen() {
+  if (!supabase) return false;
+  const { data } = await supabase.rpc('house_is_open');
+  return data === true;
+}
+
+export async function isGuest(): Promise<boolean> {
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc('is_guest');
+  return !error && data === true;
 }
 
 export async function isMember(): Promise<boolean> {
@@ -28,18 +78,6 @@ export async function isMember(): Promise<boolean> {
 
 export async function signOut() {
   await supabase?.auth.signOut();
-}
-
-// Resolves with the session as soon as there is one (already signed in, or back from a magic link).
-export function waitForSession(): Promise<Session> {
-  return new Promise((resolve) => {
-    const { data } = supabase!.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        data.subscription.unsubscribe();
-        resolve(session);
-      }
-    });
-  });
 }
 
 // Realtime needs the user's token to join the private channels; supabase-js passes it on token refresh.

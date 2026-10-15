@@ -23,7 +23,7 @@ async function player(name, character, { query = '', phone = false } = {}) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(name + ' console: ' + m.text()));
-  await page.goto('http://localhost:5173/?guest' + query.replace('?', '&'));
+  await page.goto('http://localhost:5173/?test' + query.replace('?', '&'));
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined');
   return { ctx, page, id: await page.evaluate(() => window.__house.presence.id) };
 }

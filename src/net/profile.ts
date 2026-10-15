@@ -1,9 +1,9 @@
 import { supabase } from './supabase';
 
-// Who's signed in, plus their profile (display name + character). The profile lives in public.profiles;
-// localStorage only caches it (src/prefs.ts).
+// Who's signed in (a member, or a guest without an account), plus members' profiles (display name +
+// character) in public.profiles. Guests' name and character live only in this browser (src/prefs.ts).
 
-export type User = { id: string; email: string };
+export type User = { id: string; email: string; guest: boolean };
 let user: User | null = null;
 export const setUser = (u: User | null) => (user = u);
 export const currentUser = () => user;

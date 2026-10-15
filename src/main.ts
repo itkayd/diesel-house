@@ -4,11 +4,11 @@ import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
 import './ui/theme.css';
-import { authoriseRealtime, currentSession, isMember, NOT_ON_LIST, signOut, waitForSession } from './net/auth';
+import { authoriseRealtime, currentSession, isGuest, isMember, NOT_A_MEMBER, signOut, VISIT_OVER } from './net/auth';
 import { setUser } from './net/profile';
-import { devGuest } from './net/mode';
+import { devTest } from './net/mode';
 import { supabase } from './net/supabase';
-import { hideLogin, showLogin } from './ui/login';
+import { hideLogin, loginDone, showLogin } from './ui/login';
 import { PreloadScene } from './scenes/PreloadScene';
 import { HouseScene } from './scenes/HouseScene';
 
@@ -22,22 +22,24 @@ async function fontsReady() {
   ]);
 }
 
-// The front door: sign in with a magic link, and only guest-list members get in.
+// The front door: members (name + password), new members (invite code) or guests (no account).
 async function signIn() {
-  if (!supabase || devGuest) return; // no .env, or dev guest mode for automated tests (dev only)
+  if (!supabase || devTest) return; // no .env, or dev guest mode for automated tests (dev only)
   let session = await currentSession();
   for (;;) {
     if (!session) {
       showLogin();
-      session = await waitForSession();
+      await loginDone();
+      session = await currentSession();
+      if (!session) continue;
     }
-    if (await isMember()) break;
-    await signOut();
+    if (session.user.is_anonymous ? await isGuest() : await isMember()) break;
+    await signOut(); // a guest whose visit ran out, or an account removed from the house
+    showLogin(session.user.is_anonymous ? VISIT_OVER : NOT_A_MEMBER);
     session = null;
-    showLogin(NOT_ON_LIST);
   }
   hideLogin();
-  setUser({ id: session.user.id, email: session.user.email ?? '' });
+  setUser({ id: session.user.id, email: session.user.email ?? '', guest: !!session.user.is_anonymous });
   await authoriseRealtime();
 }
 

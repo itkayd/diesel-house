@@ -5,6 +5,7 @@ const PANEL = 0x2b2034;
 const EDGE = 0x0d0912;
 const CREAM = '#fff4e0';
 const LAMP = '#f4b860';
+const MUTED = '#bcaccb';
 const OK = 0x6fdc8c;
 const TAG_GAP = 32; // tag sits just above the head (feet - 32)
 
@@ -20,10 +21,13 @@ export class Avatar {
   private character: number;
   private tagWanted = true;
   private isSpeaking = false;
+  private name: string;
+  private guest = false;
   facing: Dir = 'down';
 
   constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string, isMe = false) {
     this.character = character;
+    this.name = name;
     this.sprite = scene.add.sprite(x, y, 'chibis_a').setOrigin(0.5, 1);
 
     // Floor ring while talking: a soft green oval that steps bigger and back (or sits still).
@@ -65,8 +69,17 @@ export class Avatar {
   }
 
   setName(name: string) {
-    this.tagText.setText(name);
+    this.name = name;
+    this.tagText.setText(this.guest ? `${name} · guest` : name);
     this.drawTagBg();
+  }
+
+  // Guests (no account) get a muted tag that says so.
+  setGuest(on: boolean) {
+    if (on === this.guest) return;
+    this.guest = on;
+    if (on) this.tagText.setColor(MUTED);
+    this.setName(this.name);
   }
 
   setTagVisible(v: boolean) {

@@ -27,10 +27,12 @@ check('every portrait has a picture', blank, blank === 0);
 
 // Picking without a name is refused
 await page.click('button[data-character="5"]');
-check('picker refuses to continue without a name', 0, (await page.locator('button[data-character]').count()) === 20);
+await page.click('#picker-done');
+check('picker refuses to continue without a name', { error: await page.locator('#picker-error').textContent() }, (await page.locator('button[data-character]').count()) === 20);
 await page.fill('#player-name', 'Tester');
 // Pick chibi #6 (index 5)
 await page.click('button[data-character="5"]');
+await page.click('#picker-done');
 b = await st(); const saved = await page.evaluate(() => localStorage.getItem('diesel-house.character'));
 check('picking closes picker and saves choice', { saved, picker: await page.locator('button[data-character]').count() }, saved === '5');
 check('idle faces down using chibi sheet A, character 6 middle frame', b, b.tex === 'chibis_a' && b.anim === 'char5-idle-down' && b.frame === 4 * 12 + 3 + 1);
@@ -50,18 +52,19 @@ for (const [key, dir] of [['ArrowRight', 'right'], ['ArrowDown', 'down'], ['Arro
 // Collision with feet-based body
 await tp(48, 256);
 let r = await hold('ArrowUp'); check('hallway wall blocks (feet stop below the wall)', r.after, r.after.y === 230 && r.after.zone === 'hallway');
-await tp(96, 250); r = await hold('ArrowUp', 3500); check('door into room 1, stops at back wall', r.after, r.after.zone === 'room_01' && r.after.y === 54);
+await tp(96, 250); r = await hold('ArrowUp', 3500); check('door into room 1, stops at the TV (furniture blocks)', r.after, r.after.zone === 'room_01' && r.after.y === 70);
 r = await hold('ArrowRight', 3000); check('room 1 side wall blocks', r.after, r.after.x === 171);
-await tp(96, 250); r = await hold('ArrowDown', 4500); check('door into room 5, stops at bottom wall', r.after, r.after.zone === 'room_05' && r.after.y === 480);
+await tp(88, 250); r = await hold('ArrowDown', 4500); check('door into room 5 (clear column), stops at bottom wall', r.after, r.after.zone === 'room_05' && r.after.y === 480);
 
 // Reload: remembered, no picker
 await page.reload(); await page.waitForFunction(() => window.__house?.player);
 b = await st(); check('choice remembered after reload (no picker)', { n: await page.locator('button[data-character]').count(), anim: b.anim }, b.anim === 'char5-idle-down');
 
 // Change character -> LimeZu Adam (index 16), screenshot (LimeZu art only on screen)
-await page.click('text=Change character');
+await page.click('#profile-button');
 check('Change character reopens picker', 0, (await page.locator('button[data-character]').count()) === 20);
 await page.click('button[data-character="16"]');
+await page.click('#picker-done');
 r = await hold('ArrowRight', 800);
 check('LimeZu Adam walks right with run strip frames 0-5', r.during, r.during.tex === 'limezu_adam_run' && r.during.frame <= 5);
 r = await hold('ArrowDown', 500);

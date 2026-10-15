@@ -109,7 +109,7 @@ const P = await player('Thumb', 19, { micGranted: true, micSeen: true, phone: tr
 const cdp = await P.ctx.newCDPSession(P.page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
 const joy = await P.page.evaluate(() => {
-  const r = [...document.querySelectorAll('#overlay div')].find((d) => d.style.borderRadius === '50%').getBoundingClientRect();
+  const r = document.getElementById('joystick').getBoundingClientRect();
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 });
 await tp(P, 448, 250); // just outside room 3's door

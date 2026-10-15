@@ -85,7 +85,7 @@ const waitConnected = async (p, n, ms = 20000) => {
   }
   return null;
 };
-const status = (p) => p.page.locator('#voice-controls').evaluate((e) => (e.style.display === 'none' ? '(hidden)' : e.firstChild.textContent));
+const status = (p) => p.page.locator('#voice-controls').evaluate((e) => (e.style.display === 'none' ? '(hidden)' : document.getElementById('voice-status').textContent));
 
 const A = await player('Alice test', 16);
 const B = await player('Bob test', 19);
@@ -123,7 +123,9 @@ await A.page.click('#mic-button');
 const [unmuted] = await loudest(B);
 check('A unmutes: B hears again', unmuted, unmuted > HEARD);
 
-// Push to talk
+// Push to talk (the switch lives in settings)
+await A.page.click('#settings-button');
+await A.page.waitForSelector('#ptt-toggle');
 await A.page.check('#ptt-toggle');
 await A.page.waitForTimeout(500);
 const [pttOff] = await loudest(B);
@@ -134,6 +136,7 @@ await A.page.waitForTimeout(800);
 const [pttAfter] = await loudest(B, 1500);
 const stillPtt = await A.page.isChecked('#ptt-toggle');
 await A.page.uncheck('#ptt-toggle');
+await A.page.click('#settings-close');
 check('push to talk: silent until Space is held, silent again after', { notHolding: pttOff, holding: pttOn, released: pttAfter, boxStillTicked: stillPtt }, pttOff < SILENT && pttOn > HEARD && pttAfter < SILENT && stillPtt);
 
 // B steps into the hallway: audio stops within a second on both sides

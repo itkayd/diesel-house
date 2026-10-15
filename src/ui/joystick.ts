@@ -16,12 +16,15 @@ export class Joystick {
 
   constructor() {
     this.base = document.createElement('div');
+    this.base.id = 'joystick';
+    this.base.setAttribute('aria-hidden', 'true'); // touch-only control; keyboard players use WASD/arrows
     this.base.style.cssText = `position:absolute;left:calc(24px + env(safe-area-inset-left));bottom:calc(24px + env(safe-area-inset-bottom));
-      width:${SIZE}px;height:${SIZE}px;border-radius:50%;background:rgba(20,20,30,.35);border:2px solid rgba(255,255,255,.6);
+      width:${SIZE}px;height:${SIZE}px;border-radius:50%;background:rgba(43,32,52,.55);
+      box-shadow:0 0 0 3px var(--panel-edge),inset 0 0 0 2px rgba(255,244,224,.25);
       pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none`;
     this.knob = document.createElement('div');
     this.knob.style.cssText = `position:absolute;left:${(SIZE - KNOB) / 2 - 2}px;top:${(SIZE - KNOB) / 2 - 2}px;width:${KNOB}px;height:${KNOB}px;
-      border-radius:50%;background:rgba(255,255,255,.8);box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none`;
+      border-radius:50%;background:var(--lamp);box-shadow:0 0 0 3px var(--panel-edge),inset 0 -4px 0 var(--lamp-deep);pointer-events:none`;
     this.base.appendChild(this.knob);
     overlay().appendChild(this.base);
 

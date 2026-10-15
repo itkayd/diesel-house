@@ -1,6 +1,6 @@
 import { createElement, Mic, MicOff } from 'lucide';
 import type { VoiceStatus } from '../net/voice';
-import { overlay } from './overlay';
+import { hudBottomRight } from './overlay';
 
 type Callbacks = {
   onMute: (muted: boolean) => void;
@@ -9,57 +9,69 @@ type Callbacks = {
 };
 
 const PTT_KEY = 'diesel-house.ptt';
+const LONG_PRESS = 500; // ms
 
-// Mic button + push-to-talk switch + status line, bottom-right. Only visible inside a room.
+// The big mic button (bottom-right, only inside a room). A dot on it shows voice status: green connected,
+// amber connecting, red mic blocked. Long-press (or hover) shows the detail. Push-to-talk lives in settings.
 export class VoiceControls {
   private box: HTMLDivElement;
   private micBtn: HTMLButtonElement;
-  private pttInput: HTMLInputElement;
-  private statusLine: HTMLDivElement;
+  private dot: HTMLSpanElement;
+  private detail: HTMLDivElement;
   private muted = false;
   private ptt = false;
   private talking = false;
+  private pressTimer = 0;
+  private longPressed = false;
 
   constructor(private cb: Callbacks) {
     this.box = document.createElement('div');
     this.box.id = 'voice-controls';
-    this.box.style.cssText = `position:absolute;right:calc(16px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom));
-      display:none;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none;font:13px system-ui,sans-serif`;
+    this.box.style.cssText = 'position:relative;display:none';
 
-    this.statusLine = document.createElement('div');
-    this.statusLine.style.cssText = 'padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.55)';
+    this.detail = document.createElement('div');
+    this.detail.id = 'voice-status';
+    this.detail.className = 'dh-pill';
+    this.detail.style.cssText = 'position:absolute;right:0;bottom:calc(100% + 12px);visibility:hidden;font-family:var(--font-body);font-size:13px';
 
     this.micBtn = document.createElement('button');
     this.micBtn.type = 'button';
     this.micBtn.id = 'mic-button';
-    this.micBtn.style.cssText = `width:68px;height:68px;border-radius:50%;border:2px solid rgba(255,255,255,.6);pointer-events:auto;
-      display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none`;
+    this.micBtn.className = 'dh-icon-btn';
+    this.micBtn.style.cssText = 'width:72px;height:72px;touch-action:none;user-select:none;-webkit-user-select:none;position:relative';
+    this.dot = document.createElement('span');
+    this.dot.className = 'dh-dot';
+    this.dot.style.cssText = 'position:absolute;top:7px;right:7px;width:12px;height:12px';
+
     this.micBtn.addEventListener('click', () => {
+      if (this.longPressed) return; // that press only showed the detail
       if (!this.ptt) this.setMuted(!this.muted);
     });
     this.micBtn.addEventListener('pointerdown', (e) => {
-      if (!this.ptt) return;
-      this.micBtn.setPointerCapture(e.pointerId);
-      this.setTalking(true);
+      this.longPressed = false;
+      if (this.ptt) {
+        this.micBtn.setPointerCapture(e.pointerId);
+        this.setTalking(true);
+        return;
+      }
+      this.pressTimer = window.setTimeout(() => {
+        this.longPressed = true;
+        this.showDetail(true);
+      }, LONG_PRESS);
     });
-    const stop = () => this.ptt && this.setTalking(false);
-    this.micBtn.addEventListener('pointerup', stop);
-    this.micBtn.addEventListener('pointercancel', stop);
+    const release = () => {
+      clearTimeout(this.pressTimer);
+      if (this.longPressed) setTimeout(() => this.showDetail(false), 1500);
+      if (this.ptt) this.setTalking(false);
+    };
+    this.micBtn.addEventListener('pointerup', release);
+    this.micBtn.addEventListener('pointercancel', release);
+    this.micBtn.addEventListener('pointerenter', (e) => e.pointerType === 'mouse' && this.showDetail(true));
+    this.micBtn.addEventListener('pointerleave', (e) => e.pointerType === 'mouse' && this.showDetail(false));
+    this.micBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on phones
 
-    const pttLabel = document.createElement('label');
-    pttLabel.style.cssText =
-      'display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(0,0,0,.55);pointer-events:auto;cursor:pointer';
-    this.pttInput = document.createElement('input');
-    this.pttInput.type = 'checkbox';
-    this.pttInput.id = 'ptt-toggle';
-    this.pttInput.addEventListener('change', () => {
-      this.setPushToTalk(this.pttInput.checked);
-      this.pttInput.blur(); // so Space talks instead of toggling the box
-    });
-    pttLabel.append(this.pttInput, 'Push to talk');
-
-    this.box.append(this.statusLine, pttLabel, this.micBtn);
-    overlay().appendChild(this.box);
+    this.box.append(this.detail, this.micBtn);
+    hudBottomRight().appendChild(this.box);
 
     // Space bar = hold to talk on desktop (only in push-to-talk mode).
     window.addEventListener('keydown', (e) => {
@@ -85,15 +97,26 @@ export class VoiceControls {
     this.setPushToTalk(saved);
   }
 
+  get pushToTalk() {
+    return this.ptt;
+  }
+
+  get statusText() {
+    return this.detail.textContent ?? '';
+  }
+
+  private showDetail(on: boolean) {
+    this.detail.style.visibility = on ? 'visible' : 'hidden';
+  }
+
   private setMuted(m: boolean) {
     this.muted = m;
     this.cb.onMute(m);
     this.render();
   }
 
-  private setPushToTalk(on: boolean) {
+  setPushToTalk(on: boolean) {
     this.ptt = on;
-    this.pttInput.checked = on;
     this.talking = false;
     try {
       localStorage.setItem(PTT_KEY, on ? '1' : '0');
@@ -114,19 +137,22 @@ export class VoiceControls {
 
   private render() {
     const live = this.ptt ? this.talking : !this.muted;
-    this.micBtn.replaceChildren(createElement(live ? Mic : MicOff, { width: 30, height: 30 }));
-    this.micBtn.style.background = live ? 'rgba(46,160,90,.85)' : this.ptt ? 'rgba(40,40,55,.8)' : 'rgba(190,50,50,.85)';
+    this.micBtn.replaceChildren(createElement(live ? Mic : MicOff, { width: 32, height: 32 }), this.dot);
+    this.micBtn.style.background = live ? '#2f7d4a' : this.ptt ? 'var(--panel)' : '#8a2f3a';
     const label = this.ptt ? (this.talking ? 'Talking' : 'Hold to talk') : this.muted ? 'Unmute' : 'Mute';
     this.micBtn.setAttribute('aria-label', label);
     this.micBtn.title = this.ptt ? 'Hold to talk (or hold Space)' : label;
   }
 
   show(status: VoiceStatus) {
-    this.box.style.display = status.state === 'off' ? 'none' : 'flex';
-    if (status.state === 'joining') this.statusLine.textContent = 'Joining voice…';
-    else if (status.state === 'in-room') {
+    this.box.style.display = status.state === 'off' ? 'none' : 'block';
+    if (status.state === 'joining') {
+      this.detail.textContent = 'Joining voice…';
+      this.dot.className = 'dh-dot warn';
+    } else if (status.state === 'in-room') {
       const others = status.total === 0 ? 'nobody else here' : `${status.connected}/${status.total} connected`;
-      this.statusLine.textContent = status.mic === 'blocked' ? `🔇 Mic blocked · listening · ${others}` : `Voice · ${others}`;
+      this.detail.textContent = status.mic === 'blocked' ? `Mic blocked · listening · ${others}` : `Voice · ${others}`;
+      this.dot.className = `dh-dot ${status.mic === 'blocked' ? 'bad' : status.connected < status.total ? 'warn' : 'ok'}`;
     }
   }
 }

@@ -71,15 +71,16 @@ check('B learns A entered room 1 within 1 second', { ms: zoneLag }, zoneLag !== 
 await A.page.waitForTimeout(2000); await A.page.keyboard.up('ArrowUp');
 await B.page.waitForTimeout(800);
 r = await remoteA(); const az = await A.page.evaluate(() => window.__house.zone);
-check('zone tracked: B knows A is in room_01', { aZone: az, seenByB: r.zone, onB: r }, az === 'room_01' && r.zone === 'room_01' && r.y < 60);
+check('zone tracked: B knows A is in room_01', { aZone: az, seenByB: r.zone, onB: r }, az === 'room_01' && r.zone === 'room_01' && r.y < 80);
 await B.page.evaluate((id) => { const s = window.__house.remotes.get(id).avatar.sprite; window.__house.body.reset(s.x, s.y + 70); }, aId);
 await B.page.waitForTimeout(400);
 await B.page.screenshot({ path: `${out}/p3_b_view.png` });
 
 // Change character + name on A
-await A.page.click('text=Change character');
+await A.page.click('#profile-button');
 await A.page.fill('#player-name', 'Alice renamed');
 await A.page.click('button[data-character="17"]');
+await A.page.click('#picker-done');
 const tn = Date.now(); while (Date.now() - tn < 8000) { r = await remoteA(); if (r.name === 'Alice renamed' && r.character === 17) break; await B.page.waitForTimeout(100); }
 r = { ...(await remoteA()), ms: Date.now() - tn };
 check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 17 && r.zone === 'room_01');

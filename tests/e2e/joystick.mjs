@@ -15,7 +15,7 @@ const cdp = await ctx.newCDPSession(page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
 const pos = () => page.evaluate(() => { const h = window.__house; return { x: Math.round(h.player.x), y: Math.round(h.player.y), zone: h.zone }; });
 const res = []; const check = (n, p, ok) => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}  -> ${JSON.stringify(p)}`);
-const box = await page.evaluate(() => { const r = [...document.querySelectorAll('#overlay div')].find((d) => d.style.borderRadius === '50%').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; });
+const box = await page.evaluate(() => { const r = document.getElementById('joystick').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; });
 check('joystick shown on phone', box, box.w > 100);
 // Touch elsewhere: should not move
 let a = await pos(); await touch('touchStart', 300, 200); await page.waitForTimeout(1000); await touch('touchEnd'); let b = await pos();
@@ -34,11 +34,11 @@ check('small push walks slowly left', e, e.x < d.x && d.x - e.x < 50);
 // Up through a door into room 1
 await page.evaluate(() => window.__house.body.reset(96, 240));
 await touch('touchStart', box.x, box.y); await touch('touchMove', box.x, box.y - 60); await page.waitForTimeout(3500); await touch('touchEnd');
-const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 54);
+const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 70); // stopped by the TV
 // Desktop: no joystick
 const dp = await browser.newPage({ viewport: { width: 1366, height: 768 } }); await dp.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
 await dp.goto('http://localhost:5173/'); await dp.waitForFunction(() => window.__house?.player);
-const n = await dp.evaluate(() => [...document.querySelectorAll('#overlay div')].filter((d) => d.style.borderRadius === '50%').length);
+const n = await dp.evaluate(() => document.querySelectorAll('#joystick').length);
 check('no joystick on desktop', n, n === 0);
 console.log(res.join('\n')); console.log(errors.length ? 'ERRORS: ' + errors.join('\n') : 'no page errors');
 await browser.close();

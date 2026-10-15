@@ -53,6 +53,11 @@ export function saveVolume(person: string, v: number) {
   write(VOLUME_KEY, JSON.stringify({ ...volumes(), [person]: v }));
 }
 
+// Whether to draw your own name tag above your character.
+const OWN_TAG_KEY = 'diesel-house.show-own-tag';
+export const savedShowOwnTag = () => read(OWN_TAG_KEY) !== '0';
+export const saveShowOwnTag = (on: boolean) => write(OWN_TAG_KEY, on ? '1' : '0');
+
 // Which microphone to use on this device ('' = the system default).
 const MIC_KEY = 'diesel-house.mic-device';
 export const savedMicDevice = () => read(MIC_KEY) ?? '';

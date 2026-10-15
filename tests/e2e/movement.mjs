@@ -112,7 +112,7 @@ const P = await player('Thumb', 18, { phone: true });
 const cdp = await P.ctx.newCDPSession(P.page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
 const box = await P.page.evaluate(() => {
-  const r = [...document.querySelectorAll('#overlay div')].find((d) => d.style.borderRadius === '50%').getBoundingClientRect();
+  const r = document.getElementById('joystick').getBoundingClientRect();
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 });
 await P.page.waitForTimeout(500);

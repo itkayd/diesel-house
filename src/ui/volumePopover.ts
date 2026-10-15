@@ -10,12 +10,12 @@ export function showVolumePopover(name: string, value: number, onChange: (v: num
   pop.id = 'volume-popover';
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', `Volume for ${name}`);
-  pop.style.cssText = `position:absolute;left:50%;top:calc(max(12px,env(safe-area-inset-top)) + 64px);transform:translateX(-50%);
-    width:min(300px,calc(100% - 32px));box-sizing:border-box;padding:12px 14px;border-radius:12px;pointer-events:auto;
-    background:rgba(20,15,28,.94);border:2px solid rgba(255,255,255,.2);font:14px system-ui,sans-serif`;
+  pop.className = 'dh-card dh-popover';
+  pop.style.top = 'calc(max(12px, env(safe-area-inset-top)) + 60px)';
   const title = document.createElement('div');
   title.textContent = name;
-  title.style.cssText = 'font-weight:600;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  title.className = 'dh-title';
+  title.style.cssText = 'font-size:17px;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;align-items:center;gap:10px';
   const icon = document.createElement('span');
@@ -27,7 +27,8 @@ export function showVolumePopover(name: string, value: number, onChange: (v: num
   slider.value = String(Math.round(value * 100));
   slider.id = 'volume-slider';
   slider.setAttribute('aria-label', `Volume for ${name}`);
-  slider.style.cssText = 'flex:1;min-height:44px;accent-color:#f4b860';
+  slider.className = 'dh-range';
+  slider.style.flex = '1';
   const pct = document.createElement('span');
   pct.style.cssText = 'width:40px;text-align:right;font-variant-numeric:tabular-nums';
   const render = () => {

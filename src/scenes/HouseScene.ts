@@ -6,16 +6,18 @@ import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { installAudioUnlock } from '../net/audio';
 import { msgStats } from '../net/stats';
 import type { Voice } from '../net/voice';
-import { saveCharacter, savedCharacter, saveName, savedName, savedVolume, saveVolume } from '../prefs';
+import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
 import { showStatus, showZone } from '../ui/overlay';
 import { isTouchDevice, Joystick } from '../ui/joystick';
-import { addChangeCharacterButton, pickCharacter } from '../ui/picker';
+import { addProfileButton, pickCharacter } from '../ui/picker';
 import { askForMic } from '../ui/micPrompt';
-import { addSettings } from '../ui/settings';
+import { addSettingsSection, switchRow } from '../ui/settings';
+import { addVoiceSettings } from '../ui/voiceSettings';
 import { showVolumePopover, volumePopoverOpen } from '../ui/volumePopover';
 import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
+import { HouseLook } from './houseLook';
 
 const SPEED = 80; // px per second
 const SLOW = 0.5; // joystick half-push speed, as a fraction of SPEED
@@ -67,6 +69,8 @@ export class HouseScene extends Phaser.Scene {
   private voiceControls: VoiceControls | null = null;
   private voiceTimer: Phaser.Time.TimerEvent | null = null;
   private starting = false;
+  private presenceState: 'connecting' | 'online' | 'offline' = 'connecting';
+  look!: HouseLook;
   private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
 
   constructor() {
@@ -75,10 +79,19 @@ export class HouseScene extends Phaser.Scene {
 
   create() {
     const map = this.make.tilemap({ key: 'house' });
-    const tiles = map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!;
+    const tiles = [
+      map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!,
+      map.addTilesetImage('limezu_interiors', 'limezu_interiors', 16, 16, 0, 0)!,
+      map.addTilesetImage('kenney_indoor', 'kenney_indoor', 16, 16, 0, 1)!,
+    ];
     const floor = map.createLayer('floor', tiles)!;
     const walls = map.createLayer('walls', tiles)!;
     walls.setCollisionByExclusion([-1]);
+    map.createLayer('decor', tiles);
+    map.createLayer('furniture', tiles);
+    map.createLayer('furniture_top', tiles)!.setDepth(50_000); // tops of plants and lamps: over people behind them
+    const solid = map.createLayer('collision', tiles)!.setVisible(false);
+    solid.setCollisionByExclusion([-1]);
 
     for (const obj of map.getObjectLayer('zones')!.objects) {
       if (obj.name === 'hallway' || (ROOM_IDS as readonly string[]).includes(obj.name))
@@ -93,7 +106,11 @@ export class HouseScene extends Phaser.Scene {
         floor.forEachTile((t) => (t.tint = colour), this, obj.x! / TILE_SIZE, obj.y! / TILE_SIZE, obj.width! / TILE_SIZE, rows);
       }
     }
-    this.addRoomLabels();
+    this.look = new HouseLook(
+      this,
+      map,
+      this.zones.filter((z) => z.name !== 'hallway') as { name: RoomId; rect: Phaser.Geom.Rectangle }[],
+    );
 
     // Sprite position is the character's feet; the physics body is a small box around them.
     const spawn = map.findObject('zones', (o) => o.name === 'spawn')!;
@@ -107,6 +124,7 @@ export class HouseScene extends Phaser.Scene {
     this.body = this.player.body as Phaser.Physics.Arcade.Body;
     this.body.setSize(10, 6).setOffset(3, 26);
     this.physics.add.collider(this.player, walls);
+    this.physics.add.collider(this.player, solid);
     this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.body.setCollideWorldBounds(true);
 
@@ -121,7 +139,16 @@ export class HouseScene extends Phaser.Scene {
     this.fitCamera();
     this.scale.on('resize', this.fitCamera, this);
 
-    addChangeCharacterButton(() => this.choose());
+    addProfileButton(() => void this.choose());
+    if (!savedShowOwnTag()) this.me.setTagVisible(false);
+    addSettingsSection(30, (box) =>
+      box.append(
+        switchRow('show-own-tag', 'Show my name tag', savedShowOwnTag(), (on) => {
+          saveShowOwnTag(on);
+          this.me.setTagVisible(on);
+        }),
+      ),
+    );
     if (saved === null || name === null) void this.choose();
     else void this.start();
 
@@ -131,7 +158,12 @@ export class HouseScene extends Phaser.Scene {
   private async choose() {
     this.canMove = false;
     this.body.setVelocity(0, 0);
-    const { character, name } = await pickCharacter(this.textures, savedCharacter(), savedName());
+    const choice = await pickCharacter(this.textures, savedCharacter(), savedName());
+    if (!choice) {
+      this.canMove = true; // closed without changes
+      return;
+    }
+    const { character, name } = choice;
     this.character = character;
     this.name = name;
     saveCharacter(character);
@@ -147,7 +179,7 @@ export class HouseScene extends Phaser.Scene {
     this.canMove = true;
     if (this.starting) return;
     this.starting = true;
-    showStatus('Connecting…', false);
+    showStatus('Connecting…', 'warn');
     const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
     this.presence = new Presence(
       { name: this.name, character: this.character, zone: this.zone },
@@ -179,7 +211,7 @@ export class HouseScene extends Phaser.Scene {
       onPushToTalk: (on) => this.voice!.setPushToTalk(on),
       onTalking: (t) => this.voice!.setTalking(t),
     });
-    addSettings({ listMics: () => this.voice!.listMics(), onMicChange: (id) => void this.voice!.setMicDevice(id) });
+    addVoiceSettings(this.voice, this.voiceControls);
     this.updateVoice();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
     window.addEventListener('pagehide', () => {
@@ -204,9 +236,29 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private showPresenceStatus(s: 'connecting' | 'online' | 'offline') {
-    if (s === 'connecting') showStatus('Connecting…', false);
-    else if (s === 'offline') showStatus('Offline', false);
-    else showStatus(`${this.activeCount()} in the house`, true);
+    this.presenceState = s;
+    this.refreshRooms();
+    if (s === 'connecting') showStatus('Connecting…', 'warn');
+    else if (s === 'offline') showStatus('Offline', 'bad');
+    else if (this.zone && this.zone !== 'hallway') showStatus(`${this.countIn(this.zone)} here`, 'ok');
+    else showStatus(`${this.activeCount()} in the house`, 'ok');
+  }
+
+  // Nameplate faces and room warmth, from who's where.
+  private refreshRooms() {
+    for (const room of ROOM_IDS) {
+      const chars: number[] = [];
+      if (this.zone === room) chars.push(this.character);
+      for (const r of this.remotes.values()) if (r.active && r.info.zone === room) chars.push(r.info.character);
+      this.look.setOccupants(room, chars);
+    }
+  }
+
+  // People in a zone, counting you if you're there.
+  countIn(zone: Zone) {
+    let n = this.zone === zone ? 1 : 0;
+    for (const r of this.remotes.values()) if (r.active && r.info.zone === zone) n++;
+    return n;
   }
 
   private activeCount() {
@@ -264,8 +316,10 @@ export class HouseScene extends Phaser.Scene {
     r.clockOffset = Math.min(r.clockOffset, now - m.t);
     const motion: Motion = { t: m.t + r.clockOffset, x: m.x, y: m.y, vx: m.vx, vy: m.vy, dir: m.dir };
     if (r.motion && motion.t <= r.motion.t) return; // out of order
+    const moved = r.info.zone !== m.zone;
     r.info.zone = m.zone;
     r.lastHeard = now;
+    if (moved && r.active) this.showPresenceStatus(this.presenceState);
     if (!r.active) {
       r.active = true;
       r.motion = motion;
@@ -343,23 +397,6 @@ export class HouseScene extends Phaser.Scene {
     this.cameras.main.setZoom(zoom);
   }
 
-  private addRoomLabels() {
-    for (const z of this.zones) {
-      if (z.name === 'hallway') continue;
-      const n = Number(z.name.slice(-2));
-      this.add
-        .text(z.rect.centerX, z.rect.centerY, `Room ${n}`, {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '10px',
-          color: '#ffffff',
-          stroke: '#1b1b24',
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5)
-        .setAlpha(0.8)
-        .setResolution(4);
-    }
-  }
 
   update() {
     const v = this.canMove ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
@@ -382,6 +419,7 @@ export class HouseScene extends Phaser.Scene {
     if (zone !== this.zone) {
       this.zone = zone;
       showZone(zone);
+      this.showPresenceStatus(this.presenceState);
       this.presence?.update({ zone });
       this.sendMove(true);
       this.updateVoice();

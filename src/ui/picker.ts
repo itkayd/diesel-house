@@ -1,85 +1,181 @@
 import type Phaser from 'phaser';
-import { CHARACTER_COUNT, portraitFrame } from '../characters';
+import { createElement, UserRound, X } from 'lucide';
+import { CHARACTER_COUNT, characterFrames, portraitFrame } from '../characters';
 import { NAME_MAX } from '../prefs';
-import { overlay } from './overlay';
+import { hudButtons, overlay } from './overlay';
 
 const SCALE = 3;
 
-function portrait(textures: Phaser.Textures.TextureManager, index: number) {
-  const { key, frame } = portraitFrame(index);
+function drawFrame(c: HTMLCanvasElement, textures: Phaser.Textures.TextureManager, key: string, frame: number) {
   const f = textures.getFrame(key, frame);
+  const g = c.getContext('2d')!;
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(f.source.image as CanvasImageSource, f.cutX, f.cutY, 16, 32, 0, 0, c.width, c.height);
+}
+
+function portrait(textures: Phaser.Textures.TextureManager, index: number) {
   const c = document.createElement('canvas');
   c.width = 16 * SCALE;
   c.height = 32 * SCALE;
-  c.style.cssText = 'image-rendering:pixelated;display:block;margin:0 auto';
-  const g = c.getContext('2d')!;
-  g.imageSmoothingEnabled = false;
-  g.drawImage(f.source.image as CanvasImageSource, f.cutX, f.cutY, 16, 32, 0, 0, c.width, c.height);
+  c.style.cssText = 'image-rendering:pixelated;display:block;margin:0 auto;width:48px;height:96px';
+  const { key, frame } = portraitFrame(index);
+  drawFrame(c, textures, key, frame);
   return c;
 }
 
-// Full-screen name box + grid of characters. Resolves with the name and chosen index.
+// The selected character moves gently: LimeZu ones breathe (idle strip), chibis step in place.
+function animationFrames(index: number) {
+  const f = characterFrames(index);
+  return index < 16 ? f.walk.down : f.idle.down;
+}
+
+// Name + character card. Resolves with the choice, or null if closed without changing (only possible
+// when `canClose`, i.e. not the first launch).
 export function pickCharacter(
   textures: Phaser.Textures.TextureManager,
   current: number | null,
   currentName: string | null,
-): Promise<{ character: number; name: string }> {
+  canClose = current !== null && currentName !== null,
+): Promise<{ character: number; name: string } | null> {
   return new Promise((resolve) => {
-    const panel = document.createElement('div');
-    panel.style.cssText = `position:absolute;inset:0;pointer-events:auto;background:rgba(15,15,22,.92);overflow-y:auto;
-      display:flex;flex-direction:column;align-items:center;padding:calc(20px + env(safe-area-inset-top)) 16px 24px;box-sizing:border-box`;
+    let selected = current;
+    let raf = 0;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'picker';
+    backdrop.style.cssText = `position:absolute;inset:0;pointer-events:auto;background:rgba(20,15,28,.82);overflow-y:auto;
+      display:flex;justify-content:center;align-items:flex-start;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box`;
+    const card = document.createElement('div');
+    card.className = 'dh-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-labelledby', 'picker-title');
+    card.style.cssText = 'width:min(100%,520px);box-sizing:border-box;padding:20px;display:grid;gap:16px;margin:auto 0';
+
+    const head = document.createElement('div');
+    head.className = 'dh-sheet-head';
+    const title = document.createElement('h2');
+    title.id = 'picker-title';
+    title.className = 'dh-title';
+    title.textContent = canClose ? 'You' : 'Who are you?';
+    head.append(title);
+    if (canClose) {
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.id = 'picker-close';
+      close.className = 'dh-icon-btn dh-sheet-close';
+      close.setAttribute('aria-label', 'Close');
+      close.append(createElement(X, { width: 22, height: 22 }));
+      close.addEventListener('click', () => finish(null));
+      head.append(close);
+    }
+
+    const nameField = document.createElement('div');
     const nameLabel = document.createElement('label');
+    nameLabel.className = 'dh-label';
     nameLabel.textContent = 'Your name';
-    nameLabel.style.cssText = 'font-size:14px;opacity:.8;margin-bottom:6px';
     const nameInput = document.createElement('input');
     nameInput.id = 'player-name';
+    nameInput.className = 'dh-input';
     nameLabel.htmlFor = nameInput.id;
     nameInput.maxLength = NAME_MAX;
     nameInput.value = currentName ?? '';
-    nameInput.placeholder = 'Type your name';
+    nameInput.placeholder = 'What your friends call you';
     nameInput.setAttribute('autocomplete', 'nickname');
-    nameInput.style.cssText = `width:100%;max-width:280px;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:2px solid rgba(255,255,255,.25);
-      background:rgba(255,255,255,.08);color:#fff;font:16px system-ui,sans-serif;margin-bottom:20px;text-align:center`;
-    const title = document.createElement('h2');
-    title.textContent = 'Pick your character';
-    title.style.cssText = 'margin:0 0 16px;font-size:20px;font-weight:600';
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:10px;width:100%;max-width:520px';
+    nameField.append(nameLabel, nameInput);
 
+    const charLabel = document.createElement('div');
+    charLabel.className = 'dh-label';
+    charLabel.id = 'picker-characters';
+    charLabel.textContent = 'Your character';
+    const grid = document.createElement('div');
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-labelledby', 'picker-characters');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:10px';
+    const buttons: HTMLButtonElement[] = [];
+    const canvases: HTMLCanvasElement[] = [];
     for (let i = 0; i < CHARACTER_COUNT; i++) {
       const b = document.createElement('button');
       b.type = 'button';
+      b.setAttribute('role', 'radio');
       b.setAttribute('aria-label', `Character ${i + 1}`);
       b.dataset.character = String(i);
-      const selected = i === current;
-      b.style.cssText = `padding:8px 0;border-radius:12px;cursor:pointer;background:${selected ? 'rgba(255,211,77,.25)' : 'rgba(255,255,255,.08)'};
-        border:2px solid ${selected ? '#ffd34d' : 'transparent'}`;
-      b.appendChild(portrait(textures, i));
-      b.addEventListener('click', () => {
-        const name = nameInput.value.trim().slice(0, NAME_MAX);
-        if (!name) {
-          nameInput.style.borderColor = '#ff6b6b';
-          nameInput.placeholder = 'Type your name first';
-          nameInput.focus();
-          return;
-        }
-        panel.remove();
-        resolve({ character: i, name });
-      });
+      b.style.cssText = 'padding:6px 0;border:0;border-radius:var(--radius);cursor:pointer;background:var(--panel-edge)';
+      const c = portrait(textures, i);
+      canvases.push(c);
+      b.appendChild(c);
+      b.addEventListener('click', () => select(i));
+      buttons.push(b);
       grid.appendChild(b);
     }
-    panel.append(nameLabel, nameInput, title, grid);
-    overlay().appendChild(panel);
+
+    const error = document.createElement('p');
+    error.id = 'picker-error';
+    error.style.cssText = 'margin:0;color:var(--error);font-size:14px';
+    error.hidden = true;
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.id = 'picker-done';
+    done.className = 'dh-btn primary';
+    done.textContent = 'Done';
+    done.addEventListener('click', () => {
+      const name = nameInput.value.trim().slice(0, NAME_MAX);
+      const problem = !name ? 'Type your name first.' : selected === null ? 'Pick a character.' : '';
+      error.textContent = problem;
+      error.hidden = !problem;
+      nameInput.classList.toggle('invalid', !name);
+      if (!name) nameInput.focus();
+      if (!problem) finish({ character: selected!, name });
+    });
+    nameInput.addEventListener('input', () => nameInput.classList.remove('invalid'));
+    nameInput.addEventListener('keydown', (e) => e.key === 'Enter' && done.click());
+
+    card.append(head, nameField, charLabel, grid, error, done);
+    backdrop.append(card);
+    overlay().appendChild(backdrop);
+    if (!currentName) nameInput.focus();
+
+    function select(i: number) {
+      if (selected !== null) {
+        const { key, frame } = portraitFrame(selected);
+        drawFrame(canvases[selected], textures, key, frame);
+      }
+      selected = i;
+      buttons.forEach((b, j) => {
+        b.setAttribute('aria-checked', String(j === i));
+        b.style.boxShadow = j === i ? '0 0 0 3px var(--lamp)' : 'none';
+        b.style.background = j === i ? 'var(--panel-hi)' : 'var(--panel-edge)';
+      });
+      buttons[i].scrollIntoView?.({ block: 'nearest' });
+    }
+    if (selected !== null) select(selected);
+
+    const frames = (i: number) => animationFrames(i);
+    const tick = (t: number) => {
+      if (selected !== null) {
+        const fs = frames(selected);
+        const f = fs[Math.floor(t / (selected < 16 ? 220 : 140)) % fs.length];
+        drawFrame(canvases[selected], textures, f.key, f.frame);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) raf = requestAnimationFrame(tick);
+
+    function finish(result: { character: number; name: string } | null) {
+      cancelAnimationFrame(raf);
+      backdrop.remove();
+      resolve(result);
+    }
   });
 }
 
-// Small round button (top-right) that reopens the picker.
-export function addChangeCharacterButton(onClick: () => void) {
+// Profile button (top-right) that reopens the picker.
+export function addProfileButton(onClick: () => void) {
   const b = document.createElement('button');
   b.type = 'button';
-  b.textContent = 'Change character';
-  b.style.cssText = `position:absolute;top:max(12px,env(safe-area-inset-top));right:12px;pointer-events:auto;padding:6px 12px;border:0;
-    border-radius:999px;background:rgba(0,0,0,.55);color:#fff;font:14px system-ui,sans-serif;cursor:pointer`;
+  b.id = 'profile-button';
+  b.className = 'dh-icon-btn';
+  b.setAttribute('aria-label', 'You: name and character');
+  b.append(createElement(UserRound, { width: 22, height: 22 }));
   b.addEventListener('click', onClick);
-  overlay().appendChild(b);
+  hudButtons().prepend(b);
 }

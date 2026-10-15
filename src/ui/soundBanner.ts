@@ -11,9 +11,9 @@ export function showSoundBanner() {
   banner.type = 'button';
   banner.id = 'sound-banner';
   banner.append(createElement(Volume2, { width: 20, height: 20 }), 'Tap to turn on sound');
-  banner.style.cssText = `position:absolute;left:50%;top:calc(max(12px,env(safe-area-inset-top)) + 64px);transform:translateX(-50%);
-    display:flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:999px;border:2px solid #f4b860;background:rgba(20,15,28,.94);color:#fff;
-    font:600 15px system-ui,sans-serif;pointer-events:auto;cursor:pointer`;
+  banner.className = 'dh-btn primary';
+  banner.style.cssText = `position:absolute;left:50%;top:calc(max(12px,env(safe-area-inset-top)) + 60px);transform:translateX(-50%);
+    display:flex;align-items:center;gap:8px;white-space:nowrap`;
   banner.addEventListener('click', () => unlockAudio());
   overlay().appendChild(banner);
 }

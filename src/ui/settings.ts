@@ -1,76 +1,85 @@
 import { createElement, Settings, X } from 'lucide';
-import { savedMicDevice } from '../prefs';
-import { overlay } from './overlay';
+import { hudButtons, overlay } from './overlay';
 
-type Mic = { id: string; label: string };
-type Options = {
-  listMics: () => Promise<Mic[]>;
-  onMicChange: (id: string) => void;
-};
+// Settings: a gear button (top-right) opening a bottom sheet. Each feature adds its own section with
+// addSettingsSection(); sections render fresh every time the sheet opens.
+type Section = { order: number; render: (box: HTMLElement) => void | Promise<void> };
+const sections: Section[] = [];
+let added = false;
 
-// Gear button (top-right, under "Change character") that opens a settings sheet.
-// Phase 4.6 restyles this and moves more controls in here.
-export function addSettings(opts: Options) {
+export function addSettingsSection(order: number, render: Section['render']) {
+  sections.push({ order, render });
+  sections.sort((a, b) => a.order - b.order);
+  if (!added) addButton();
+}
+
+function addButton() {
+  added = true;
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.id = 'settings-button';
+  btn.className = 'dh-icon-btn';
   btn.setAttribute('aria-label', 'Settings');
   btn.append(createElement(Settings, { width: 22, height: 22 }));
-  btn.style.cssText = `position:absolute;top:calc(max(12px,env(safe-area-inset-top)) + 40px);right:12px;width:44px;height:44px;
-    display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;
-    pointer-events:auto;cursor:pointer`;
-  btn.addEventListener('click', () => void open(opts));
-  overlay().appendChild(btn);
+  btn.addEventListener('click', () => void openSettings());
+  hudButtons().appendChild(btn);
 }
 
-async function open(opts: Options) {
+export async function openSettings() {
   if (document.getElementById('settings-sheet')) return;
   const sheet = document.createElement('div');
   sheet.id = 'settings-sheet';
+  sheet.className = 'dh-card dh-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-labelledby', 'settings-title');
-  sheet.style.cssText = `position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(420px,100%);box-sizing:border-box;
-    padding:16px 16px calc(20px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;pointer-events:auto;
-    background:rgba(20,15,28,.97);border:2px solid rgba(255,255,255,.2);border-bottom:0;font:14px system-ui,sans-serif`;
-
   const head = document.createElement('div');
-  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:12px';
+  head.className = 'dh-sheet-head';
   const title = document.createElement('h2');
   title.id = 'settings-title';
+  title.className = 'dh-title';
   title.textContent = 'Settings';
-  title.style.cssText = 'margin:0;font-size:18px';
   const close = document.createElement('button');
   close.type = 'button';
   close.id = 'settings-close';
+  close.className = 'dh-icon-btn dh-sheet-close';
   close.setAttribute('aria-label', 'Close settings');
   close.append(createElement(X, { width: 22, height: 22 }));
-  close.style.cssText = 'width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;background:none;color:#fff;cursor:pointer';
   close.addEventListener('click', () => sheet.remove());
   head.append(title, close);
-
-  const label = document.createElement('label');
-  label.htmlFor = 'mic-select';
-  label.textContent = 'Microphone';
-  label.style.cssText = 'display:block;margin-bottom:6px;opacity:.8';
-  const select = document.createElement('select');
-  select.id = 'mic-select';
-  select.style.cssText = `width:100%;min-height:44px;padding:0 10px;border-radius:8px;border:2px solid rgba(255,255,255,.25);
-    background:#2b2034;color:#fff;font:15px system-ui,sans-serif`;
-  const mics = await opts.listMics();
-  const current = savedMicDevice();
-  // Skip the browser's own 'default'/'communications' aliases; 'System default' covers them.
-  for (const m of [{ id: '', label: 'System default' }, ...mics.filter((m) => m.id && m.id !== 'default' && m.id !== 'communications')]) {
-    const o = document.createElement('option');
-    o.value = m.id;
-    o.textContent = m.label;
-    o.selected = m.id === current;
-    select.appendChild(o);
-  }
-  select.addEventListener('change', () => opts.onMicChange(select.value));
-  const hint = document.createElement('div');
-  hint.textContent = mics.some((m) => !m.label.startsWith('Microphone ')) ? '' : 'Names show up once you have allowed the mic.';
-  hint.style.cssText = 'margin-top:6px;opacity:.6;font-size:12px';
-
-  sheet.append(head, label, select, hint);
+  sheet.append(head);
   overlay().appendChild(sheet);
+  for (const s of sections) {
+    const box = document.createElement('section');
+    box.style.display = 'grid';
+    box.style.gap = '6px';
+    sheet.append(box);
+    await s.render(box);
+  }
+}
+
+// Helpers for sections.
+export function switchRow(id: string, label: string, checked: boolean, onChange: (on: boolean) => void) {
+  const row = document.createElement('label');
+  row.className = 'dh-switch';
+  row.htmlFor = id;
+  const text = document.createElement('span');
+  text.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.id = id;
+  input.checked = checked;
+  input.addEventListener('change', () => {
+    onChange(input.checked);
+    input.blur(); // so Space (push to talk) doesn't toggle it again
+  });
+  row.append(text, input);
+  return row;
+}
+
+export function sectionLabel(text: string, forId?: string) {
+  const l = document.createElement('label');
+  l.className = 'dh-label';
+  l.textContent = text;
+  if (forId) l.htmlFor = forId;
+  return l;
 }

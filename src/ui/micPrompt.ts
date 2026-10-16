@@ -9,7 +9,7 @@ let declinedThisVisit = false;
 export const resetMicDecline = () => (declinedThisVisit = false);
 
 // True if the browser will hand over the mic without asking (already allowed, or allowed here before).
-async function micAlreadyAllowed() {
+export async function micAlreadyAllowed() {
   try {
     if (localStorage.getItem(OK_KEY) === '1') return true;
   } catch {

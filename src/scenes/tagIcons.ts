@@ -38,6 +38,23 @@ export function makeTagIcons(scene: Phaser.Scene) {
         for (let y = 7 - h; y < 7; y++) px(i * 2, y, i < lit ? colour : DIM);
       });
     });
+  // Walkie-talkie over a talker's head: radio body, antenna, green LED.
+  paint(scene, 'tag-radio', 7, 11, (px) => {
+    const R = '#9ec9ff';
+    for (let y = 0; y < 4; y++) px(5, y, R);
+    for (let x = 1; x < 6; x++) {
+      px(x, 4, R);
+      px(x, 10, R);
+    }
+    for (let y = 4; y < 11; y++) {
+      px(1, y, R);
+      px(5, y, R);
+    }
+    px(3, 7, R);
+    px(3, 8, R);
+    px(2, 5, OK);
+    px(3, 5, OK);
+  });
   bars('tag-net-poor', 1, ERROR);
   bars('tag-net-strong', 2, LAMP);
   bars('tag-net-super', 3, OK);

@@ -407,3 +407,27 @@ html, body, #game, #overlay, #overlay * {
 .v2-badge[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--lamp); }
 .v2-badgeinfo { font-size: 14px; color: var(--muted); min-height: 20px; }
 .v2-badgeinfo b { color: var(--cream); font-family: var(--font-display); }
+
+/* Walkie-talkie button and on-air strip (UPDATE.md Phase 10, design/game/v2.html). */
+.dh-walkie { width: 64px; height: 64px; border: 0; cursor: pointer; position: relative; display: grid; place-items: center; align-content: center; gap: 2px;
+  background: var(--panel); color: var(--radio); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -5px 0 rgba(0,0,0,.30);
+  touch-action: none; user-select: none; -webkit-user-select: none; font-family: var(--font-display); }
+.dh-walkie[hidden] { display: none; }
+.dh-walkie svg { width: 26px; height: 26px; }
+.dh-walkie .lab { font-size: 11px; letter-spacing: .04em; color: var(--cream); }
+.dh-walkie .led { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #3a3344; box-shadow: 0 0 0 2px var(--panel-edge); }
+.dh-walkie[data-state="talking"] { background: var(--radio); color: var(--panel-edge); }
+.dh-walkie[data-state="talking"] .lab { color: var(--panel-edge); }
+.dh-walkie .led[data-state="talking"] { background: var(--ok); }
+.dh-walkie[data-state="busy"] { color: var(--faint); }
+.dh-walkie .led[data-state="busy"] { background: var(--error); animation: dh-blink 1s steps(2) infinite; }
+.dh-walkie-strip { justify-self: center; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); color: var(--radio); }
+.dh-walkie-strip svg { width: 16px; height: 16px; }
+.dh-walkie-strip[hidden] { display: none; }
+
+/* Narrow phones: messages and the walkie strip go just under the top row (not over the "where" pill and
+   buttons), and the connection rating shows as bars only. */
+@media (max-width: 600px) {
+  .dh-hud-tc { top: calc(80px + var(--safe-t)); }
+  #net .dh-sub { display: none; }
+}

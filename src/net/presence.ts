@@ -8,13 +8,16 @@ import { countMessage, countReconnect } from './stats';
 import { supabase } from './supabase';
 
 // Who someone is (shared via Realtime presence; changes rarely). `id` is their account id.
+// Presence carries only what rarely changes (name, character, guest). Zone, mic state and connection
+// rating change often, so they ride on move messages instead (Supabase allows each client only 5 presence
+// updates per 30 s; more and it closes the channel: ClientPresenceRateLimitReached).
 // `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
 export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
 // `t` is the sender's clock (ms) when the position was taken.
-export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number };
+export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number; mic?: PlayerInfo['mic']; net?: NetQuality };
 // Door messages, addressed to one person: a knock (to the owner), let in / not now (to the visitor), or
 // being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
 export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
@@ -42,10 +45,10 @@ type Handlers = {
 };
 
 const CHANNEL = 'house';
-// Supabase cuts off a client that updates its presence too often (ClientPresenceRateLimitReached), e.g.
-// someone standing in a doorway flipping between hallway and room. Presence is sent at most this often,
-// always with the latest info; positions and zones travel in move messages anyway.
-const TRACK_EVERY_MS = 2000;
+// Supabase allows each client at most 5 presence updates (track or untrack) per 30 s per channel, and
+// closes the channel past that (ClientPresenceRateLimitReached). Presence is only re-sent for name or
+// character changes, at most this often, always with the latest info.
+const TRACK_EVERY_MS = 10_000;
 // If the channel drops (rate limit, network, phone asleep) and doesn't come back by itself, start again.
 const RECONNECT_MS = [2000, 5000, 10000, 20000, 30000];
 // Back from the background (or the network) after this long, or nothing heard for this long: rebuild.

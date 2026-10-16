@@ -11,6 +11,7 @@ const SLIDERS: [keyof Levels, IconName, string, Sfx | null][] = [
   ['voices', 'users', 'Voices', null],
   ['game', 'gamepad-2', 'Game sounds', 'knock'],
   ['music', 'music', 'Music & jingles', 'levelup'],
+  ['radio', 'radio', 'Walkie & whisper', null],
 ];
 
 export function addSoundSettings() {

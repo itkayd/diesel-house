@@ -8,8 +8,13 @@ import { countMessage } from './stats';
 import { net } from './netQuality';
 import { supabase } from './supabase';
 
-// Per-room voice: a full mesh of peer-to-peer WebRTC connections (max 8 people), signalled over a
-// Supabase Realtime channel per room. ICE: Google STUN + Twilio TURN from /api/turn.
+// Voice for one "space" at a time: a room, or the hallway. Peer-to-peer WebRTC (max 8 people), signalled
+// over a Supabase Realtime channel per space (voice:room_0N, voice:hallway). ICE: Google STUN + Twilio
+// TURN from /api/turn.
+// Rooms: everyone connects to everyone and hears everyone. Hallway (UPDATE.md Phase 10): a HallPolicy
+// decides who to connect to (people nearby, or everyone while someone's on the walkie-talkie), who gets
+// our mic (sender-side: replaceTrack, so distant people get no bytes), and how each person sounds
+// (receiver-side Web Audio: muffled whisper fading with distance, or a crackly radio).
 
 const STUN: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const CONNECT_TIMEOUT = 10_000; // ms before retrying a peer through TURN only
@@ -20,6 +25,8 @@ const DROP_AFTER = 4_000; // ms a connection may stay 'disconnected' before we d
 const SPEAKING_LEVEL = 0.02; // RMS above which someone counts as speaking
 const LEVEL_EVERY = 60; // ms between speaking checks
 const STATS_EVERY = 5_000; // ms between call-quality readings (for the connection bars)
+const HALL_EVERY = 200; // ms between hallway checks (who to connect to, who hears us, how loud)
+const RECONTACT_AFTER = 2_000; // ms before calling the same hallway person again
 const SPEAKING_HOLD = 350; // ms the glow stays on after the last loud moment, so it doesn't flicker
 const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
 // Opus tuning we ask the other side to send us: in-band FEC (survives lost packets on mobile/Middle East
@@ -46,9 +53,14 @@ type Signal =
   | { kind: 'offer' | 'answer'; from: string; to: string; session: number; relay: boolean; sdp: string }
   | { kind: 'ice'; from: string; to: string; session: number; candidate: RTCIceCandidateInit };
 
+// Hallway: how we hear one person (receiver-side effects, see createFx).
+type Fx = { src: MediaStreamAudioSourceNode; whisper: GainNode; radio: GainNode; hiss: GainNode; noise: AudioBufferSourceNode };
+
 type Peer = {
   id: string;
   pc: RTCPeerConnection;
+  sender: RTCRtpSender | null; // our mic to them (null track = they get nothing)
+  fx: Fx | null;
   session: number;
   relay: boolean;
   initiator: boolean;
@@ -59,10 +71,25 @@ type Peer = {
   created: number;
 };
 
+export type Space = RoomId | 'hallway';
 export type VoiceStatus =
   | { state: 'off' }
   | { state: 'joining' }
-  | { state: 'in-room'; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean; problem: MicProblemKind; silent: boolean };
+  | { state: 'in-room'; space: Space; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean; problem: MicProblemKind; silent: boolean };
+
+// The hallway's rules (src/scenes/hallway.ts), asked every HALL_EVERY ms.
+export type HallPolicy = {
+  // Should we be connected to this person? (connected: we are now, so use the far edge of the range.)
+  wants(id: string, connected: boolean): boolean;
+  // Send them our mic right now?
+  sendsTo(id: string): boolean;
+  // How we hear them: muffled whisper at some loudness, the walkie-talkie radio, or nothing.
+  route(id: string): { mode: 'whisper' | 'radio' | 'off'; gain: number };
+  // Should our mic be open at all (someone near enough to whisper to, or we're on the walkie)?
+  micOpen(): boolean;
+};
+// Walkie-talkie floor control, broadcast on voice:hallway.
+export type WalkieMsg = { kind: 'start' | 'end'; from: string; t: number };
 export type MicProblemKind = 'declined' | 'denied' | 'busy' | 'none' | 'unsupported' | null;
 // What others get from our mic: sending sound, muted (or push-to-talk not held), no mic, or a mic that
 // only gives silence (on Android, usually another app holding it).
@@ -75,8 +102,12 @@ type Handlers = {
   onStatus: (s: VoiceStatus) => void;
   // The browser is holding sound back until the player taps (iPhone): ask for a tap.
   onAudioLocked: () => void;
-  // Explain the mic before the browser asks. Resolves false to join listening only.
-  askMic: (cancelled: Promise<void>) => Promise<boolean>;
+  // Explain the mic before the browser asks. Resolves false to join listening only. (The hallway only
+  // uses the mic if it was allowed before, so walking in doesn't pop up a question.)
+  askMic: (cancelled: Promise<void>, space: Space) => Promise<boolean>;
+  // Hallway rules and walkie-talkie messages (only used in the hallway).
+  hall?: HallPolicy;
+  onWalkie?: (m: WalkieMsg) => void;
   // How loud this person should be for us (0..1), when their audio starts.
   volumeFor: (id: string) => number;
   // Our mic's state changed (shared with everyone so they can see why they can't hear us).
@@ -114,7 +145,11 @@ class Meter {
 }
 
 export class Voice {
-  room: RoomId | null = null;
+  space: Space | null = null;
+  // The room we're in (null in the hallway or nowhere).
+  get room(): RoomId | null {
+    return this.space && this.space !== 'hallway' ? this.space : null;
+  }
   private channel: RealtimeChannel | null = null;
   private peers = new Map<string, Peer>();
   private stream: MediaStream | null = null;
@@ -130,6 +165,9 @@ export class Voice {
   private reportedMic: MicState | null = null;
   private maintainTimer = 0;
   private statsTimer = 0;
+  private hallTimer = 0;
+  private micWasOpen = true;
+  private lastContact = new Map<string, number>();
   private lastCounts = new Map<string, { lost: number; got: number }>();
   private speaking = new Set<string>();
   private loudUntil = new Map<string, number>();
@@ -153,10 +191,11 @@ export class Voice {
   // has it, there's none, or this browser can't use one (e.g. an app's built-in browser).
   micProblem: MicProblemKind = null;
 
-  async join(room: RoomId) {
-    if (this.room === room) return;
+  async join(space: Space) {
+    if (this.space === space) return;
     this.leave();
-    this.room = room;
+    this.space = space;
+    const room = space;
     const token = ++this.joinToken;
     this.h.onStatus({ state: 'joining' });
     this.restartedForSilence = false;
@@ -164,7 +203,7 @@ export class Voice {
     this.ctx = audioContext();
     void this.ctx.resume();
     const cancelled = new Promise<void>((r) => (this.cancelJoin = r));
-    const wantMic = await this.h.askMic(cancelled);
+    const wantMic = await this.h.askMic(cancelled, space);
     if (token !== this.joinToken) return;
     const [stream] = await Promise.all([wantMic ? this.openMic() : null, this.iceServers()]);
     if (!wantMic) this.micProblem = 'declined';
@@ -189,6 +228,10 @@ export class Voice {
       countMessage('received', 'signal');
       void this.onSignal(payload as Signal);
     });
+    ch.on('broadcast', { event: 'walkie' }, ({ payload }) => {
+      countMessage('received', 'walkie');
+      this.h.onWalkie?.(payload as WalkieMsg);
+    });
     ch.on('presence', { event: 'sync' }, () => {
       // Backup cleanup in case a "bye" was missed (closed tab). Someone can also drop off this list just
       // because their (or our) Supabase connection blipped while the call itself is fine, so a working
@@ -211,6 +254,8 @@ export class Voice {
         return;
       }
       joinedBefore = true;
+      // The hallway connects by distance (hallTick), not to everyone: no hello to all.
+      if (space === 'hallway') return;
       // Say hello now and once more shortly after, in case the first one raced someone else's join.
       this.send({ kind: 'hello', from: this.myId, to: '*' });
       setTimeout(() => token === this.joinToken && this.send({ kind: 'hello', from: this.myId, to: '*', retry: true }), 1500);
@@ -219,12 +264,13 @@ export class Voice {
     this.levelTimer = window.setInterval(() => this.checkLevels(), LEVEL_EVERY);
     this.maintainTimer = window.setInterval(() => this.maintain(), MAINTAIN_EVERY);
     this.statsTimer = window.setInterval(() => void this.callStats(), STATS_EVERY);
+    if (space === 'hallway') this.hallTimer = window.setInterval(() => this.hallTick(), HALL_EVERY);
     this.report();
     if (audioLocked()) this.h.onAudioLocked();
   }
 
   leave() {
-    if (!this.room) return;
+    if (!this.space) return;
     this.joinToken++;
     this.cancelJoin?.();
     this.cancelJoin = null;
@@ -243,11 +289,14 @@ export class Voice {
     clearInterval(this.levelTimer);
     clearInterval(this.maintainTimer);
     clearInterval(this.statsTimer);
+    clearInterval(this.hallTimer);
+    this.lastContact.clear();
+    this.micWasOpen = true;
     this.lastCounts.clear();
     for (const id of this.speaking) this.h.onSpeaking(id, false);
     this.speaking.clear();
     this.loudUntil.clear();
-    this.room = null;
+    this.space = null;
     this.h.onStatus({ state: 'off' });
   }
 
@@ -283,13 +332,12 @@ export class Voice {
   // Opens the mic again and swaps it into every call (no reconnect). Used after the mic stopped or went
   // silent, and by "Try again".
   async restartMic() {
-    if (!this.room) return;
-    const sendsAudio = (p: Peer) => p.pc.getSenders().some((x) => x.track?.kind === 'audio');
-    if (!this.stream || [...this.peers.values()].some((p) => !sendsAudio(p))) {
-      // Calls set up listening only can't take a mic without renegotiating: rejoin the room instead.
-      const room = this.room;
+    if (!this.space) return;
+    if (!this.stream || [...this.peers.values()].some((p) => !p.sender)) {
+      // Calls set up listening only can't take a mic without renegotiating: rejoin instead.
+      const space = this.space;
       this.leave();
-      return void this.join(room);
+      return void this.join(space);
     }
     const next = await this.openMic();
     if (!next) {
@@ -300,7 +348,7 @@ export class Voice {
     }
     const track = next.getAudioTracks()[0];
     for (const p of this.peers.values()) {
-      const sender = p.pc.getSenders().find((x) => x.track?.kind === 'audio');
+      const sender = this.sendsTo(p.id) ? p.sender : null;
       await sender?.replaceTrack(track).catch(() => {});
     }
     const old = this.stream;
@@ -333,7 +381,7 @@ export class Voice {
 
   private applyVolume(id: string) {
     const a = this.peers.get(id)?.audio;
-    if (a) a.volume = mixer.voiceVolume(this.volumes.get(id) ?? this.h.volumeFor(id));
+    if (a && this.space !== 'hallway') a.volume = mixer.voiceVolume(this.volumes.get(id) ?? this.h.volumeFor(id));
   }
 
   // The live mic stream while we're in a room (Settings → Mic meters and tests it).
@@ -374,7 +422,7 @@ export class Voice {
     }
     const track = next.getAudioTracks()[0];
     for (const p of this.peers.values()) {
-      const sender = p.pc.getSenders().find((x) => x.track?.kind === 'audio');
+      const sender = this.sendsTo(p.id) ? p.sender : null;
       await sender?.replaceTrack(track);
     }
     const old = this.stream;
@@ -386,8 +434,19 @@ export class Voice {
     return !!this.stream && !this.muted && (!this.pushToTalk || this.talking);
   }
 
+  // Our mic is actually going out: live, and (in the hallway) someone near enough or we're on the walkie.
+  private get sending() {
+    return this.micLive && this.micOpen;
+  }
+  private get micOpen() {
+    return this.space !== 'hallway' || (this.h.hall?.micOpen() ?? false);
+  }
+  private sendsTo(id: string) {
+    return this.space !== 'hallway' || (this.h.hall?.sendsTo(id) ?? false);
+  }
+
   private applyMute() {
-    const live = this.micLive;
+    const live = this.sending;
     this.stream?.getAudioTracks().forEach((t) => (t.enabled = live));
     this.lastSound = Date.now(); // muting/unmuting restarts the silence check
     this.reportMic();
@@ -449,6 +508,8 @@ export class Voice {
     if (s.from === this.myId || (s.to !== '*' && s.to !== this.myId) || !this.channel) return;
 
     if (s.kind === 'hello') {
+      // Hallway: only people within range (the wider, already-connected edge, as positions differ a bit).
+      if (this.space === 'hallway' && !this.wanted(s.from, true)) return;
       // A fresh hello from someone we think we're connected to means they've lost us (rejoined, or
       // dropped their side): start over. Retry hellos only fill gaps.
       const existing = this.peers.get(s.from);
@@ -528,7 +589,7 @@ export class Voice {
   private maintain() {
     if (!this.channel) return;
     const here = Object.keys(this.channel.presenceState()).filter((id) => id !== this.myId);
-    for (const id of here) if (!this.peers.has(id)) void this.contact(id);
+    for (const id of here) if (!this.peers.has(id) && this.wanted(id, false)) void this.contact(id);
     for (const p of [...this.peers.values()]) {
       if (!p.initiator || p.pc.connectionState === 'connected') continue;
       const dead = p.pc.connectionState === 'failed' || p.pc.connectionState === 'closed';
@@ -537,6 +598,108 @@ export class Voice {
         void this.startPeer(p.id, this.opts.forceRelay ?? false);
       }
     }
+  }
+
+  private wanted(id: string, connected: boolean) {
+    return this.space !== 'hallway' || (this.h.hall?.wants(id, connected) ?? false);
+  }
+
+  // Hallway: connect to the people the rules want (and drop the rest), gate our mic per person, open or
+  // close the mic, and set how loud / which effect each person gets. All local: no messages unless a
+  // connection starts or ends.
+  private hallTick() {
+    const hall = this.h.hall;
+    if (!hall || !this.channel) return;
+    const now = Date.now();
+    const here = Object.keys(this.channel.presenceState()).filter((id) => id !== this.myId);
+    for (const id of here) {
+      if (this.peers.has(id) || !hall.wants(id, false)) continue;
+      if (now - (this.lastContact.get(id) ?? 0) < RECONTACT_AFTER) continue;
+      this.lastContact.set(id, now);
+      // Both sides notice each other at about the same time: the lower id calls, the higher one asks to be
+      // called with a "retry" hello, which never restarts a call that is already starting.
+      if (this.myId < id) void this.startPeer(id, this.opts.forceRelay ?? false);
+      else this.send({ kind: 'hello', from: this.myId, to: id, retry: true });
+    }
+    for (const p of [...this.peers.values()]) {
+      if (!hall.wants(p.id, true)) {
+        this.closePeer(p.id, true);
+        continue;
+      }
+      this.gate(p);
+      if (p.fx && this.ctx) {
+        const r = hall.route(p.id);
+        const vol = this.volumes.get(p.id) ?? this.h.volumeFor(p.id);
+        const t = this.ctx.currentTime;
+        p.fx.whisper.gain.setTargetAtTime(r.mode === 'whisper' ? r.gain * vol : 0, t, 0.06);
+        p.fx.radio.gain.setTargetAtTime(r.mode === 'radio' ? r.gain * vol : 0, t, 0.03);
+        p.fx.hiss.gain.setTargetAtTime(r.mode === 'radio' ? 0.032 * vol : 0, t, 0.03);
+      }
+    }
+    const open = this.micOpen;
+    if (open !== this.micWasOpen) {
+      this.micWasOpen = open;
+      this.applyMute();
+    }
+  }
+
+  // Our mic to one person: on or off without renegotiating (replaceTrack).
+  private gate(p: Peer) {
+    if (!p.sender) return;
+    const want = this.sendsTo(p.id) ? (this.stream?.getAudioTracks()[0] ?? null) : null;
+    if (p.sender.track !== want) void p.sender.replaceTrack(want).catch(() => {});
+  }
+
+  // Hallway: whisper path (low-pass 2.5 kHz, quieter) and radio path (300-3000 Hz band, a little
+  // distortion, a low hiss), mixed by hallTick. Out through the mixer's "Walkie & whisper" bus.
+  private createFx(stream: MediaStream): Fx | null {
+    const ctx = this.ctx;
+    if (!ctx) return null;
+    const out = mixer.bus('radio');
+    const src = ctx.createMediaStreamSource(stream);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2500;
+    const whisper = ctx.createGain();
+    whisper.gain.value = 0;
+    src.connect(lp).connect(whisper).connect(out);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 300;
+    const lp3 = ctx.createBiquadFilter();
+    lp3.type = 'lowpass';
+    lp3.frequency.value = 3000;
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) {
+      const x = (i / (curve.length - 1)) * 2 - 1;
+      curve[i] = Math.tanh(2.4 * x) / Math.tanh(2.4);
+    }
+    shaper.curve = curve;
+    const radio = ctx.createGain();
+    radio.gain.value = 0;
+    src.connect(hp).connect(lp3).connect(shaper).connect(radio).connect(out);
+    const noise = ctx.createBufferSource();
+    const buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    noise.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 1800;
+    const hiss = ctx.createGain();
+    hiss.gain.value = 0;
+    noise.connect(band).connect(hiss).connect(out);
+    noise.start();
+    return { src, whisper, radio, hiss, noise };
+  }
+
+  // Walkie-talkie messages to everyone in the hallway.
+  sendWalkie(m: WalkieMsg) {
+    if (this.space !== 'hallway' || this.channel?.state !== 'joined') return;
+    countMessage('sent', 'walkie');
+    void this.channel.send({ type: 'broadcast', event: 'walkie', payload: m });
   }
 
   // Someone left the room list but their call is up: keep it while data still arrives, end it when it stops.
@@ -569,11 +732,13 @@ export class Voice {
   private createPeer(id: string, session: number, relay: boolean, initiator: boolean): Peer {
     this.closePeer(id); // never leave an older connection to the same person running
     const pc = new RTCPeerConnection({ iceServers: this.ice?.servers ?? STUN, iceTransportPolicy: relay ? 'relay' : 'all' });
-    if (this.stream) for (const t of this.stream.getAudioTracks()) pc.addTrack(t, this.stream);
-    else pc.addTransceiver('audio', { direction: 'recvonly' });
+    const track = this.stream?.getAudioTracks()[0];
+    const sender = track ? pc.addTrack(track, this.stream!) : null;
+    if (!track) pc.addTransceiver('audio', { direction: 'recvonly' });
 
-    const peer: Peer = { id, pc, session, relay, initiator, audio: null, meter: null, timer: 0, pendingIce: [], created: Date.now() };
+    const peer: Peer = { id, pc, sender, fx: null, session, relay, initiator, audio: null, meter: null, timer: 0, pendingIce: [], created: Date.now() };
     this.peers.set(id, peer);
+    this.gate(peer);
 
     pc.onicecandidate = (e) => {
       if (e.candidate) this.send({ kind: 'ice', from: this.myId, to: id, session, candidate: e.candidate.toJSON() });
@@ -588,6 +753,13 @@ export class Voice {
         document.body.appendChild(peer.audio);
       }
       peer.audio.srcObject = stream;
+      if (this.space === 'hallway') {
+        // Heard through Web Audio effects instead; the muted element keeps the stream flowing (Chrome).
+        peer.audio.muted = true;
+        peer.fx?.src.disconnect();
+        peer.fx?.noise.stop();
+        peer.fx = this.createFx(stream);
+      }
       this.applyVolume(id);
       const speaker = savedSpeaker();
       if (speaker) void (peer.audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId?.(speaker).catch(() => {});
@@ -639,6 +811,13 @@ export class Voice {
     peer.pc.ontrack = peer.pc.onicecandidate = peer.pc.onconnectionstatechange = null;
     peer.pc.close();
     peer.meter?.disconnect();
+    if (peer.fx) {
+      peer.fx.src.disconnect();
+      peer.fx.noise.stop();
+      peer.fx.whisper.disconnect();
+      peer.fx.radio.disconnect();
+      peer.fx.hiss.disconnect();
+    }
     if (peer.audio) {
       peer.audio.srcObject = null;
       peer.audio.remove();
@@ -660,10 +839,10 @@ export class Voice {
       this.h.onSpeaking(id, on);
     };
     const mine = this.localMeter?.level() ?? 0;
-    set(this.myId, this.micLive && mine > SPEAKING_LEVEL);
+    set(this.myId, this.sending && mine > SPEAKING_LEVEL);
     // A live mic that gives exact digital silence for a while isn't really working (real mics always
     // pick up a little noise). Try reopening it once; if it's still silent, say so.
-    if (!this.micLive || mine > 0) {
+    if (!this.sending || mine > 0) {
       this.lastSound = now;
       if (this.silent && mine > 0) this.silent = false;
     } else if (!this.silent && now - this.lastSound > SILENT_AFTER) {
@@ -683,11 +862,12 @@ export class Voice {
   }
 
   private report() {
-    if (!this.room) return;
+    if (!this.space) return;
     let connected = 0;
     for (const p of this.peers.values()) if (p.pc.connectionState === 'connected') connected++;
     this.h.onStatus({
       state: 'in-room',
+      space: this.space,
       connected,
       total: this.peers.size,
       mic: this.stream ? 'on' : 'blocked',
@@ -699,6 +879,18 @@ export class Voice {
 
   // Used by automated checks.
   debug() {
-    return [...this.peers.values()].map((p) => ({ id: p.id, state: p.pc.connectionState, relay: p.relay, pc: p.pc }));
+    return [...this.peers.values()].map((p) => ({
+      id: p.id,
+      state: p.pc.connectionState,
+      relay: p.relay,
+      pc: p.pc,
+      sending: !!p.sender?.track,
+      hear: p.fx ? { whisper: p.fx.whisper.gain.value, radio: p.fx.radio.gain.value } : null,
+    }));
+  }
+
+  // Used by automated checks: is our mic actually going out right now?
+  get debugSending() {
+    return this.sending;
   }
 }

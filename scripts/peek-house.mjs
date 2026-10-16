@@ -1,5 +1,6 @@
 // Who's in the real house right now (names, rooms), without appearing in it: subscribes to the house
 // channel but never tracks presence or sends anything. Used before running tests that sign in for real.
+// Exits 0 only if the house is empty (so a command chain stops when someone is there), 2 if not.
 //   $env:DH_TEST_OWNER="Name:password"; node scripts/peek-house.mjs
 import { createClient } from '@supabase/supabase-js';
 import { memberLogin } from '../src/shared/members.ts';
@@ -17,4 +18,4 @@ const people = Object.values(ch.presenceState()).flat().map((m) => `${m.name} ($
 console.log(people.length ? `${people.length} in the house: ${people.join(', ')}` : 'Nobody in the house');
 await sb.removeChannel(ch);
 await sb.auth.signOut({ scope: 'local' });
-process.exit(0);
+process.exit(people.length ? 2 : 0);

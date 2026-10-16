@@ -1,29 +1,25 @@
 import { chromium } from 'playwright-core';
-// Presence stays within Supabase's rate limit and recovers from a dropped channel. Needs `npm run dev` and
-//   DH_TEST_OWNER="Name:password"   DH_TEST_VISITOR="Name:password"
+// Presence stays within Supabase's rate limit and recovers from a dropped channel. Needs `npm run dev`;
+// runs in dev test mode (its own house, separate from real players).
 // (Someone flipping between hallway and room in a doorway once got cut off: ClientPresenceRateLimitReached.)
-const A_ = process.env.DH_TEST_OWNER?.split(':');
-const B_ = process.env.DH_TEST_VISITOR?.split(':');
-if (!A_ || !B_) {
-  console.log('SKIP  presence-limits: set DH_TEST_OWNER and DH_TEST_VISITOR to run');
-  process.exit(0);
-}
+const A_ = ['Alice limits'];
+const B_ = ['Bob limits'];
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const res = [];
 const check = (n, p, ok) => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}  -> ${JSON.stringify(p)}`);
 const errors = [];
-async function signIn([name, password]) {
+async function signIn([name]) {
   const ctx = await browser.newContext({ permissions: ['microphone'] });
-  await ctx.addInitScript(() => localStorage.setItem('diesel-house.mic-ok', '1'));
+  await ctx.addInitScript((n) => {
+    localStorage.setItem('diesel-house.mic-ok', '1');
+    localStorage.setItem('diesel-house.name', n);
+    localStorage.setItem('diesel-house.character', '16');
+  }, name);
   const page = await ctx.newPage();
   const tracks = { n: 0 };
   page.on('websocket', (ws) => ws.on('framesent', (f) => /"realtime:house","presence"/.test(String(f.payload)) && /"event":"track"/.test(String(f.payload)) && tracks.n++));
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
-  await page.goto('http://localhost:5173/');
-  await page.waitForSelector('#si-name');
-  await page.fill('#si-name', name);
-  await page.fill('#si-pass', password);
-  await page.click('#signin .knock');
+  await page.goto('http://localhost:5173/?test');
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 });
   return { name, page, tracks, id: await page.evaluate(() => window.__house.presence.id) };
 }

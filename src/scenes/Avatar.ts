@@ -30,7 +30,10 @@ export class Avatar {
   private netImg: Phaser.GameObjects.Image;
   mic: MicIcon | null = null; // shown on the tag (read by automated checks)
   net: NetQuality | null = null;
-  private note: string | null = null; // e.g. "mic off", when others can't hear them
+  private note: string | null = null;
+  private radioImg: Phaser.GameObjects.Image | null = null; // on the walkie-talkie
+  private whisperImg: Phaser.GameObjects.Image | null = null; // "…" while whispering to us
+  private whisperRing: Phaser.GameObjects.Graphics | null = null; // our whisper range (own avatar) // e.g. "mic off", when others can't hear them
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
@@ -128,6 +131,49 @@ export class Avatar {
   }
 
   // Guests (no account) get a muted tag saying whose friend they are ("Sam · friend of Diesel").
+  // On the walkie-talkie: a little radio with a green LED above the name tag.
+  setRadio(on: boolean) {
+    if (on === !!this.radioImg) return;
+    if (on) this.radioImg = this.sprite.scene.add.image(0, 0, 'tag-radio').setOrigin(0.5, 1).setDepth(100002);
+    else {
+      this.radioImg?.destroy();
+      this.radioImg = null;
+    }
+    this.sync();
+  }
+
+  // Whispering to us: a "…" bubble over their head (Kenney emote, Pixel Style 1).
+  setWhispering(on: boolean) {
+    const scene = this.sprite.scene;
+    if (on === !!this.whisperImg || (on && !scene.textures.exists('emotes'))) return;
+    if (on) this.whisperImg = scene.add.image(0, 0, 'emotes', 'dots3').setOrigin(0.5, 1).setDepth(100002);
+    else {
+      this.whisperImg?.destroy();
+      this.whisperImg = null;
+    }
+    this.sync();
+  }
+
+  // Our own whisper range: a faint dotted circle under us while our whisper mic is open.
+  setWhisperRing(radius: number | null) {
+    const scene = this.sprite.scene;
+    if (!radius) {
+      this.whisperRing?.destroy();
+      this.whisperRing = null;
+      return;
+    }
+    if (!this.whisperRing) {
+      const g = scene.add.graphics();
+      const dots = 36;
+      for (let i = 0; i < dots; i++) {
+        const a = (i / dots) * Math.PI * 2;
+        g.fillStyle(0xc99bff, 0.55).fillRect(Math.round(Math.cos(a) * radius) - 1, Math.round(Math.sin(a) * radius * 0.55) - 1, 2, 2);
+      }
+      this.whisperRing = g;
+    }
+    this.sync();
+  }
+
   // A short note after the name, like "mic off". Null to clear.
   setNote(note: string | null) {
     if (note === this.note) return;
@@ -186,6 +232,9 @@ export class Avatar {
     this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(this.sprite.y - 0.5);
     this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP));
     this.bubble?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 12));
+    this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
+    this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
+    this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(this.sprite.y - 1);
   }
 
   animate(moving: boolean, dir: Dir = this.facing) {
@@ -216,5 +265,8 @@ export class Avatar {
     this.ring.destroy();
     this.bubble?.destroy();
     this.bubbleTimer?.remove();
+    this.radioImg?.destroy();
+    this.whisperImg?.destroy();
+    this.whisperRing?.destroy();
   }
 }

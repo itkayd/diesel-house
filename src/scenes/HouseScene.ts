@@ -14,7 +14,7 @@ import type { DoorMsg } from '../net/presence';
 import { loadSounds, play } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
 import { ChatPanel } from '../ui/chat';
-import type { Voice } from '../net/voice';
+import type { Space, Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
 import { setNetBadge, setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
@@ -27,7 +27,7 @@ import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addProfileButton, pickCharacter } from '../ui/picker';
 import { openProfile } from '../ui/profile';
-import { askForMic, resetMicDecline, showMicHelp } from '../ui/micPrompt';
+import { askForMic, micAlreadyAllowed, resetMicDecline, showMicHelp } from '../ui/micPrompt';
 import { modalOpen } from '../ui/modal';
 import { addSettingsSection, switchRow } from '../ui/settings';
 import { addVoiceSettings } from '../ui/voiceSettings';
@@ -36,7 +36,10 @@ import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 import { HouseLook } from './houseLook';
-import { net } from '../net/netQuality';
+import { Hallway, WHISPER } from './hallway';
+import { WalkieButton } from '../ui/walkie';
+import { addHallwaySettings } from '../ui/hallwaySettings';
+import { net, type NetQuality } from '../net/netQuality';
 import { reloadForUpdate } from '../ui/update';
 
 const SPEED = 80; // px per second
@@ -88,6 +91,9 @@ export class HouseScene extends Phaser.Scene {
   private zoneSince = 0;
   private micWarned = false;
   private lastStep = 0;
+  private hallShown = 0;
+  private myMic: PlayerInfo['mic'];
+  private myNet: NetQuality | undefined;
   private stepFoot = false; // "Others can't hear you" shown this visit
   // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
   private earlyMoves = new Map<string, MoveMsg>();
@@ -96,6 +102,9 @@ export class HouseScene extends Phaser.Scene {
   private voice: Voice | null = null;
   private voiceControls: VoiceControls | null = null;
   private voiceTimer: Phaser.Time.TimerEvent | null = null;
+  // Hallway voice: whisper + walkie-talkie rules, and the walkie button (UPDATE.md Phase 10).
+  private hallway: Hallway | null = null;
+  private walkie: WalkieButton | null = null;
   private starting = false;
   private presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
@@ -338,6 +347,40 @@ export class HouseScene extends Phaser.Scene {
     void this.start();
   }
 
+  // Walkie pressed: needs the mic (asked here, from the tap, if the hallway joined listening only).
+  private async pressWalkie() {
+    const voice = this.voice;
+    const hall = this.hallway;
+    if (!voice || !hall || voice.space !== 'hallway') return;
+    if (!voice.micStream) {
+      const ok = await askForMic(new Promise<void>(() => {}));
+      if (ok) {
+        voice.leave();
+        await voice.join('hallway');
+        toast({ icon: 'radio', id: 'walkie-ready', who: 'Walkie ready', what: 'Hold the button again to talk.', small: true, ttl: 2400 });
+      }
+      return;
+    }
+    hall.press();
+  }
+
+  // Walkie button, on-air strip, icons over heads, whisper "…" and our whisper ring.
+  private showHallway() {
+    const hall = this.hallway;
+    if (!hall) return;
+    const talker = hall.talkerId;
+    const name = !talker ? null : talker === this.presence?.id ? this.name : (this.remotes.get(talker)?.info.name ?? null);
+    this.walkie?.show(hall.meTalking ? 'talking' : hall.busy ? 'busy' : 'idle', this.zone === 'hallway' ? name : null, hall.secondsLeft);
+    const inHall = this.zone === 'hallway' && this.voice?.space === 'hallway';
+    this.me.setRadio(inHall && hall.meTalking);
+    this.me.setWhisperRing(inHall && !hall.meTalking && hall.whisperOn && hall.someoneNear && !!this.voice?.micStream ? WHISPER : null);
+    for (const r of this.remotes.values()) {
+      const there = inHall && r.active && r.info.zone === 'hallway';
+      r.avatar.setRadio(there && talker === r.info.id);
+      r.avatar.setWhispering(there && talker !== r.info.id && r.avatar.speaking && hall.route(r.info.id).mode === 'whisper');
+    }
+  }
+
   // Your profile (HUD button, or tap your own name tag).
   private openMyProfile() {
     const user = currentUser();
@@ -370,9 +413,9 @@ export class HouseScene extends Phaser.Scene {
     const problem = this.voice.micProblem;
     if (problem && problem !== 'declined' && !(await showMicHelp(problem))) return;
     resetMicDecline();
-    const room = this.voice.room;
+    const space = this.voice.space;
     this.voice.leave();
-    if (room) void this.voice.join(room);
+    if (space) void this.voice.join(space);
   }
 
   // Joins the house once we know who we are.
@@ -403,11 +446,11 @@ export class HouseScene extends Phaser.Scene {
         onSyncRequest: () => this.sendMove(true),
         onReconnected: () => {
           this.sendMove(true); // so everyone sees us again straight away
-          // Voice may have died with the socket: rejoin the room we're in.
-          const room = this.voice?.room;
-          if (room) {
+          // Voice may have died with the socket: rejoin the room (or hallway) we're in.
+          const space = this.voice?.space;
+          if (space) {
             this.voice!.leave();
-            void this.voice!.join(room);
+            void this.voice!.join(space);
           }
         },
         onRoomChange: (room) => void this.roomChanged(room),
@@ -428,18 +471,33 @@ export class HouseScene extends Phaser.Scene {
     this.presence.connect();
     net.start();
     net.onChange((q) => {
-      this.presence?.update({ net: q });
+      this.myNet = q;
+      this.sendMove(true); // shared on the next move message, not presence (see presence.ts)
       this.me.setNet(q);
       setNetBadge(q);
     });
 
     const forceRelay = import.meta.env.DEV && new URLSearchParams(location.search).has('relay'); // test TURN on its own
+    const hall = new Hallway({
+      myId: () => this.presence!.id,
+      me: () => ({ x: this.player.x, y: this.player.y, inHall: this.zone === 'hallway' }),
+      peer: (id) => {
+        const r = this.remotes.get(id);
+        return r?.active ? { x: r.avatar.sprite.x, y: r.avatar.sprite.y, inHall: r.info.zone === 'hallway', mic: r.info.mic === 'on' || r.info.mic === 'silent' } : null;
+      },
+      myMic: () => !!this.voice?.micStream,
+      send: (m) => this.voice?.sendWalkie(m),
+      onChange: () => this.showHallway(),
+    });
+    hall.idsInHall = () => [...this.remotes.values()].filter((r) => r.active && r.info.zone === 'hallway').map((r) => r.info.id);
+    this.hallway = hall;
     this.voice = new Voice(
       this.presence.id,
       {
         onSpeaking: (id, on) => (id === this.presence!.id ? this.me : this.remotes.get(id)?.avatar)?.setSpeaking(on),
         onStatus: (s) => {
-          this.voiceControls?.show(s);
+          // The mic button is for rooms; the hallway has the walkie button instead (design/game/v2.html).
+          this.voiceControls?.show(this.voice?.space === 'hallway' ? { state: 'off' } : s);
           this.showMyMic();
           // Tried to use the mic and it failed: say so once, so nobody talks without being heard.
           const problem = this.voice?.micProblem;
@@ -449,10 +507,14 @@ export class HouseScene extends Phaser.Scene {
           }
         },
         onAudioLocked: showSoundBanner,
-        askMic: askForMic,
+        // The hallway only uses the mic if it was allowed before (no question just for walking in).
+        askMic: (cancelled, space) => (space === 'hallway' ? micAlreadyAllowed() : askForMic(cancelled)),
+        hall,
+        onWalkie: (m) => hall.onMessage(m),
         volumeFor: (id) => savedVolume(id),
         onMicState: (s) => {
-          this.presence?.update({ mic: s });
+          this.myMic = s;
+          this.sendMove(true);
           this.showMyMic();
           if (s === 'silent') this.warnSilentMic();
         },
@@ -465,6 +527,12 @@ export class HouseScene extends Phaser.Scene {
       onTalking: (t) => this.voice!.setTalking(t),
       onBlockedTap: () => void this.fixMic(),
     });
+    this.walkie = new WalkieButton({
+      press: () => void this.pressWalkie(),
+      release: () => this.hallway?.release(),
+      key: () => this.hallway?.walkieKey ?? 't',
+    });
+    addHallwaySettings(hall);
     this.chat = new ChatPanel(() => ({ id: this.presence!.id, name: this.name, character: this.character }));
     this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
     addVoiceSettings(this.voice, this.voiceControls, () => {
@@ -501,14 +569,19 @@ export class HouseScene extends Phaser.Scene {
     if (!this.voice || this.presence?.isReplaced) return;
     this.voiceTimer?.remove();
     this.voiceTimer = null;
-    const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
-    if (!room) {
+    // A room, the hallway (whisper + walkie), or nowhere. Rooms and the hallway never hear each other.
+    const space: Space | null = this.zone === 'hallway' ? 'hallway' : this.zone ? (this.zone as RoomId) : null;
+    if (space !== 'hallway') this.hallway?.leftHallway();
+    if (space === 'hallway' && this.voice.room)
+      toast({ icon: 'volume-x', id: 'back-in-hallway', who: 'Back in the hallway', what: 'Room voice off. Get close to someone to whisper.', small: true, ttl: 2200 });
+    this.walkie?.setVisible(space === 'hallway');
+    if (!space) {
       this.voice.leave();
       return;
     }
-    if (this.voice.room === room) return;
+    if (this.voice.space === space) return;
     this.voice.leave();
-    this.voiceTimer = this.time.delayedCall(JOIN_VOICE_AFTER, () => void this.voice!.join(room));
+    this.voiceTimer = this.time.delayedCall(JOIN_VOICE_AFTER, () => void this.voice!.join(space));
   }
 
   private showPresenceStatus(s: 'connecting' | 'reconnecting' | 'online' | 'offline') {
@@ -755,7 +828,7 @@ export class HouseScene extends Phaser.Scene {
     }
     r.avatar.setGuest(!!p.guest);
     this.showHost(p);
-    r.info = { ...p, zone: r.info.zone };
+    r.info = { ...p, zone: r.info.zone, mic: r.info.mic, net: r.info.net };
     this.showMicNote(p.id); // zone from position updates is fresher than presence
   }
 
@@ -776,7 +849,10 @@ export class HouseScene extends Phaser.Scene {
       else if (r.info.zone === this.zone) play('leave', 0.5);
     }
     r.info.zone = m.zone;
-    if (moved) this.showMicNote(m.id);
+    const stateChanged = (m.mic !== undefined && m.mic !== r.info.mic) || (m.net !== undefined && m.net !== r.info.net);
+    if (m.mic !== undefined) r.info.mic = m.mic;
+    if (m.net !== undefined) r.info.net = m.net;
+    if (moved || stateChanged) this.showMicNote(m.id);
     r.lastHeard = now;
     if (moved && r.active) this.showPresenceStatus(this.presenceState);
     if (!r.active) {
@@ -821,7 +897,7 @@ export class HouseScene extends Phaser.Scene {
     this.sent = { vx, vy, dir, at: now };
     // Body position, not the sprite: the sprite only catches up with physics after this update runs.
     const tenth = (n: number) => Math.round(n * 10) / 10; // whole pixels would make corrections wobble back and forth
-    this.presence.sendMove({ x: tenth(this.body.center.x), y: tenth(this.body.bottom), vx, vy, dir, zone: this.zone });
+    this.presence.sendMove({ x: tenth(this.body.center.x), y: tenth(this.body.bottom), vx, vy, dir, zone: this.zone, mic: this.myMic, net: this.myNet });
   }
 
   // Draws everyone else where their last message says they should be by now, gliding out corrections.
@@ -917,7 +993,7 @@ export class HouseScene extends Phaser.Scene {
       this.showPresenceStatus(this.presenceState);
       if (zone && zone !== 'hallway' && zone !== was && this.presence)
         toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
-      this.presence?.update({ zone });
+      // (Zone rides on the move message just below; presence is kept for rare changes.)
       this.sendMove(true);
       this.updateVoice();
       this.chat?.setRoom(zone && zone !== 'hallway' ? (zone as RoomId) : null);
@@ -926,6 +1002,11 @@ export class HouseScene extends Phaser.Scene {
     }
 
     this.moveRemotes();
+    // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
+    if (this.hallway && this.zone === 'hallway' && this.time.now - this.hallShown > 100) {
+      this.hallShown = this.time.now;
+      this.showHallway();
+    }
   }
 
   private inputVelocity() {

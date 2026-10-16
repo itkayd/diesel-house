@@ -80,7 +80,9 @@ const audioEls = (p) => p.page.evaluate(() => document.querySelectorAll('audio[d
 const waitConnected = async (p, n, ms = 20000) => {
   const t = Date.now();
   while (Date.now() - t < ms) {
-    if ((await peers(p)).filter((x) => x.state === 'connected').length >= n) return Date.now() - t;
+    // (Room voice only: a hallway whisper link doesn't count.)
+    const inRoom = await p.page.evaluate(() => !!window.__house.voice.room);
+    if (inRoom && (await peers(p)).filter((x) => x.state === 'connected').length >= n) return Date.now() - t;
     await p.page.waitForTimeout(100);
   }
   return null;
@@ -90,7 +92,8 @@ const status = (p) => p.page.locator('#voice-controls').evaluate((e) => (e.style
 const A = await player('Alice test', 16);
 const B = await player('Bob test', 19);
 await A.page.waitForTimeout(1500);
-check('in the hallway: no voice, controls hidden', { A: await status(A), peers: (await peers(A)).length }, (await status(A)) === '(hidden)' && (await peers(A)).length === 0);
+// (Standing together at the front door they may whisper to each other: that's hallway voice, not a room.)
+check('in the hallway: no room voice, mic button hidden (hallway has the walkie instead)', { A: await status(A), room: await A.page.evaluate(() => window.__house.voice.room) }, (await status(A)) === '(hidden)' && (await A.page.evaluate(() => window.__house.voice.room)) === null);
 
 // Both into room 1
 await goto(A, ...ROOM1);

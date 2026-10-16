@@ -82,6 +82,9 @@ await tp(A, ...ROOM3);
 await A.page.waitForSelector('#mic-prompt');
 await A.page.click('#mic-prompt-yes');
 await A.page.waitForFunction(() => !!window.__house.voice.stream, null, { timeout: 5000 }).catch(() => {});
+// Starting the sound takes the browser a moment after the tap.
+await A.page.waitForFunction(() => window.__house.voice.ctx?.state === 'running', null, { timeout: 3000 }).catch(() => {});
+await A.page.waitForTimeout(300);
 check('"Turn on mic" uses the mic, and that tap unlocks sound', { voice: await voiceState(A), audio: await ctxState(A), banner: await visible(A, '#sound-banner') }, (await voiceState(A)).hasMic && (await ctxState(A)) === 'running' && !(await visible(A, '#sound-banner')));
 const remembered = await A.page.evaluate(() => localStorage.getItem('diesel-house.mic-ok'));
 check('the answer is remembered', { remembered }, remembered === '1');

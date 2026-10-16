@@ -1,0 +1,1504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<title>Diesel House v2</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+/*THEME*/
+
+/* ================= v2 additions (prefix v2-) ================= */
+:root { --gold: #ffd36b; --radio: #9ec9ff; --whisper: #c99bff; }
+* { box-sizing: border-box; }
+.dh-game, .dh-game * { -webkit-touch-callout: none; }
+.dh-game { user-select: none; -webkit-user-select: none; touch-action: none; background: var(--night); }
+.dh-game input, .dh-game textarea, .dh-msg .text, .v2-code { user-select: text; -webkit-user-select: text; }
+#view { position: absolute; inset: 0; overflow: hidden; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: pixelated; }
+#world > img.base { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+.it, .ch { position: absolute; image-rendering: pixelated; background-repeat: no-repeat; }
+.ch { width: 16px; height: 32px; cursor: pointer; }
+#dark { position: absolute; left: 0; top: 0; pointer-events: none; mix-blend-mode: multiply; background: #8a7fae; z-index: 9000; }
+#glow { position: absolute; left: 0; top: 0; pointer-events: none; mix-blend-mode: screen; z-index: 9001; }
+.dh-tag, .dh-nameplate, .dh-bubble { position: absolute; z-index: 10000; transform: translateX(-50%); pointer-events: none; }
+.dh-ring { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+.dh-ring.whisper { background: rgba(201,155,255,.30); box-shadow: 0 0 0 1px var(--whisper); }
+.dh-ring.radio { background: rgba(158,201,255,.30); box-shadow: 0 0 0 1px var(--radio); }
+.dh-bubble.whisper { font-style: italic; background: #efe3ff; }
+.dh-tag .lv { color: var(--gold); margin-left: 2px; }
+
+/* emote above a head (world units) */
+.v2-emo { position: absolute; z-index: 10002; width: 16px; height: 16px; image-rendering: pixelated; pointer-events: none;
+  transform: translateX(-50%); animation: v2-pop .5s steps(4) both; }
+@keyframes v2-pop { 0% { transform: translateX(-50%) translateY(6px) scale(.2); } 60% { transform: translateX(-50%) translateY(-2px) scale(1.15); } 100% { transform: translateX(-50%); } }
+.v2-onair { position: absolute; z-index: 10002; transform: translateX(-50%); font-family: var(--font-display); font-size: 5px; line-height: 1;
+  color: var(--panel-edge); background: var(--radio); padding: 1px 2px 2px; box-shadow: 0 0 0 1px var(--panel-edge); pointer-events: none;
+  animation: dh-blink .8s steps(2) infinite; }
+
+/* whisper range ring around you */
+.v2-range { position: absolute; width: 128px; height: 128px; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  border: 1px dashed rgba(201,155,255,.55); background: rgba(201,155,255,.05); z-index: 5; transition: opacity .25s; }
+.v2-range.on { border-color: var(--whisper); background: rgba(201,155,255,.10); }
+
+/* hotspots in the world: games table, noticeboard */
+.v2-sign { position: absolute; z-index: 10001; transform: translateX(-50%); pointer-events: none; display: inline-flex; align-items: center; gap: 2px;
+  font-family: var(--font-display); font-size: 6px; letter-spacing: .05em; color: var(--panel-edge); background: var(--lamp); padding: 1px 3px 2px;
+  box-shadow: 0 0 0 1px var(--panel-edge), inset 0 -1px 0 var(--lamp-deep); animation: v2-bob 1.6s steps(2) infinite; }
+.v2-sign svg { width: 6px; height: 6px; }
+@keyframes v2-bob { 50% { transform: translateX(-50%) translateY(-1px); } }
+.v2-board { position: absolute; width: 30px; height: 20px; background: #a8743f; z-index: 3;
+  box-shadow: 0 0 0 1px var(--panel-edge), inset 0 0 0 2px #6b3f22; }
+.v2-board i { position: absolute; width: 6px; height: 6px; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.v2-dicetop { position: absolute; width: 11px; height: 11px; z-index: 400; background-size: 77px 11px; image-rendering: pixelated; pointer-events: none; }
+
+/* ---------- HUD ---------- */
+.dh-hud-tl { max-width: calc(100% - 200px); }
+#zonePill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+#zonePill.whisper { box-shadow: 0 0 0 3px var(--panel-edge), inset 0 0 0 2px var(--whisper); }
+.v2-xp { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; padding: 4px 10px 4px 4px; min-height: 40px;
+  background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge); font-family: var(--font-display); position: relative; }
+.v2-xp:hover { background: var(--panel-hi); }
+.v2-xp .dh-portrait { width: 30px; height: 30px; }
+.v2-xp .lv { font-size: 13px; color: var(--gold); letter-spacing: .03em; }
+.v2-xp .v2-bar { width: 64px; }
+.v2-xp .streak { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: #ffae6b; }
+.v2-xp .streak svg { width: 13px; height: 13px; }
+.v2-bar { height: 8px; background: var(--panel-edge); box-shadow: inset 0 0 0 1px var(--line); position: relative; overflow: hidden; }
+.v2-bar > b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); box-shadow: inset 0 -2px 0 #c9982f; transition: width .5s steps(8); }
+.v2-bar.ok > b { background: var(--ok); box-shadow: inset 0 -2px 0 #3fa865; }
+.v2-float { position: absolute; left: 60px; top: 0; font-family: var(--font-display); font-size: 15px; color: var(--gold); pointer-events: none;
+  text-shadow: 2px 2px 0 var(--panel-edge); animation: v2-up 1.2s steps(8) forwards; }
+@keyframes v2-up { to { transform: translateY(-26px); opacity: 0; } }
+
+.dh-hud-tr .dh-iconbtn { width: 44px; height: 44px; }
+.dh-hud-br { align-items: end; bottom: calc(34px + var(--safe-b)); }
+.v2-small { width: 52px !important; height: 52px !important; }
+
+/* walkie button: idle | talking | busy */
+.v2-walkie { width: 72px; height: 72px; border: 0; cursor: pointer; position: relative; display: grid; place-items: center; color: var(--panel-edge);
+  background: var(--radio); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -5px 0 rgba(0,0,0,.30); touch-action: none; }
+.v2-walkie svg { width: 30px; height: 30px; }
+.v2-walkie .cap { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--font-display);
+  font-size: 11px; letter-spacing: .04em; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); }
+.v2-walkie[data-state="talking"] { background: var(--lamp); animation: v2-air .7s steps(2) infinite; }
+.v2-walkie[data-state="busy"] { background: var(--panel); color: var(--faint); }
+.v2-walkie .meter { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--panel-edge); }
+@keyframes v2-air { 50% { box-shadow: 0 0 0 3px var(--panel-edge), 0 0 0 8px rgba(244,184,96,.4), inset 0 -5px 0 rgba(0,0,0,.30); } }
+
+.dh-mic[data-state="nomic"], .dh-mic[data-state="silent"] { background: var(--panel); color: var(--warn); }
+.dh-mic .why { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--font-display);
+  font-size: 11px; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); }
+
+/* action prompt (near a hotspot / door) */
+.v2-act { position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); z-index: 20; }
+.v2-act .dh-btn { animation: dh-drop .18s steps(3); }
+.v2-act kbd { font-family: var(--font-display); font-size: 12px; background: rgba(13,9,18,.25); padding: 0 5px; }
+
+/* connection pill */
+.v2-conn { justify-self: center; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 7px; font-family: var(--font-display); font-size: 14px;
+  background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 0 0 2px var(--warn); animation: dh-drop .18s steps(3); }
+.v2-conn.ok { box-shadow: 0 0 0 3px var(--panel-edge), inset 0 0 0 2px var(--ok); }
+.v2-conn svg { width: 16px; height: 16px; }
+.v2-dots i { display: inline-block; width: 4px; height: 4px; margin: 0 1px; background: var(--warn); animation: dh-blink .9s steps(2) infinite; }
+.v2-dots i:nth-child(2) { animation-delay: .3s; } .v2-dots i:nth-child(3) { animation-delay: .6s; }
+.dh-hud-tc { justify-items: stretch; }
+
+/* coach marks (first run) */
+.v2-coach { position: absolute; left: 50%; bottom: calc(120px + var(--safe-b)); transform: translateX(-50%); width: min(92%, 380px); z-index: 25; }
+.v2-coach .dh-panel { gap: 10px; animation: dh-drop .18s steps(3); }
+.v2-coach .step { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; }
+.v2-coach .ico { width: 44px; height: 44px; display: grid; place-items: center; background: var(--panel-edge); color: var(--lamp); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-coach .ico svg { width: 24px; height: 24px; }
+.v2-coach b { font-family: var(--font-display); font-size: 17px; display: block; margin-bottom: 2px; }
+.v2-pips { display: flex; gap: 6px; } .v2-pips i { width: 8px; height: 8px; background: var(--line); } .v2-pips i.on { background: var(--lamp); }
+
+/* ---------- panels ---------- */
+.dh-scrim { z-index: 60; }
+.dh-scrim > .dh-panel { width: min(100%, 460px); grid-auto-rows: max-content; }
+.v2-me .big .dh-portrait { display: block; }
+.v2-head { display: flex; align-items: center; gap: 10px; }
+.v2-head h2 { flex: 1; min-width: 0; }
+.v2-head .dh-iconbtn { width: 40px; height: 40px; }
+.v2-tabs { display: flex; gap: 6px; padding: 4px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); overflow-x: auto; }
+.v2-tabs button { flex: 1; min-height: 36px; border: 0; cursor: pointer; font-family: var(--font-display); font-size: 14px; color: var(--muted); background: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; white-space: nowrap; }
+.v2-tabs button svg { width: 15px; height: 15px; }
+.v2-tabs button[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
+.v2-list { display: grid; gap: 8px; }
+.v2-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-item.done { box-shadow: inset 0 0 0 2px #3fa865; }
+.v2-item .t { font-weight: 700; font-size: 15px; } .v2-item .s { color: var(--muted); font-size: 13px; }
+.v2-item .ic { width: 36px; height: 36px; display: grid; place-items: center; background: var(--panel); color: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge); }
+.v2-item .ic svg { width: 20px; height: 20px; }
+.v2-item.done .ic { color: var(--ok); }
+.v2-item .dh-btn { min-height: 36px; font-size: 13px; padding: 6px 10px 8px; }
+.v2-xpchip { font-family: var(--font-display); font-size: 12px; color: var(--panel-edge); background: var(--gold); padding: 2px 6px 3px; box-shadow: 0 0 0 2px var(--panel-edge); white-space: nowrap; }
+.v2-item.done .v2-xpchip { background: var(--ok); }
+.v2-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
+.v2-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.v2-stat { background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); padding: 8px; display: grid; gap: 2px; text-align: center; }
+.v2-stat b { font-family: var(--font-display); font-size: 20px; color: var(--gold); }
+.v2-stat span { font-size: 12px; color: var(--muted); }
+
+/* profile */
+.v2-me { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.v2-me .big { width: 72px; height: 72px; border: 0; cursor: pointer; position: relative; padding: 0; }
+.v2-me .big .pen { position: absolute; right: -6px; bottom: -6px; width: 24px; height: 24px; display: grid; place-items: center; background: var(--lamp); color: var(--panel-edge); box-shadow: 0 0 0 2px var(--panel-edge); }
+.v2-me .big .pen svg { width: 14px; height: 14px; }
+.v2-me .nm { display: flex; gap: 8px; align-items: center; }
+.v2-me .nm .dh-input { font-family: var(--font-display); font-size: 18px; padding: 6px 8px; min-height: 38px; }
+.v2-chip { font-family: var(--font-display); font-size: 11px; letter-spacing: .05em; color: var(--panel-edge); background: var(--muted); padding: 2px 6px 3px; box-shadow: 0 0 0 2px var(--panel-edge); white-space: nowrap; }
+.v2-chip.gold { background: var(--gold); } .v2-chip.radio { background: var(--radio); } .v2-chip.whisper { background: var(--whisper); }
+.v2-facts { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+.v2-facts div { display: flex; gap: 8px; align-items: center; } .v2-facts svg { width: 16px; height: 16px; color: var(--lamp); flex: none; }
+.v2-facts b { color: var(--cream); font-weight: 700; }
+.v2-codebox { display: grid; gap: 10px; padding: 12px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-code { font-family: var(--font-display); font-size: 26px; letter-spacing: .12em; color: var(--lamp); text-align: center; padding: 6px; background: #1b1424; box-shadow: inset 0 0 0 2px var(--line); }
+.v2-codebox.off .v2-code { color: var(--faint); text-decoration: line-through; }
+.v2-codebox .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2-codebox .btns .dh-btn { min-height: 42px; font-size: 14px; }
+.v2-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
+.v2-badge { border: 0; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); padding: 6px 2px 6px; cursor: pointer; display: grid; justify-items: center; gap: 4px; color: var(--cream); }
+.v2-badge span { font-size: 10px; line-height: 1.15; font-family: var(--font-display); color: var(--muted); text-align: center; }
+.v2-medal { width: 48px; height: 48px; image-rendering: pixelated; background-repeat: no-repeat; }
+.v2-badge.locked .v2-medal { filter: brightness(0) opacity(.45); }
+.v2-badge.new { box-shadow: inset 0 0 0 2px var(--gold); animation: dh-blink 1s steps(2) 3; }
+.v2-badge[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--lamp); }
+.v2-badgeinfo { font-size: 14px; color: var(--muted); min-height: 20px; }
+.v2-badgeinfo b { color: var(--cream); font-family: var(--font-display); }
+
+/* people / map */
+.v2-heads { display: inline-flex; gap: 3px; }
+.v2-heads span { width: 20px; height: 20px; image-rendering: pixelated; background-repeat: no-repeat; box-shadow: 0 0 0 2px var(--panel-edge); background-color: var(--panel); }
+.v2-mini { position: relative; width: 100%; aspect-ratio: 45 / 31; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); overflow: hidden; }
+.v2-mini img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .65; }
+.v2-mini .dot { position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--panel-edge); background: var(--cream); }
+.v2-mini .dot.me { background: var(--lamp); width: 12px; height: 12px; animation: dh-blink 1s steps(2) infinite; }
+.v2-mini .zone { position: absolute; border: 0; background: rgba(0,0,0,0); cursor: pointer; }
+.v2-mini .zone:hover { background: rgba(244,184,96,.18); }
+.v2-mini .lab { position: absolute; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: 10px; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); pointer-events: none; white-space: nowrap; }
+
+/* friend menu popover */
+.v2-pop { position: absolute; z-index: 55; width: 250px; }
+.v2-pop .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.v2-pop .acts .dh-btn { min-height: 40px; font-size: 13px; padding: 6px 8px 8px; }
+.v2-emogrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.v2-emogrid button { aspect-ratio: 1; border: 0; cursor: pointer; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: grid; place-items: center; }
+.v2-emogrid button:hover { box-shadow: inset 0 0 0 2px var(--lamp); }
+.v2-emogrid i { width: 32px; height: 32px; image-rendering: pixelated; background-repeat: no-repeat; display: block; }
+.v2-emotebar { position: absolute; right: 0; bottom: calc(100% + 14px); width: 240px; }
+
+/* games */
+.v2-games { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2-game { border: 0; cursor: pointer; text-align: left; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); padding: 12px; display: grid; gap: 6px; align-content: start; min-height: 104px; }
+.v2-game:hover { box-shadow: inset 0 0 0 2px var(--lamp); }
+.v2-game .gi { width: 34px; height: 34px; display: grid; place-items: center; background: var(--panel); color: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge); }
+.v2-game .gi svg { width: 20px; height: 20px; }
+.v2-game b { font-family: var(--font-display); font-size: 16px; } .v2-game span { font-size: 12px; color: var(--muted); }
+.v2-game.soon { opacity: .55; cursor: default; } .v2-game.soon:hover { box-shadow: inset 0 0 0 2px var(--line); }
+.v2-vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; text-align: center; }
+.v2-vs .side { display: grid; gap: 8px; justify-items: center; padding: 10px 6px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-vs .side.win { box-shadow: inset 0 0 0 3px var(--ok); }
+.v2-vs .side b { font-family: var(--font-display); font-size: 15px; }
+.v2-vs .x { font-family: var(--font-display); color: var(--muted); }
+.v2-dice { display: flex; gap: 8px; } .v2-die { width: 44px; height: 44px; image-rendering: pixelated; background-repeat: no-repeat; background-size: 308px 44px; }
+.v2-die.roll { animation: v2-shake .12s steps(2) infinite; }
+@keyframes v2-shake { 50% { transform: translate(2px, -3px) rotate(8deg); } }
+.v2-rps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.v2-rps button { min-height: 72px; font-size: 32px; border: 0; cursor: pointer; background: var(--panel-hi); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 rgba(0,0,0,.35); display: grid; place-items: center; gap: 0; color: var(--cream); }
+.v2-rps button small { font-family: var(--font-display); font-size: 12px; }
+.v2-rps button:disabled { opacity: .45; cursor: default; }
+.v2-hand { font-size: 40px; line-height: 1; min-height: 44px; }
+.v2-hand.hidden { filter: brightness(0); opacity: .6; }
+.v2-score { font-family: var(--font-display); font-size: 22px; color: var(--gold); }
+.v2-result { font-family: var(--font-display); font-size: 22px; text-align: center; min-height: 28px; }
+.v2-result.win { color: var(--ok); } .v2-result.lose { color: var(--error); }
+.v2-draw { display: grid; place-items: center; min-height: 190px; cursor: pointer; text-align: center; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); padding: 14px; touch-action: manipulation; }
+.v2-draw b { font-family: var(--font-display); font-size: 34px; letter-spacing: .06em; }
+.v2-draw.ready { background: #2a1d14; }
+.v2-draw.go { background: var(--lamp); color: var(--panel-edge); box-shadow: inset 0 0 0 4px var(--panel-edge); }
+.v2-draw.foul { background: #3a1a1a; }
+.v2-board-row { display: grid; grid-template-columns: 28px 32px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-board-row.me { box-shadow: inset 0 0 0 2px var(--lamp); }
+.v2-board-row .rk { font-family: var(--font-display); color: var(--muted); text-align: center; }
+.v2-board-row .rk.top { color: var(--gold); }
+.v2-board-row b { font-family: var(--font-display); font-weight: 500; }
+
+/* level up */
+.v2-lvl { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(13,9,18,.6); cursor: pointer; overflow: hidden; }
+.v2-lvl .card { display: grid; justify-items: center; gap: 10px; padding: 22px 28px; background: var(--panel); box-shadow: var(--frame-drop); text-align: center; animation: v2-zoom .35s steps(5) both; max-width: 92%; }
+.v2-lvl .card .k { font-family: var(--font-display); color: var(--muted); letter-spacing: .12em; font-size: 13px; text-transform: uppercase; }
+.v2-lvl .card .n { font-family: var(--font-display); font-weight: 700; font-size: 54px; line-height: 1; color: var(--gold); text-shadow: 4px 4px 0 var(--panel-edge); }
+.v2-lvl .card p { margin: 0; color: var(--muted); }
+@keyframes v2-zoom { from { transform: scale(.3); opacity: 0; } }
+.v2-conf { position: absolute; width: 8px; height: 8px; top: -10px; animation: v2-fall linear forwards; }
+@keyframes v2-fall { to { transform: translateY(110vh) rotate(540deg); } }
+
+/* sound settings */
+.v2-sl { display: grid; grid-template-columns: 24px 1fr 46px 36px; gap: 10px; align-items: center; }
+.v2-sl svg { width: 18px; height: 18px; color: var(--muted); }
+.v2-sl .lab { grid-column: 2 / -1; font-family: var(--font-display); font-size: 14px; display: flex; justify-content: space-between; margin-bottom: -6px; }
+.v2-sl .val { font-family: var(--font-display); font-size: 13px; color: var(--muted); text-align: right; }
+.v2-sl .dh-iconbtn { width: 36px; height: 36px; } .v2-sl .dh-iconbtn svg { width: 16px; height: 16px; }
+.v2-meter { height: 14px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: flex; gap: 2px; padding: 3px; }
+.v2-meter i { flex: 1; background: #2f2a38; } .v2-meter i.on { background: var(--ok); } .v2-meter i.on.hot { background: var(--warn); }
+.v2-section { font-family: var(--font-display); font-size: 15px; color: var(--lamp); letter-spacing: .04em; margin-top: 4px; }
+.v2-note { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.45; }
+.v2-mstate { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 12px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-mstate .dh-mic { width: 56px; height: 56px; pointer-events: none; } .v2-mstate .dh-mic svg { width: 26px; height: 26px; }
+.v2-demo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2-demo .dh-btn { min-height: 44px; font-size: 13px; padding: 6px 8px 8px; }
+.empty { color: var(--muted); text-align: center; padding: 30px 10px; font-size: 14px; }
+
+/* ---------- login ---------- */
+#login { position: fixed; inset: 0; z-index: 100; background: var(--night); transition: opacity .5s steps(5); }
+#login.out { opacity: 0; pointer-events: none; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+#login .stage { position: relative; height: 100%; display: grid; grid-template-rows: auto 1fr auto; padding-inline: 16px; padding-block: clamp(16px, 4vh, 40px); }
+#login .sign { justify-self: center; text-align: center; display: grid; gap: 6px; }
+#login .sign h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 6vw, 52px); letter-spacing: .04em; line-height: 1;
+  text-shadow: 0 0 18px rgba(244,184,96,.55), 3px 3px 0 var(--panel-edge); }
+#login .sign p { margin: 0; font-family: var(--font-display); font-size: clamp(14px, 2.2vw, 17px); letter-spacing: .06em; color: var(--lamp); text-shadow: 2px 2px 0 var(--panel-edge); }
+#login .sign .new { display: inline-block; margin-top: 4px; justify-self: center; font-family: var(--font-display); font-size: 12px; letter-spacing: .08em; color: var(--panel-edge); background: var(--radio); padding: 2px 8px 3px; box-shadow: 0 0 0 2px var(--panel-edge); }
+#login .card { grid-row: 3; justify-self: center; width: min(100%, 400px); background: var(--panel); padding: 20px 20px 16px; display: grid; gap: 12px; box-shadow: var(--frame-drop); }
+#login .card h2 { margin: 0; font-family: var(--font-display); font-size: 22px; }
+#login .field { display: grid; gap: 6px; }
+#login .pw { position: relative; } #login .pw .dh-input { padding-right: 52px; }
+#login .pw button { position: absolute; right: 4px; top: 4px; width: 40px; height: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+#login .pw button svg { width: 18px; height: 18px; }
+#login .knock { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--panel-edge); background: var(--lamp); border: 0; padding: 13px 16px 15px; cursor: pointer;
+  box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 var(--lamp-deep); }
+#login .knock:active { transform: translateY(2px); }
+#login .fine { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+#login .linkish { font: inherit; font-size: 13px; background: none; border: 0; padding: 0; color: var(--lamp); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+#login .demo { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); font-size: 13px; color: var(--muted); }
+#login .demo b { font-family: var(--font-display); color: var(--cream); font-weight: 500; }
+#login .demo button { margin-left: auto; }
+#login .shake { animation: v2-no .3s steps(4); }
+@keyframes v2-no { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (max-height: 640px) { #login .card { padding: 14px; gap: 9px; } #login .lede { display: none; } }
+
+@container game (max-width: 640px) {
+  .dh-hud-tl { max-width: calc(100% - 170px); }
+  .dh-hud-tr { gap: 9px; }
+  .dh-hud-tc { top: calc(112px + var(--safe-t)); }
+  .dh-hud-tr .dh-iconbtn { width: 40px; height: 40px; }
+  .v2-xp .v2-bar { width: 44px; }
+  #zonePill .dh-sub { display: none; }
+  .dh-mic, .v2-walkie { width: 64px; height: 64px; }
+  .v2-coach { bottom: calc(170px + var(--safe-b)); }
+  .v2-act { bottom: calc(160px + var(--safe-b)); }
+  .v2-pop { left: 50% !important; transform: translateX(-50%); top: auto !important; bottom: 12px; width: min(94%, 340px); }
+}
+@media (prefers-reduced-motion: reduce) { .v2-sign, .v2-emo, .v2-walkie, .v2-conf, .v2-onair { animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="dh-game" id="game">
+  <div id="view"><div id="world"></div></div>
+
+  <div class="dh-hud" id="hud">
+    <div class="dh-hud-tl">
+      <div class="dh-pill" id="zonePill"></div>
+      <button class="v2-xp" id="xpChip" aria-label="Your profile, level and badges"></button>
+    </div>
+    <div class="dh-hud-tc" id="toasts"></div>
+    <div class="dh-hud-tr">
+      <button class="dh-iconbtn" id="btnPeople" aria-label="Who's where"><i data-lucide="map"></i></button>
+      <button class="dh-iconbtn" id="btnChallenges" aria-label="Challenges"><i data-lucide="trophy"></i><span class="dh-badge-dot" id="chDot" hidden></span></button>
+      <button class="dh-iconbtn" id="btnSettings" aria-label="Settings"><i data-lucide="settings"></i></button>
+    </div>
+    <div class="dh-hud-bl" id="joyWrap" hidden><div class="dh-joy" id="joy"><div class="knob" id="knob"></div></div></div>
+    <div class="dh-hud-br" id="br">
+      <button class="dh-iconbtn v2-small" id="btnEmote" aria-label="Emotes"><i data-lucide="smile-plus"></i></button>
+      <button class="dh-iconbtn v2-small" id="btnChat" aria-label="Room chat" hidden><i data-lucide="message-square"></i><span class="dh-badge-dot" id="unread" hidden></span></button>
+      <button class="v2-walkie" id="walkie" data-state="idle" aria-label="Hold to talk on the walkie"><i data-lucide="radio"></i><span class="cap">Hold · T</span><span class="meter" id="wMeter"></span></button>
+      <button class="dh-mic" id="mic" data-state="live" aria-label="Mute" hidden></button>
+    </div>
+    <div class="v2-act" id="act" hidden></div>
+  </div>
+  <div id="layer"></div>
+</div>
+
+<div id="login">
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <main class="stage">
+    <header class="sign">
+      <h1>Diesel House</h1>
+      <p>8 rooms · walk in to talk</p>
+      <span class="new">v2 · games, walkie, challenges</span>
+    </header>
+    <section class="card" aria-live="polite">
+      <form id="loginForm" style="display:grid;gap:12px" novalidate>
+        <h2>Knock to come in</h2>
+        <p class="dh-lede lede">Step into a room and you hear everyone inside. In the hallway, get close to whisper or grab the walkie.</p>
+        <div class="field"><label class="dh-label" for="lgName">Your name</label>
+          <input class="dh-input" id="lgName" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="admin"></div>
+        <div class="field"><label class="dh-label" for="lgPass">Password</label>
+          <div class="pw"><input class="dh-input" id="lgPass" type="password" autocomplete="current-password" placeholder="admin"><button type="button" id="lgEye" aria-label="Show password"><i data-lucide="eye"></i></button></div></div>
+        <p class="dh-error" id="lgErr" hidden></p>
+        <button class="knock" id="lgGo" type="submit">Knock on the door</button>
+        <div class="demo"><i data-lucide="key-round" style="width:16px;height:16px;color:var(--lamp)"></i><span>Demo login: <b>admin</b> / <b>admin</b></span><button type="button" class="linkish" id="lgFill">Fill in</button></div>
+        <p class="fine">Just visiting? <button class="linkish" type="button" id="lgGuest">Come in as a guest</button></p>
+      </form>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+const D = "__DATA__";
+const IM = "__IMGS__";
+const T = 16;
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const icons = () => window.lucide && lucide.createIcons();
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+const MOOD = { gaming: ['gamepad-2', 'Gaming'], deeptalk: ['message-circle-heart', 'Deep talk'], music: ['music', 'Music'],
+  study: ['book-open', 'Study'], chill: ['sofa', 'Chill'], dnd: ['moon', 'Do not disturb'] };
+const DOOR = { open: ['door-open', 'Open'], knock: ['hand', 'Knock'], locked: ['lock', 'Locked'] };
+const CHARS = ['adam', 'alex', 'amelia', 'bob'];
+
+/* emotes: Kenney emotes-pack pixel_style1 (16 px cells) */
+const EMO = { laugh: [16, 16], hearts: [16, 48], heart: [16, 80], music: [16, 0], idea: [16, 32], happy: [32, 16], sad: [32, 0],
+  question: [0, 80], exclaim: [32, 64], sleep: [0, 48], dots: [48, 16], stars: [0, 16], anger: [64, 48], cash: [64, 16], swirl: [0, 0] };
+const EMO_MENU = ['laugh', 'hearts', 'happy', 'music', 'idea', 'question', 'exclaim', 'stars', 'sleep', 'anger'];
+const emoStyle = (k, size) => { const [x, y] = EMO[k], s = size / 16; return `background-image:url(${IM.EMO});background-size:${80 * s}px ${96 * s}px;background-position:-${x * s}px -${y * s}px`; };
+
+/* badges: OGA medals atlas, 48 px cells in this order */
+const BADGES = [
+  { id: 'first_knock', name: 'First knock', how: 'Knock on a friend’s door.' },
+  { id: 'night_owl', name: 'Night owl', how: 'Be in the house after midnight.' },
+  { id: 'high_roller', name: 'High roller', how: 'Roll a double six at the games table.' },
+  { id: 'duelist', name: 'Duelist', how: 'Win 3 rock-paper-scissors duels.' },
+  { id: 'fast_hand', name: 'Fastest hand', how: 'Win a round of Quick Draw.' },
+  { id: 'over_out', name: 'Over and out', how: 'Use the walkie 3 times.' },
+  { id: 'steady', name: 'Slow & steady', how: 'Keep a 7-day streak.' },
+  { id: 'host', name: 'Party host', how: 'Have 4 people in your room at once.' },
+  { id: 'lvl5', name: 'Level 5', how: 'Reach level 5.' },
+  { id: 'legend', name: 'House legend', how: 'Reach level 10.' },
+  { id: 'decor', name: 'Home maker', how: 'Name your room.' },
+  { id: 'social', name: 'Social butterfly', how: 'Send emotes to 3 different friends.' },
+];
+const medalStyle = (i, size = 48) => { const s = size / 48; return `background-image:url(${IM.MEDALS});background-size:${576 * s}px ${48 * s}px;background-position:-${i * 48 * s}px 0`; };
+const dieStyle = n => `background-image:url(${IM.DICE});background-position:-${(n - 1) * 44}px 0`; // 1..6, 7 = ?
+
+/* challenges (daily resets at local midnight, weekly on Monday) */
+const CHAL = [
+  { id: 'd_chat', per: 'day', icon: 'message-square', text: 'Say hi in a room chat', goal: 1, xp: 30 },
+  { id: 'd_game', per: 'day', icon: 'dice-5', text: 'Play a game at the games table', goal: 1, xp: 40 },
+  { id: 'd_emote', per: 'day', icon: 'smile', text: 'Send 3 emotes', goal: 3, xp: 20 },
+  { id: 'w_rooms', per: 'week', icon: 'door-open', text: 'Visit 4 different rooms', goal: 4, xp: 120 },
+  { id: 'w_walkie', per: 'week', icon: 'radio', text: 'Use the walkie 3 times', goal: 3, xp: 80 },
+  { id: 'w_whisper', per: 'week', icon: 'ear', text: 'Whisper with 3 friends', goal: 3, xp: 90 },
+];
+const xpFor = L => 50 * (L - 1) * L;             // total XP needed to reach level L
+const levelOf = xp => { let L = 1; while (xp >= xpFor(L + 1)) L++; return L; };
+
+/* ---------- saved state (this device) ---------- */
+const S = Object.assign({ xp: 260, streak: 3, badges: ['first_knock', 'decor'], seen: [], ch: 'adam', name: 'Diesel', tips: false,
+  code: 'DSL-7K2Q', codeOn: true, prog: {}, wins: { rps: 0 }, emoted: [], board: null }, store.get('dh.v2.state', {}));
+const save = () => store.set('dh.v2.state', S);
+const SND = Object.assign({ master: 80, voices: 100, game: 80, music: 70, radio: 80, sfx: true, doors: true, chimes: true, hideMute: true }, store.get('dh.v2.sound', {}));
+const saveSnd = () => store.set('dh.v2.sound', SND);
+let guest = false;
+
+/* ---------- audio: one Web Audio bus, a gain per category ---------- */
+const AC = { ctx: null, g: {} };
+function audio() {
+  if (!AC.ctx) {
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+    AC.ctx = new C(); AC.master = AC.ctx.createGain(); AC.master.connect(AC.ctx.destination);
+    for (const k of ['voices', 'game', 'music', 'radio']) { const g = AC.ctx.createGain(); g.connect(AC.master); AC.g[k] = g; }
+    applyGains();
+  }
+  if (AC.ctx.state === 'suspended') AC.ctx.resume();
+  return AC.ctx;
+}
+function applyGains() {
+  if (!AC.ctx) return;
+  const hidden = SND.hideMute && document.hidden;
+  AC.master.gain.value = hidden ? 0 : SND.master / 100;
+  for (const k in AC.g) AC.g[k].gain.value = SND[k] / 100;
+}
+function tone(cat, { f = 440, f2, type = 'square', t = 0, d = .12, v = .15 }) {
+  const c = audio(); if (!c) return; const t0 = c.currentTime + t;
+  const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
+  g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + d);
+  o.connect(g); g.connect(AC.g[cat]); o.start(t0); o.stop(t0 + d + .02);
+}
+let noiseBuf = null;
+function noise(cat, { t = 0, d = .2, v = .2, bp = 1800, q = 1, type = 'bandpass' }) {
+  const c = audio(); if (!c) return; const t0 = c.currentTime + t;
+  if (!noiseBuf) { noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const a = noiseBuf.getChannelData(0); for (let i = 0; i < a.length; i++) a[i] = Math.random() * 2 - 1; }
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); s.buffer = noiseBuf; f.type = type; f.frequency.value = bp; f.Q.value = q;
+  g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + d);
+  s.connect(f); f.connect(g); g.connect(AC.g[cat]); s.start(t0, Math.random() * .5); s.stop(t0 + d + .02);
+}
+const sfx = {
+  blip() { if (SND.sfx) tone('game', { f: 880, d: .05, v: .08 }); },
+  knock() { if (!SND.sfx || !SND.doors) return; for (const t of [0, .16, .32]) { noise('game', { t, d: .07, v: .6, bp: 260, q: 3 }); tone('game', { f: 120, f2: 70, type: 'sine', t, d: .09, v: .35 }); } },
+  door() { if (!SND.sfx || !SND.doors) return; noise('game', { d: .35, v: .12, bp: 500, q: 1.5 }); tone('game', { f: 180, f2: 120, type: 'triangle', d: .25, v: .12 }); },
+  join() { if (!SND.sfx || !SND.chimes) return; tone('game', { f: 660, type: 'triangle', d: .14, v: .12 }); tone('game', { f: 990, type: 'triangle', t: .1, d: .2, v: .12 }); },
+  leave() { if (!SND.sfx || !SND.chimes) return; tone('game', { f: 880, type: 'triangle', d: .14, v: .1 }); tone('game', { f: 587, type: 'triangle', t: .1, d: .2, v: .1 }); },
+  coin() { tone('music', { f: 988, d: .07, v: .1 }); tone('music', { f: 1319, t: .07, d: .22, v: .1 }); },
+  levelup() { [523, 659, 784, 1047].forEach((f, i) => tone('music', { f, t: i * .09, d: .14, v: .12 })); tone('music', { f: 1319, t: .4, d: .5, v: .12 }); tone('music', { f: 784, type: 'triangle', t: .4, d: .5, v: .1 }); },
+  badge() { [784, 988, 1175, 1568].forEach((f, i) => tone('music', { f, t: i * .07, d: .12, v: .09 })); },
+  win() { [523, 784, 1047].forEach((f, i) => tone('music', { f, t: i * .1, d: .16, v: .12 })); },
+  lose() { [392, 330, 262].forEach((f, i) => tone('music', { f, t: i * .12, d: .18, v: .1 })); },
+  dice() { if (!SND.sfx) return; for (let i = 0; i < 7; i++) noise('game', { t: i * .07 + Math.random() * .03, d: .04, v: .5, bp: 2500 + Math.random() * 2000, q: 4 }); },
+  bang() { if (!SND.sfx) return; noise('game', { d: .4, v: .9, bp: 900, q: .4, type: 'lowpass' }); tone('game', { f: 140, f2: 40, type: 'sine', d: .3, v: .4 }); },
+  squelchOn() { noise('radio', { d: .09, v: .35, bp: 2200, q: .8 }); tone('radio', { f: 1400, d: .06, v: .06 }); },
+  squelchOff() { tone('radio', { f: 1000, d: .05, v: .06 }); noise('radio', { t: .04, d: .25, v: .3, bp: 2000, q: .7 }); },
+  static(d = 1.2) { noise('radio', { d, v: .12, bp: 1600, q: .6 }); },
+  whisper() { noise('radio', { d: .5, v: .08, bp: 3800, q: 2 }); },
+  voice() { // a soft "hm-hm" murmur for the Voices preview
+    for (const [t, f] of [[0, 180], [.22, 150]]) { tone('voices', { f, type: 'sawtooth', t, d: .18, v: .05 }); tone('voices', { f: f * 2, type: 'sine', t, d: .18, v: .05 }); }
+  },
+};
+
+/* ---------- people ---------- */
+const owners = { room_01: 'sami', room_02: 'me', room_03: 'zak', room_04: 'hodan', room_05: 'leila', room_06: 'yusuf', room_07: 'amira', room_08: 'omar' };
+const people = [
+  { id: 'me', name: S.name, ch: S.ch, x: D.spawn[0] + 260, y: D.spawn[1] + 8, dir: 3, me: true, lv: levelOf(S.xp) },
+  { id: 'sami', name: 'Sami', ch: 'alex', x: 68, y: 120, dir: 3, home: 'room_01', lv: 7, xpw: 340 },
+  { id: 'amira', name: 'Amira', ch: 'amelia', x: 132, y: 114, dir: 2, home: 'room_01', lv: 5, xpw: 410 },
+  { id: 'yusuf', name: 'Yusuf', ch: 'bob', x: 232, y: 440, dir: 0, home: 'room_06', lv: 4, xpw: 150 },
+  { id: 'zak', name: 'Zak', ch: 'alex', x: 330, y: 262, dir: 2, home: 'hallway', roam: true, lv: 9, xpw: 520 },
+  { id: 'leila', name: 'Leila', ch: 'amelia', x: 540, y: 250, dir: 3, home: 'hallway', roam: true, lv: 6, xpw: 275 },
+  { id: 'omar', name: 'Omar', ch: 'bob', x: 620, y: 420, dir: 3, home: 'room_08', lv: 3, xpw: 90 },
+  { id: 'hodan', name: 'Hodan', ch: 'amelia', x: 600, y: 110, dir: 3, home: 'room_04', lv: 8, xpw: 230 },
+];
+const me = () => people[0];
+const byId = id => people.find(p => p.id === id);
+const passes = new Set();
+let mic = 'live', micAsked = false, zone = null, whisperWith = new Set(), walkie = 'idle', ptt = false;
+
+/* ---------- world ---------- */
+const world = $('#world'), view = $('#view'), game = $('#game');
+world.style.width = D.W * T + 'px'; world.style.height = D.H * T + 'px';
+const base = el('img', 'base'); base.src = IM.BASE; base.alt = ''; world.append(base);
+
+// games corner: a table at the west end of the hallway (solid), plus the noticeboard on the wall
+D.items.push({ k: 'table_wood', x: 64, y: 234, w: 38, h: 37, z: 271, room: 'hallway' });
+D.items.push({ k: 'stool', x: 58, y: 262, w: 10, h: 12, z: 274, room: 'hallway' }, { k: 'stool', x: 98, y: 262, w: 10, h: 12, z: 274, room: 'hallway' });
+for (const [tx, ty] of [[4, 15], [5, 15], [4, 16], [5, 16]]) D.walls[ty * D.W + tx] = 1;
+for (const it of D.items) {
+  const a = D.atlas[it.k]; if (!a) continue; const e = el('div', 'it');
+  Object.assign(e.style, { left: it.x + 'px', top: it.y + 'px', width: (it.w || a[2]) + 'px', height: (it.h || a[3]) + 'px', zIndex: it.z,
+    backgroundImage: `url(${IM.ATLAS})`, backgroundPosition: `-${a[0]}px -${a[1]}px` });
+  world.append(e);
+}
+for (const [x, y, n] of [[70, 238, 5], [84, 243, 3]]) { // two little dice on the table (11 px cells)
+  const d = el('div', 'v2-dicetop'); d.style.cssText = `left:${x}px;top:${y}px;background-image:url(${IM.DICE});background-position:-${(n - 1) * 11}px 0`; world.append(d);
+}
+const board = el('div', 'v2-board'); Object.assign(board.style, { left: '470px', top: '200px' });
+board.innerHTML = ['#ffe9a8', '#ffb3c7', '#9ec9ff', '#9be0a8', '#fff4e0'].map((c, i) => `<i style="background:${c};left:${3 + (i % 3) * 8}px;top:${3 + Math.floor(i / 3) * 8}px"></i>`).join('');
+world.append(board);
+const SPOTS = [
+  { id: 'games', x: 83, y: 282, sx: 83, sy: 226, label: 'Games', icon: 'dice-5', act: 'Play games' },
+  { id: 'board', x: 485, y: 246, sx: 485, sy: 223, label: 'Challenges', icon: 'trophy', act: 'Noticeboard' },
+];
+for (const s of SPOTS) { const g = el('div', 'v2-sign', `<i data-lucide="${s.icon}"></i>${s.label}`); Object.assign(g.style, { left: s.sx + 'px', top: s.sy + 'px' }); world.append(g); }
+
+const dark = el('div'); dark.id = 'dark'; const glow = el('div'); glow.id = 'glow';
+for (const d of [dark, glow]) { d.style.width = D.W * T + 'px'; d.style.height = D.H * T + 'px'; world.append(d); }
+const range = el('div', 'v2-range'); world.append(range);
+
+const hexA = (h, a) => `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${a})`;
+function paintLights() {
+  const g = [];
+  for (const it of D.items) if (it.light) {
+    const fire = it.k === 'fireplace', fairy = it.k === 'fairy_lights', r = fire ? 70 : fairy ? 26 : 46;
+    g.push(`radial-gradient(circle at ${it.x + it.w / 2}px ${it.y + (fairy ? 6 : it.h * 0.3)}px, ${hexA(it.light, fire ? .75 : .6)} 0, ${hexA(it.light, 0)} ${r}px)`);
+  }
+  g.push(`radial-gradient(circle at 83px 250px, rgba(244,184,96,.5) 0, rgba(244,184,96,0) 46px)`);
+  for (const [rid, r] of Object.entries(D.rooms)) if (occupants(rid).length)
+    g.push(`radial-gradient(ellipse 95px 80px at ${r.origin[0] + 80}px ${r.origin[1] + 96}px, rgba(244,184,96,.38) 0, rgba(244,184,96,0) 100%)`);
+  glow.style.background = g.join(',');
+}
+
+/* characters */
+for (const p of people) {
+  p.el = el('div', 'ch'); p.el.dataset.id = p.id;
+  p.tag = el('div', 'dh-tag' + (p.me ? ' dh-tag--me' : ''));
+  p.ring = el('div', 'dh-ring'); p.ring.hidden = true;
+  world.append(p.ring, p.el, p.tag);
+  p.frame = Math.random() * 6; p.moving = false; p.path = null; p.wait = rnd(1, 4);
+  renderTag(p);
+}
+function renderTag(p) { p.tag.innerHTML = `${esc(p.name)}<span class="lv">${p.lv}</span>`; }
+function drawPerson(p, dt) {
+  p.frame = (p.frame + dt * (p.moving ? 10 : 8)) % 6;
+  const f = p.dir * 6 + Math.floor(p.frame);
+  Object.assign(p.el.style, { left: Math.round(p.x - 8) + 'px', top: Math.round(p.y - 32) + 'px', zIndex: Math.round(p.y),
+    backgroundImage: `url(${IM[`${p.ch}_${p.moving ? 'run' : 'idle'}`]})`, backgroundPosition: `-${f * 16}px 0` });
+  Object.assign(p.tag.style, { left: Math.round(p.x) + 'px', top: Math.round(p.y - 41) + 'px' });
+  Object.assign(p.ring.style, { left: p.x + 'px', top: (p.y - 1) + 'px', zIndex: Math.round(p.y) - 1 });
+  let top = p.y - 43;
+  if (p.bubble) { top -= p.bubble.offsetHeight + 1; Object.assign(p.bubble.style, { left: Math.round(p.x) + 'px', top: Math.round(top) + 'px' }); top -= 2; }
+  if (p.emo) Object.assign(p.emo.style, { left: Math.round(p.x) + 'px', top: Math.round(top - 16) + 'px' });
+  if (p.air) Object.assign(p.air.style, { left: Math.round(p.x + 11) + 'px', top: Math.round(p.y - 36) + 'px' });
+}
+function headStyle(ch, size) { const k = size / 16; return `background-image:url(${IM[ch + '_idle']});background-size:${384 * k}px ${32 * k}px;background-position:-${18 * 16 * k}px -${8 * k}px`; }
+
+function emote(p, k) {
+  p.emo?.remove(); p.emo = el('div', 'v2-emo'); p.emo.setAttribute('style', emoStyle(k, 16)); world.append(p.emo);
+  clearTimeout(p.emoT); p.emoT = setTimeout(() => { p.emo?.remove(); p.emo = null; }, 2600);
+}
+function bubble(p, text, kind) {
+  p.bubble?.remove(); p.bubble = el('div', 'dh-bubble' + (kind ? ' ' + kind : '')); p.bubble.textContent = text; world.append(p.bubble);
+  clearTimeout(p.bubT); p.bubT = setTimeout(() => { p.bubble?.remove(); p.bubble = null; }, 4000);
+}
+function onAir(p, on) { if (on && !p.air) { p.air = el('div', 'v2-onair', 'ON AIR'); world.append(p.air); } if (!on && p.air) { p.air.remove(); p.air = null; } }
+
+/* nameplates */
+const plates = {};
+function doorCenter(rid) { const o = D.rooms[rid].origin, top = o[1] < 12 * T; return { x: o[0] + 80, y: top ? 12 * T + 3 : 19 * T - 2, top }; }
+function occupants(rid) { return people.filter(p => zoneAt(p.x, p.y) === rid); }
+function renderPlate(rid) {
+  const r = D.rooms[rid]; let pl = plates[rid];
+  if (!pl) { pl = plates[rid] = el('div', 'dh-nameplate'); world.append(pl); }
+  pl.dataset.door = r.door;
+  const occ = occupants(rid);
+  const heads = occ.slice(0, 4).map(p => `<span style="${headStyle(p.ch, 8)}"></span>`).join('') + (occ.length > 4 ? `<span class="more">+${occ.length - 4}</span>` : '');
+  const doorIcon = r.door === 'open' ? '' : `<i data-lucide="${DOOR[r.door][0]}"></i>`;
+  const key = r.door + r.name + r.mood + occ.map(p => p.id).join();
+  if (pl.dataset.key === key) return; pl.dataset.key = key;
+  pl.innerHTML = (occ.length ? `<div class="heads">${heads}</div>` : '') + `<div class="board">${doorIcon}${esc(r.name)}<i data-lucide="${MOOD[r.mood][0]}" style="color:var(--mood-${r.mood})"></i></div>`;
+  const c = doorCenter(rid);
+  Object.assign(pl.style, { left: c.x + 'px', top: c.top ? (c.y - (occ.length ? 10 : 0)) + 'px' : (c.y - 2) + 'px' });
+  icons();
+}
+function renderPlates() { for (const rid in D.rooms) renderPlate(rid); paintLights(); }
+
+/* ---------- collision, zones, paths ---------- */
+const solid = (tx, ty) => tx < 0 || ty < 0 || tx >= D.W || ty >= D.H || D.walls[ty * D.W + tx] === 1;
+function blocked(x, y) { for (const [dx, dy] of [[-5, -6], [5, -6], [-5, 0], [5, 0]]) if (solid(Math.floor((x + dx) / T), Math.floor((y + dy - 0.01) / T))) return true; return false; }
+function zoneAt(x, y) { for (const z of D.zones) if (x >= z.x && x < z.x + z.w && y - 3 >= z.y && y - 3 < z.y + z.h) return z.name; return null; }
+const zoneRect = n => D.zones.find(z => z.name === n);
+function findPath(x0, y0, x1, y1) {
+  const s = [Math.floor(x0 / T), Math.floor((y0 - 3) / T)], g = [Math.floor(x1 / T), Math.floor((y1 - 3) / T)];
+  if (solid(g[0], g[1])) return null;
+  const W = D.W, prev = new Int32Array(W * D.H).fill(-1), q = [s[1] * W + s[0]]; prev[q[0]] = q[0];
+  while (q.length) {
+    const c = q.shift(); if (c === g[1] * W + g[0]) break;
+    const cx = c % W, cy = (c / W) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, n = ny * W + nx; if (!solid(nx, ny) && prev[n] < 0) { prev[n] = c; q.push(n); } }
+  }
+  let c = g[1] * W + g[0]; if (prev[c] < 0) return null;
+  const out = []; while (c !== prev[c]) { out.unshift([(c % W) * T + 8, ((c / W) | 0) * T + 13]); c = prev[c]; }
+  return out;
+}
+function randomSpot(zn) {
+  const z = zoneRect(zn);
+  for (let i = 0; i < 40; i++) { const x = rnd(z.x + 16, z.x + z.w - 16), y = rnd(z.y + 40, z.y + z.h - 8); const tx = Math.floor(x / T), ty = Math.floor((y - 3) / T); if (!solid(tx, ty)) return [tx * T + 8, ty * T + 13]; }
+  return null;
+}
+
+/* ---------- HUD ---------- */
+const pill = $('#zonePill'), micBtn = $('#mic'), walkieBtn = $('#walkie'), chatBtn = $('#btnChat');
+function renderPill() {
+  const w = [...whisperWith].map(id => byId(id).name);
+  pill.classList.toggle('whisper', !!w.length);
+  if (!zone || zone === 'hallway') {
+    pill.innerHTML = w.length ? `<i data-lucide="ear"></i>Whispering <span class="dh-sub">with ${esc(w.join(', '))}</span>`
+      : `<i data-lucide="house"></i>Hallway <span class="dh-sub"><span class="dh-dot dh-dot--ok"></span> ${people.length} in the house</span>`;
+  } else {
+    const r = D.rooms[zone], n = occupants(zone).length;
+    pill.innerHTML = `<i data-lucide="door-open"></i>${esc(r.name)} <span class="dh-mood" data-mood="${r.mood}"><i data-lucide="${MOOD[r.mood][0]}"></i>${MOOD[r.mood][1]}</span><span class="dh-sub">${n} here</span>`;
+  }
+  icons();
+}
+function renderXP(gain) {
+  const L = levelOf(S.xp), a = xpFor(L), b = xpFor(L + 1), pct = Math.round((S.xp - a) / (b - a) * 100);
+  const chip = $('#xpChip');
+  chip.innerHTML = `<span class="dh-portrait" style="${headStyle(me().ch, 30)}"></span><span style="display:grid;gap:3px;justify-items:start"><span class="lv">${guest ? 'Guest' : 'Lv ' + L}</span>${guest ? '' : `<span class="v2-bar"><b style="width:${pct}%"></b></span>`}</span>${guest ? '' : `<span class="streak"><i data-lucide="flame"></i>${S.streak}</span>`}`;
+  if (gain) { const f = el('span', 'v2-float', `+${gain} XP`); chip.append(f); setTimeout(() => f.remove(), 1300); }
+  me().lv = L; renderTag(me()); icons();
+  const open = CHAL.some(c => !isDone(c) && prog(c) >= c.goal);
+  $('#chDot').hidden = !CHAL.some(c => !isDone(c)) || guest;
+}
+
+/* mic states: live | muted | ptt | talking | blocked | nomic | silent */
+const MIC = { live: ['mic', 'Mute', ''], muted: ['mic-off', 'Unmute', 'Muted'], ptt: ['mic', 'Hold to talk', 'Hold'], talking: ['mic', 'Talking', ''],
+  blocked: ['mic-off', 'Mic blocked — tap for help', 'Blocked'], nomic: ['mic-off', 'No microphone found — tap for help', 'No mic'], silent: ['mic', 'We can’t hear your mic — tap for help', 'Silent?'] };
+function setMic(s) {
+  mic = s; micBtn.dataset.state = s; const [ic, label, why] = MIC[s];
+  const conn = s === 'blocked' || s === 'nomic' ? 'error' : s === 'silent' ? 'warn' : 'ok';
+  micBtn.innerHTML = `<i data-lucide="${ic}"></i><span class="dh-conn" data-s="${conn}"></span>${why ? `<span class="why">${why}</span>` : ''}`;
+  micBtn.setAttribute('aria-label', label); icons();
+  me().ring.hidden = !(s === 'talking' || (s === 'live' && meTalking));
+}
+let meTalking = false;
+micBtn.addEventListener('click', () => {
+  if (ptt) return;
+  if (['blocked', 'nomic', 'silent'].includes(mic)) return showMicHelp();
+  setMic(mic === 'live' ? 'muted' : 'live'); sfx.blip();
+});
+micBtn.addEventListener('pointerdown', () => { if (ptt && mic === 'ptt') setMic('talking'); });
+for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) micBtn.addEventListener(ev, () => { if (ptt && mic === 'talking') setMic('ptt'); });
+
+function onZoneChange(prev) {
+  renderPill(); renderPlates();
+  const inRoom = zone && zone !== 'hallway';
+  micBtn.hidden = !inRoom; chatBtn.hidden = !inRoom; walkieBtn.hidden = inRoom;
+  if (inRoom) { stopWalkie(); range.style.opacity = 0; }
+  if (!inRoom) closeChat();
+  if (inRoom && prev !== zone) {
+    sfx.door(); setTimeout(sfx.join, 250);
+    progress('w_rooms', zone);
+    const others = occupants(zone).filter(p => !p.me);
+    toast({ icon: 'door-open', who: D.rooms[zone].name, what: others.length ? `Voice on · you can hear ${others.map(p => p.name).join(' & ')}` : 'Nobody else here yet', small: true, ttl: 2400 });
+    if (!micAsked) { micAsked = true; setTimeout(showMicCard, 400); }
+    if (owners[zone] === 'me' && occupants(zone).length >= 4) unlock('host');
+    $('#unread').hidden = !(chatLog[zone] && chatLog[zone].unread);
+  }
+  if (prev && prev !== 'hallway' && zone === 'hallway') { sfx.leave(); toast({ icon: 'volume-x', who: 'Back in the hallway', what: 'Room voice off. Get close to someone to whisper.', small: true, ttl: 2200 }); }
+}
+
+/* toasts */
+function toast({ icon, who, what, actions, small, ttl = 4500, face, medal, emo }) {
+  const t = el('div', 'dh-toast' + (small ? ' dh-toast--small' : ''));
+  const lead = face ? `<div class="dh-portrait dh-portrait--lg" style="${headStyle(face, 48)}"></div>`
+    : medal != null ? `<div class="v2-medal" style="${medalStyle(medal, 48)}"></div>`
+    : emo ? `<div class="dh-portrait" style="${emoStyle(emo, 32)};background-color:transparent;box-shadow:none"></div>`
+    : `<i data-lucide="${icon}" style="width:24px;height:24px;color:var(--lamp)"></i>`;
+  t.innerHTML = `${lead}<div><div class="who">${who}</div><div class="what">${what}</div></div>`;
+  if (actions) {
+    const a = el('div', 'actions');
+    for (const [label, quiet, fn] of actions) { const b = el('button', 'dh-btn' + (quiet ? ' dh-btn--quiet' : ''), label); b.onclick = () => { t.remove(); fn && fn(); }; a.append(b); }
+    t.append(a);
+  }
+  const box = $('#toasts'); box.append(t); while (box.querySelectorAll('.dh-toast').length > 3) box.querySelector('.dh-toast').remove();
+  icons(); if (ttl) setTimeout(() => t.remove(), ttl);
+  return t;
+}
+
+/* ---------- XP, challenges, badges ---------- */
+const dayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+const weekKey = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return 'w' + d.toDateString(); };
+function slot(c) { const k = c.per === 'day' ? dayKey() : weekKey(); S.prog[k] ||= {}; return S.prog[k]; }
+function prog(c) { const v = slot(c)[c.id]; return Array.isArray(v) ? v.length : (v || 0); }
+const isDone = c => !!slot(c)[c.id + ':done'];
+function progress(id, uniq) {
+  if (guest) return;
+  const c = CHAL.find(x => x.id === id); if (!c || isDone(c)) return;
+  const s = slot(c);
+  if (uniq != null) { s[id] ||= []; if (s[id].includes(uniq)) return; s[id].push(uniq); } else s[id] = (s[id] || 0) + 1;
+  if (prog(c) >= c.goal) {
+    s[id + ':done'] = 1; save();
+    toast({ icon: c.icon, who: 'Challenge done!', what: `${c.text} · <b style="color:var(--gold)">+${c.xp} XP</b>`, small: true, ttl: 3200 });
+    setTimeout(() => addXP(c.xp), 400);
+  } else save();
+  renderXP(); if (openPanel === 'challenges') showChallenges(chTab);
+}
+function addXP(n) {
+  if (guest) return;
+  const before = levelOf(S.xp); S.xp += n; save(); sfx.coin(); renderXP(n);
+  const after = levelOf(S.xp);
+  if (after > before) setTimeout(() => levelUp(after), 600);
+}
+function unlock(id) {
+  if (guest || S.badges.includes(id)) return;
+  S.badges.push(id); save(); const i = BADGES.findIndex(b => b.id === id);
+  setTimeout(() => { sfx.badge(); toast({ medal: i, who: `Badge: ${BADGES[i].name}`, what: BADGES[i].how, ttl: 3800 }); }, 300);
+}
+function levelUp(L) {
+  sfx.levelup();
+  const o = el('div', 'v2-lvl');
+  o.innerHTML = `<div class="card"><div class="k">Level up</div><div class="n">Lv ${L}</div><p>${L >= 5 ? 'You earned the Level 5 badge.' : 'Keep hanging out to unlock more badges.'}</p><button class="dh-btn">Nice!</button></div>`;
+  const cols = ['#f4b860', '#ffd36b', '#6fdc8c', '#9ec9ff', '#ff9fb2', '#c99bff'];
+  for (let i = 0; i < 46; i++) { const c = el('i', 'v2-conf'); c.style.cssText = `left:${rnd(0, 100)}%;background:${pick(cols)};animation-duration:${rnd(1.6, 3)}s;animation-delay:${rnd(0, .6)}s`; o.append(c); }
+  o.onclick = () => o.remove(); game.append(o); setTimeout(() => o.remove(), 5000);
+  if (L >= 5) unlock('lvl5'); if (L >= 10) unlock('legend');
+}
+
+/* ---------- doors ---------- */
+let lastDoorMsg = 0;
+function doorAllows(rid) {
+  const r = D.rooms[rid];
+  if (!r || r.door === 'open' || owners[rid] === 'me' || passes.has(rid)) return true;
+  const now = performance.now();
+  if (now - lastDoorMsg > 3500) {
+    lastDoorMsg = now; const owner = byId(owners[rid])?.name || r.name.split("'")[0];
+    if (r.door === 'locked') toast({ icon: 'lock', who: `${r.name} is locked`, what: `${owner} wants some quiet. Try the walkie?`, ttl: 2800 });
+    else {
+      sfx.knock(); unlock('first_knock');
+      toast({ icon: 'hand', who: `You knocked on ${owner}'s door`, what: 'Waiting for them to answer…', ttl: 2400 });
+      setTimeout(() => { passes.add(rid); sfx.door(); toast({ face: byId(owners[rid])?.ch || 'alex', who: `${owner} let you in`, what: 'Walk in. Your pass lasts 12 hours.', small: true, ttl: 2800 }); }, 2400);
+    }
+  }
+  return false;
+}
+
+/* ---------- input ---------- */
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !loggedOut) { closeModals(); closeChat(); return; }
+  if (e.target.closest('input,textarea,select') || loggedOut) return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); me().path = null; e.preventDefault(); }
+  if (k === 't' && !e.repeat) startWalkie();
+  if (k === 'e' && !e.repeat && curSpot && !modalOpen()) openSpot(curSpot);
+  if (e.code === 'Space' && ptt && zone && zone !== 'hallway') { e.preventDefault(); if (!e.repeat) setMic('talking'); }
+});
+addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys.delete(k); if (k === 't') stopWalkie(true); if (e.code === 'Space' && ptt && mic === 'talking') setMic('ptt'); });
+game.addEventListener('contextmenu', e => { if (!e.target.closest('input,textarea')) e.preventDefault(); });
+
+let pointerWalk = null;
+view.addEventListener('pointerdown', e => {
+  const t = e.target.closest('.ch');
+  if (t) { const p = byId(t.dataset.id); return p.me ? showProfile() : friendMenu(p, e); }
+  closePop();
+  if (e.pointerType === 'mouse') { pointerWalk = e; me().path = null; view.setPointerCapture(e.pointerId); }
+  else { // tap-to-walk on touch
+    const r = view.getBoundingClientRect(); const wx = (e.clientX - r.left) / Z + cam.x, wy = (e.clientY - r.top) / Z + cam.y + 6;
+    walkTo(wx, wy, true);
+  }
+});
+view.addEventListener('pointermove', e => { if (pointerWalk) pointerWalk = e; });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) view.addEventListener(ev, () => pointerWalk = null);
+
+/* joystick: never sticks (FIXES #2) */
+const joy = $('#joy'), knob = $('#knob'); const jv = { x: 0, y: 0 }; let joyId = null;
+const joyRelease = () => { joyId = null; jv.x = jv.y = 0; knob.style.transform = ''; };
+joy.addEventListener('pointerdown', e => { e.preventDefault(); joyId = e.pointerId; joy.setPointerCapture(e.pointerId); me().path = null; moveJoy(e); }, { passive: false });
+joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) moveJoy(e); });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) joy.addEventListener(ev, e => { if (e.pointerId === joyId) joyRelease(); });
+joy.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+for (const ev of ['blur', 'pagehide']) addEventListener(ev, () => { joyRelease(); keys.clear(); stopWalkie(true); });
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect(); let dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2;
+  const L = Math.hypot(dx, dy), M = 36; if (L > M) { dx *= M / L; dy *= M / L; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`; jv.x = L > 6 ? dx / M : 0; jv.y = L > 6 ? dy / M : 0;
+}
+
+/* whole-number zoom, re-fit only on a real size change (FIXES #1) */
+let Z = 3, cam = { x: 0, y: 0 }, lastFit = null;
+function fit(force) {
+  const w = view.clientWidth, h = view.clientHeight;
+  if (!force && lastFit) {
+    const kb = window.visualViewport && document.activeElement?.matches('input,textarea') && visualViewport.height < innerHeight * .8;
+    const big = Math.abs(w - lastFit[0]) / lastFit[0] > .2 || Math.abs(h - lastFit[1]) / lastFit[1] > .2;
+    if (kb || !big) return;
+  }
+  lastFit = [w, h];
+  Z = Math.max(2, Math.min(4, Math.floor(Math.min(w / (22 * T), h / (14 * T)))));
+  $('#joyWrap').hidden = !matchMedia('(pointer: coarse)').matches;
+}
+new ResizeObserver(() => fit()).observe(view);
+addEventListener('orientationchange', () => setTimeout(() => fit(true), 250));
+
+/* ---------- walking helpers ---------- */
+function walkTo(x, y, quiet) {
+  const p = me(), path = findPath(p.x, p.y, x, y);
+  if (!path) { if (!quiet) toast({ icon: 'footprints', who: 'Can’t get there', what: 'Something’s in the way.', small: true, ttl: 1800 }); return false; }
+  p.path = path; return true;
+}
+function stepPath(p, speed, dt) {
+  const w = p.path[0]; const dx = w[0] - p.x, dy = w[1] - p.y, L = Math.hypot(dx, dy);
+  if (L < 1.5) { p.path.shift(); if (!p.path.length) p.path = null; return [0, 0]; }
+  return [dx / L, dy / L, Math.min(speed * dt, L)];
+}
+
+/* ---------- loop ---------- */
+let last = performance.now(), curSpot = null, loggedOut = true;
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const p = me(); let vx = 0, vy = 0, step = null;
+  if (!modalOpen() && !loggedOut) {
+    if (keys.has('a') || keys.has('arrowleft')) vx--; if (keys.has('d') || keys.has('arrowright')) vx++;
+    if (keys.has('w') || keys.has('arrowup')) vy--; if (keys.has('s') || keys.has('arrowdown')) vy++;
+    if (jv.x || jv.y) { vx = jv.x; vy = jv.y; }
+    else if (!vx && !vy && pointerWalk) {
+      const r = view.getBoundingClientRect();
+      const wx = (pointerWalk.clientX - r.left) / Z + cam.x, wy = (pointerWalk.clientY - r.top) / Z + cam.y;
+      const dx = wx - p.x, dy = wy - (p.y - 8); if (Math.hypot(dx, dy) > 4) { vx = dx; vy = dy; }
+    } else if (!vx && !vy && p.path) { const s = stepPath(p, 80, dt); vx = s[0]; vy = s[1]; step = s[2]; }
+  }
+  const L = Math.hypot(vx, vy);
+  if (L > 0) {
+    const k = step != null ? step / L : (jv.x || jv.y ? Math.min(1, L) : 1) * 80 * dt / L;
+    const nx = p.x + vx * k, ny = p.y + vy * k;
+    const tryMove = (x, y) => { const zz = zoneAt(x, y); if (blocked(x, y)) return false; if (zz && zz !== zone && zz !== 'hallway' && !doorAllows(zz)) { p.path = null; return false; } p.x = x; p.y = y; return true; };
+    if (!tryMove(nx, ny)) { tryMove(nx, p.y) || tryMove(p.x, ny); }
+    p.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 0 : 2) : (vy > 0 ? 3 : 1);
+  }
+  p.moving = L > 0;
+  const z = zoneAt(p.x, p.y);
+  if (z && z !== zone) { const prev = zone; zone = z; onZoneChange(prev); }
+  for (const q of people) { if (!q.me) npcTick(q, dt); drawPerson(q, dt); }
+  hallwayTick();
+  spotTick();
+  // camera
+  const vw = view.clientWidth / Z, vh = view.clientHeight / Z;
+  const tx = Math.max(0, Math.min(D.W * T - vw, p.x - vw / 2)), ty = Math.max(0, Math.min(D.H * T - vh, p.y - 16 - vh / 2));
+  cam.x += (tx - cam.x) * Math.min(1, dt * 8); cam.y += (ty - cam.y) * Math.min(1, dt * 8);
+  if (D.W * T < vw) cam.x = (D.W * T - vw) / 2; if (D.H * T < vh) cam.y = (D.H * T - vh) / 2;
+  world.style.transform = `translate(${-Math.round(cam.x * Z)}px,${-Math.round(cam.y * Z)}px) scale(${Z})`;
+  Object.assign(range.style, { left: p.x + 'px', top: (p.y - 8) + 'px' });
+  requestAnimationFrame(loop);
+}
+
+/* ---------- NPCs ---------- */
+const LINES = {
+  room: ['haha no way', 'brb tea', 'who’s winning?', 'this song 🔥', 'ok one more round', 'Diesel!! hi', 'did you see the new games table?', 'lol'],
+  whisper: ['psst… hi', 'quick q: you free later?', 'the walkie is so fun', 'don’t tell Sami 🤫', 'let’s duel at the table', 'shh, Hodan’s studying'],
+  walkie: ['copy that 👍', 'roger, heading over', 'who’s at the games table?', 'over and out', 'loud and clear!', 'Zak to base, anyone up for dice?'],
+};
+function npcTick(q, dt) {
+  q.moving = false;
+  if (q.held) return;
+  if (q.path) {
+    const [vx, vy, s] = stepPath(q, 46, dt);
+    if (s) { q.x += vx * s; q.y += vy * s; q.moving = true; q.dir = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 0 : 2) : (vy > 0 ? 3 : 1); }
+    return;
+  }
+  q.wait -= dt; if (q.wait > 0) return;
+  q.wait = rnd(2.5, 7);
+  const r = Math.random(), here = zoneAt(q.x, q.y);
+  if (r < .55) { const s = randomSpot(q.roam ? 'hallway' : here || q.home); if (s) q.path = findPath(q.x, q.y, s[0], s[1]); }
+  else if (r < .63 && q.roam) { const target = pick(['room_01', 'room_06', 'room_05', 'hallway', 'hallway']); const s = randomSpot(target); if (s) q.path = findPath(q.x, q.y, s[0], s[1]); }
+  else if (r < .75) emote(q, pick(['music', 'laugh', 'happy', 'idea', 'dots', 'hearts']));
+  else if (r < .85 && here && here !== 'hallway' && here === zone) { const line = pick(LINES.room); bubble(q, line); chatPush(here, q.id, line); }
+  else if (r < .9) q.dir = Math.floor(Math.random() * 4);
+}
+/* who's talking in your room (voice simulation) */
+setInterval(() => {
+  for (const q of people) if (!q.me) {
+    const inMine = zone && zone !== 'hallway' && zoneAt(q.x, q.y) === zone && D.rooms[zone].mood !== 'dnd';
+    const whisp = whisperWith.has(q.id);
+    q.ring.className = 'dh-ring' + (whisp ? ' whisper' : q.air ? ' radio' : '');
+    q.ring.hidden = !(q.air || (inMine && Math.random() > .5) || (whisp && Math.random() > .6));
+  }
+  if (zone && zone !== 'hallway' && mic === 'live') { meTalking = Math.random() > .75; me().ring.hidden = !meTalking; }
+}, 900);
+
+/* ---------- hallway: whisper (64 px) + walkie ---------- */
+function hallwayTick() {
+  const p = me(), inHall = zone === 'hallway' && !loggedOut;
+  const near = new Set();
+  if (inHall) for (const q of people) if (!q.me && zoneAt(q.x, q.y) === 'hallway') {
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d < 64 || (whisperWith.has(q.id) && d < 80)) near.add(q.id); // connect at 64, let go a bit later so it doesn't flicker
+  }
+  range.style.opacity = inHall ? 1 : 0; range.classList.toggle('on', near.size > 0);
+  const changed = near.size !== whisperWith.size || [...near].some(id => !whisperWith.has(id));
+  if (changed) {
+    for (const id of near) if (!whisperWith.has(id)) {
+      const q = byId(id); sfx.whisper(); progress('w_whisper', id);
+      setTimeout(() => { if (whisperWith.has(id)) bubble(q, pick(LINES.whisper), 'whisper'); }, 700);
+    }
+    whisperWith = near; renderPill();
+  }
+}
+let wTimer = null, wLeft = 0, busyUntil = 0, walkieUses = 0;
+function setWalkie(s) {
+  walkie = s; walkieBtn.dataset.state = s;
+  walkieBtn.querySelector('.cap').textContent = s === 'talking' ? `On air ${Math.ceil(wLeft)}s` : s === 'busy' ? 'Channel busy' : 'Hold · T';
+  $('#wMeter').style.width = s === 'talking' ? (wLeft / 15 * 100) + '%' : '0';
+}
+function startWalkie() {
+  if (loggedOut || modalOpen() || zone !== 'hallway') return;
+  if (walkie === 'busy') { toast({ icon: 'radio', who: 'Channel busy', what: 'Someone else is talking. Try again in a second.', small: true, ttl: 1600 }); sfx.static(.3); return; }
+  if (walkie === 'talking') return;
+  audio(); sfx.squelchOn(); wLeft = 15; setWalkie('talking'); onAir(me(), true);
+  wTimer = setInterval(() => { wLeft -= .1; if (wLeft <= 0) { stopWalkie(true); toast({ icon: 'timer', who: 'Walkie cut off at 15 s', what: 'Keep it short so others can talk.', small: true, ttl: 2000 }); } else setWalkie('talking'); }, 100);
+}
+function stopWalkie(sent) {
+  if (walkie !== 'talking') return;
+  clearInterval(wTimer); onAir(me(), false); setWalkie('idle'); sfx.squelchOff();
+  if (sent && wLeft < 14.6) {
+    walkieUses++; progress('w_walkie'); if (walkieUses >= 3) unlock('over_out');
+    if (Math.random() < .7) setTimeout(() => npcWalkie(pick(people.filter(q => !q.me && q.id !== 'omar'))), rnd(900, 1800));
+  }
+}
+function npcWalkie(q, line) {
+  if (walkie === 'talking') return;
+  line ||= pick(LINES.walkie); setWalkie('busy'); onAir(q, true); sfx.squelchOn(); setTimeout(() => sfx.static(1.1), 120);
+  toast({ face: q.ch, who: `${q.name} <span class="v2-chip radio">walkie</span>`, what: esc(line), small: true, ttl: 3000 });
+  setTimeout(() => { onAir(q, false); sfx.squelchOff(); if (walkie === 'busy') setWalkie('idle'); }, 2200);
+}
+walkieBtn.addEventListener('pointerdown', e => { e.preventDefault(); walkieBtn.setPointerCapture(e.pointerId); startWalkie(); }, { passive: false });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) walkieBtn.addEventListener(ev, () => stopWalkie(true));
+setInterval(() => { if (!loggedOut && zone === 'hallway' && walkie === 'idle' && Math.random() < .35) npcWalkie(pick(people.filter(q => !q.me && q.roam))); }, 26000);
+
+/* ---------- hotspots ---------- */
+const actBox = $('#act');
+function spotTick() {
+  const p = me(); let s = null;
+  if (!loggedOut) for (const sp of SPOTS) if (Math.hypot(sp.x - p.x, sp.y - p.y) < 34) s = sp;
+  if (s === curSpot) return; curSpot = s;
+  actBox.hidden = !s;
+  if (s) { actBox.innerHTML = `<button class="dh-btn"><i data-lucide="${s.icon}"></i>${s.act} <kbd>E</kbd></button>`; actBox.firstChild.onclick = () => openSpot(s); icons(); sfx.blip(); }
+}
+function openSpot(s) { if (s.id === 'games') showGames(); else showBoard(); }
+
+/* ---------- layers ---------- */
+const layer = $('#layer'); let openPanel = null;
+const modalOpen = () => !!game.querySelector('.dh-scrim');
+function closeModals() { game.querySelectorAll('.dh-scrim').forEach(n => n.remove()); openPanel = null; closePop(); clearGame(); }
+function closePop() { game.querySelectorAll('.v2-pop').forEach(n => n.remove()); }
+function modal(inner, name) {
+  closeModals(); openPanel = name || null;
+  const s = el('div', 'dh-scrim'); const pnl = el('div', 'dh-panel', inner);
+  s.append(pnl); s.addEventListener('pointerdown', e => { if (e.target === s) closeModals(); }); game.append(s);
+  pnl.querySelectorAll('[data-x]').forEach(b => b.onclick = closeModals);
+  icons(); return pnl;
+}
+const head = (title, icon) => `<div class="v2-head">${icon ? `<i data-lucide="${icon}" style="width:22px;height:22px;color:var(--lamp)"></i>` : ''}<h2>${title}</h2><button class="dh-iconbtn" data-x aria-label="Close"><i data-lucide="x"></i></button></div>`;
+function tabs(list, cur) { return `<div class="v2-tabs" role="tablist">${list.map(([k, ic, l]) => `<button role="tab" data-tab="${k}" aria-selected="${k === cur}"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>`; }
+
+/* mic */
+function showMicCard() {
+  const p = modal(`<h2>Your mic, your call</h2><p class="dh-lede">People in this room can hear you once your mic is on. Mute any time; nothing is recorded.</p>
+    <div style="display:grid;gap:10px"><button class="dh-btn" data-r="on"><i data-lucide="mic"></i> Turn on mic</button>
+    <button class="dh-btn dh-btn--quiet" data-r="listen"><i data-lucide="headphones"></i> Just listen for now</button></div>`);
+  p.querySelector('[data-r="on"]').onclick = () => { closeModals(); setMic(ptt ? 'ptt' : 'live'); toast({ icon: 'mic', who: 'Mic is on', what: 'Tap the green button to mute.', small: true, ttl: 2200 }); };
+  p.querySelector('[data-r="listen"]').onclick = () => { closeModals(); setMic('muted'); toast({ icon: 'headphones', who: 'Listening only', what: 'Tap the red mic button when you want to talk.', small: true, ttl: 2600 }); };
+}
+function showMicHelp() {
+  const txt = {
+    blocked: ['Your browser blocked the mic', 'Tap <b>Try again</b>. If nothing pops up, tap the <b>aA</b> or lock icon in the address bar → Microphone → Allow.'],
+    nomic: ['No microphone found', 'Plug in headphones with a mic, or check that no other app is using it, then tap Try again.'],
+    silent: ['We can’t hear your mic', 'Your mic is on but very quiet. Check it isn’t muted on your headset, or pick another mic in Settings → Sound.'],
+  }[mic];
+  const p = modal(`${head(txt[0], 'mic-off')}<div class="v2-mstate"><button class="dh-mic" data-state="${mic}"><i data-lucide="mic-off"></i></button><p class="v2-note" style="font-size:14px">${txt[1]}</p></div>
+    <button class="dh-btn" id="mhTry"><i data-lucide="refresh-cw"></i> Try again</button><button class="dh-btn dh-btn--quiet" data-x>Keep listening only</button>`);
+  p.querySelector('#mhTry').onclick = e => {
+    e.currentTarget.innerHTML = '<span class="v2-dots"><i></i><i></i><i></i></span> Checking…';
+    setTimeout(() => { closeModals(); setMic('live'); sfx.join(); toast({ icon: 'mic', who: 'Mic is working', what: 'Everyone in the room can hear you now. No reload needed.', small: true, ttl: 2600 }); }, 900);
+  };
+}
+
+/* profile */
+function showProfile(tab = 'me') {
+  if (guest) return showGuestProfile();
+  const L = levelOf(S.xp), a = xpFor(L), b = xpFor(L + 1);
+  const my = Object.keys(owners).find(k => owners[k] === 'me');
+  const p = modal(`${head('Profile')}
+    <div class="v2-me"><button class="big" id="pfFace" aria-label="Change character"><span class="dh-portrait" style="width:72px;height:72px;${headStyle(me().ch, 72)}"></span><span class="pen"><i data-lucide="pencil"></i></span></button>
+      <div style="display:grid;gap:8px;min-width:0"><div class="nm"><input class="dh-input" id="pfName" maxlength="24" value="${esc(me().name)}" aria-label="Display name"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="v2-chip gold">Lv ${L}</span><span class="v2-chip">admin</span><span class="v2-chip" style="background:#ffae6b">${S.streak}-day streak</span></div></div></div>
+    <div style="display:grid;gap:6px"><div class="v2-meta"><span>${S.xp - a} / ${b - a} XP to level ${L + 1}</span><span>${S.xp} total</span></div><div class="v2-bar" style="height:12px"><b style="width:${(S.xp - a) / (b - a) * 100}%"></b></div></div>
+    ${tabs([['me', 'id-card', 'About'], ['code', 'ticket', 'Guest code'], ['badges', 'award', 'Badges']], tab)}
+    <div id="pfBody" style="display:grid;gap:12px"></div>`, 'profile');
+  p.querySelector('#pfFace').onclick = showPicker;
+  p.querySelector('#pfName').onchange = e => { const n = e.target.value.trim(); if (!n) return; me().name = S.name = n; save(); renderTag(me()); toast({ icon: 'check', who: 'Name saved', what: `Friends now see “${esc(n)}”.`, small: true, ttl: 1800 }); };
+  p.querySelectorAll('[data-tab]').forEach(t => t.onclick = () => { p.querySelectorAll('[data-tab]').forEach(n => n.setAttribute('aria-selected', String(n === t))); body(t.dataset.tab); });
+  const bodyEl = p.querySelector('#pfBody');
+  function body(t) {
+    if (t === 'me') bodyEl.innerHTML = `<div class="v2-facts">
+      <div><i data-lucide="door-open"></i><span>Owns <b>${esc(D.rooms[my].name)}</b></span></div>
+      <div><i data-lucide="calendar"></i><span>You opened the house on <b>${new Date(2026, 9, 12).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</b></span></div>
+      <div><i data-lucide="clock"></i><span>Last seen <b>right now</b> (${new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} your time)</span></div>
+      <div><i data-lucide="award"></i><span><b>${S.badges.length}</b> of ${BADGES.length} badges</span></div></div>
+      <div class="v2-stats"><div class="v2-stat"><b>${L}</b><span>Level</span></div><div class="v2-stat"><b>${S.streak}</b><span>Day streak</span></div><div class="v2-stat"><b>${S.wins.rps + (S.wins.dice || 0) + (S.wins.draw || 0)}</b><span>Games won</span></div></div>`;
+    if (t === 'code') {
+      bodyEl.innerHTML = `<div class="v2-codebox ${S.codeOn ? '' : 'off'}"><div class="dh-row" style="min-height:0"><span class="dh-label">Your guest code</span><input type="checkbox" class="dh-switch" id="cdOn" ${S.codeOn ? 'checked' : ''} aria-label="Guest code on"></div>
+        <div class="v2-code" id="cdVal">${S.code}</div>
+        <div class="btns"><button class="dh-btn" id="cdCopy"><i data-lucide="copy"></i>Copy</button><button class="dh-btn dh-btn--quiet" id="cdShare"><i data-lucide="share-2"></i>Share</button></div></div>
+        <p class="v2-note">Friends you share this with can visit as guests for 12 hours. Turn it off to stop new guests.</p>
+        <button class="dh-btn dh-btn--quiet" id="cdNew"><i data-lucide="refresh-cw"></i>Make a new code</button>`;
+      const copy = async () => { try { await navigator.clipboard.writeText(S.code); } catch {} sfx.blip(); toast({ icon: 'copy', who: 'Copied', what: `${S.code} is on your clipboard.`, small: true, ttl: 1600 }); };
+      bodyEl.querySelector('#cdCopy').onclick = copy;
+      bodyEl.querySelector('#cdShare').onclick = async () => { if (navigator.share) { try { await navigator.share({ title: 'Diesel House', text: `Come hang out in Diesel House. Guest code: ${S.code}` }); return; } catch {} } copy(); };
+      bodyEl.querySelector('#cdOn').onchange = e => { S.codeOn = e.target.checked; save(); bodyEl.querySelector('.v2-codebox').classList.toggle('off', !S.codeOn); };
+      bodyEl.querySelector('#cdNew').onclick = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; S.code = 'DSL-' + Array.from({ length: 4 }, () => pick(A)).join(''); save(); bodyEl.querySelector('#cdVal').textContent = S.code; toast({ icon: 'refresh-cw', who: 'New code made', what: 'The old one stops working straight away.', small: true, ttl: 2000 }); };
+    }
+    if (t === 'badges') {
+      bodyEl.innerHTML = `<div class="v2-badges">${BADGES.map((bd, i) => `<button class="v2-badge ${S.badges.includes(bd.id) ? '' : 'locked'} ${S.badges.includes(bd.id) && !S.seen.includes(bd.id) ? 'new' : ''}" data-b="${i}"><span class="v2-medal" style="${medalStyle(i)}"></span><span>${bd.name}</span></button>`).join('')}</div>
+        <div class="v2-badgeinfo" id="bdInfo">Tap a badge to see how to earn it.</div>`;
+      S.seen = [...S.badges]; save();
+      bodyEl.querySelectorAll('[data-b]').forEach(bt => bt.onclick = () => {
+        bodyEl.querySelectorAll('[data-b]').forEach(n => n.setAttribute('aria-pressed', String(n === bt)));
+        const bd = BADGES[+bt.dataset.b], has = S.badges.includes(bd.id); sfx.blip();
+        bodyEl.querySelector('#bdInfo').innerHTML = `<b>${bd.name}</b> · ${has ? 'Earned. ' : 'Locked. '}${bd.how}`;
+      });
+    }
+    icons();
+  }
+  body(tab);
+}
+function showGuestProfile() {
+  const p = modal(`${head('Profile')}<div class="v2-me"><span class="dh-portrait" style="width:72px;height:72px;${headStyle(me().ch, 72)}"></span>
+    <div style="display:grid;gap:6px"><b style="font-family:var(--font-display);font-size:20px">${esc(me().name)}</b><span class="v2-chip radio" style="justify-self:start">Guest of Diesel</span></div></div>
+    <div class="v2-facts"><div><i data-lucide="timer"></i><span>Your visit ends in <b>11 h 58 min</b></span></div><div><i data-lucide="info"></i><span>Guests can talk and play games. Ask Diesel for an invite to get your own room, XP and badges.</span></div></div>
+    <button class="dh-btn dh-btn--quiet" id="gpChar"><i data-lucide="user-round"></i>Change character</button>`);
+  p.querySelector('#gpChar').onclick = showPicker;
+}
+function showPicker() {
+  const p = modal(`${head('Pick your character')}<div class="dh-picks" role="radiogroup" id="picks"></div><button class="dh-btn" id="pkDone"><i data-lucide="check"></i> Done</button>`);
+  const grid = p.querySelector('#picks'); let sel = me().ch;
+  for (const c of CHARS) {
+    const b = el('button', 'dh-pick'); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(c === sel)); b.setAttribute('aria-label', c);
+    b.innerHTML = `<div style="width:48px;height:96px;image-rendering:pixelated;background:url(${IM[c + '_idle']}) -864px 0 / 1152px 96px no-repeat"></div>`;
+    b.onclick = () => { sel = c; sfx.blip(); grid.querySelectorAll('.dh-pick').forEach(n => n.setAttribute('aria-checked', String(n === b))); };
+    grid.append(b);
+  }
+  p.querySelector('#pkDone').onclick = () => { me().ch = S.ch = sel; save(); closeModals(); renderXP(); renderPlates(); };
+}
+
+/* challenges */
+let chTab = 'day';
+function showChallenges(tab = chTab) {
+  chTab = tab;
+  if (guest) return modal(`${head('Challenges', 'trophy')}<p class="dh-lede">Challenges and XP are for members. Ask Diesel for an invite to join in.</p>`);
+  const L = levelOf(S.xp), a = xpFor(L), b = xpFor(L + 1);
+  const list = CHAL.filter(c => c.per === tab);
+  const now = new Date(), mid = new Date(now); mid.setHours(24, 0, 0, 0); const hrs = Math.ceil((mid - now) / 36e5);
+  const p = modal(`${head('Challenges', 'trophy')}
+    <div class="v2-stats"><div class="v2-stat"><b>Lv ${L}</b><span>${b - S.xp} XP to go</span></div><div class="v2-stat"><b>${S.streak}</b><span>Day streak</span></div><div class="v2-stat"><b>${CHAL.filter(isDone).length}/6</b><span>Done</span></div></div>
+    ${tabs([['day', 'sun', 'Today'], ['week', 'calendar-days', 'This week']], tab)}
+    <div class="v2-list">${list.map(c => { const n = Math.min(prog(c), c.goal), d = isDone(c); return `<div class="v2-item ${d ? 'done' : ''}"><span class="ic"><i data-lucide="${d ? 'check' : c.icon}"></i></span>
+      <span style="display:grid;gap:5px"><span class="t">${c.text}</span><span class="v2-bar ${d ? 'ok' : ''}"><b style="width:${n / c.goal * 100}%"></b></span><span class="s">${n} / ${c.goal}</span></span><span class="v2-xpchip">+${c.xp} XP</span></div>`; }).join('')}</div>
+    <p class="v2-note">${tab === 'day' ? `New challenges in ${hrs} h (midnight your time).` : 'New challenges every Monday.'} XP also comes from winning games.</p>`, 'challenges');
+  p.querySelectorAll('[data-tab]').forEach(t => t.onclick = () => showChallenges(t.dataset.tab));
+}
+
+/* noticeboard: weekly leaderboard */
+function showBoard() {
+  const rows = people.map(p => ({ p, xp: p.me ? weekXP() : p.xpw })).sort((a, b) => b.xp - a.xp);
+  const p = modal(`${head('Noticeboard', 'clipboard-list')}<div class="dh-label">This week’s top housemates</div>
+    <div class="v2-list">${rows.map((r, i) => `<div class="v2-board-row ${r.p.me ? 'me' : ''}"><span class="rk ${i < 3 ? 'top' : ''}">${i + 1}</span><span class="dh-portrait" style="${headStyle(r.p.ch, 32)}"></span><b>${esc(r.p.name)}${r.p.me ? ' (you)' : ''}</b><span class="v2-xpchip">${r.xp} XP</span></div>`).join('')}</div>
+    <button class="dh-btn" id="nbCh"><i data-lucide="trophy"></i>See your challenges</button>`);
+  p.querySelector('#nbCh').onclick = () => showChallenges();
+}
+const weekXP = () => S.xp - 260 + 180;
+
+/* people + map */
+function showPeople() {
+  const W = D.W * T, H = D.H * T;
+  const zl = D.zones.filter(z => z.name !== 'hallway');
+  const p = modal(`${head('Who’s where', 'map')}
+    <div class="v2-mini"><img src="${IM.BASE}" alt="">${zl.map(z => `<button class="zone" data-go="${z.name}" style="left:${z.x / W * 100}%;top:${z.y / H * 100}%;width:${z.w / W * 100}%;height:${z.h / H * 100}%" aria-label="Go to ${esc(D.rooms[z.name].name)}"></button><span class="lab" style="left:${(z.x + z.w / 2) / W * 100}%;top:${(z.y + z.h / 2) / H * 100}%">${esc(D.rooms[z.name].name.replace("'s room", ''))}</span>`).join('')}
+    ${people.map(q => `<span class="dot ${q.me ? 'me' : ''}" style="left:${q.x / W * 100}%;top:${(q.y - 6) / H * 100}%;${q.me ? '' : headStyle(q.ch, 10)}"></span>`).join('')}</div>
+    <p class="v2-note">Tap a room on the map, or a friend below, and you’ll walk there.</p>
+    <div class="v2-list">${people.filter(q => !q.me).map(q => { const zz = zoneAt(q.x, q.y); const where = zz === 'hallway' || !zz ? 'Hallway' : D.rooms[zz].name; const talking = zz && zz !== 'hallway' && occupants(zz).length > 1;
+      return `<div class="v2-item"><span class="dh-portrait" style="${headStyle(q.ch, 32)}"></span><span style="display:grid;gap:2px"><span class="t">${esc(q.name)} <span class="v2-chip gold" style="font-size:10px">Lv ${q.lv}</span></span><span class="s">${esc(where)}${talking ? ' · talking' : ''}${whisperWith.has(q.id) ? ' · whispering with you' : ''}</span></span><button class="dh-btn dh-btn--quiet" data-walk="${q.id}"><i data-lucide="footprints"></i>Go</button></div>`; }).join('')}</div>`, 'people');
+  p.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const z = zoneRect(b.dataset.go), s = [z.x + 80, z.y + (z.y < 200 ? 120 : 60)]; const s2 = randomSpot(b.dataset.go); closeModals(); walkTo(...(s2 || s)); });
+  p.querySelectorAll('[data-walk]').forEach(b => b.onclick = () => { const q = byId(b.dataset.walk); closeModals(); if (walkTo(q.x + (q.x > 40 ? -14 : 14), q.y)) toast({ icon: 'footprints', who: `Walking to ${q.name}`, what: 'Move any way to stop.', small: true, ttl: 1600 }); });
+}
+
+/* friend menu */
+function friendMenu(q, e) {
+  closePop(); sfx.blip();
+  const g = game.getBoundingClientRect(); const pop = el('div', 'dh-panel v2-pop');
+  const zz = zoneAt(q.x, q.y), same = zone && zone !== 'hallway' && zz === zone;
+  pop.innerHTML = `<div class="v2-head"><span class="dh-portrait" style="${headStyle(q.ch, 32)}"></span><h2 style="font-size:17px">${esc(q.name)} <span class="v2-chip gold">Lv ${q.lv}</span></h2><button class="dh-iconbtn" style="width:36px;height:36px" aria-label="Close"><i data-lucide="x"></i></button></div>
+    ${same ? `<div style="display:flex;gap:10px;align-items:center"><i data-lucide="volume-1" style="width:18px"></i><input type="range" class="dh-range" value="100" aria-label="${esc(q.name)}'s volume"><i data-lucide="volume-2" style="width:18px"></i></div>` : `<p class="v2-note">${whisperWith.has(q.id) ? 'You’re close enough to whisper.' : zz && zz !== 'hallway' ? `In ${esc(D.rooms[zz].name)}. Walk in to hear them.` : 'In the hallway. Get close to whisper.'}</p>`}
+    <div class="dh-label">Send an emote</div>
+    <div class="v2-emogrid">${EMO_MENU.map(k => `<button data-e="${k}" aria-label="${k}"><i style="${emoStyle(k, 32)}"></i></button>`).join('')}</div>
+    <div class="acts"><button class="dh-btn dh-btn--quiet" data-a="duel"><i data-lucide="swords"></i>Duel</button><button class="dh-btn dh-btn--quiet" data-a="walk"><i data-lucide="footprints"></i>Walk to</button></div>`;
+  pop.style.left = Math.min(g.width - 262, Math.max(10, e.clientX - g.left - 125)) + 'px';
+  pop.style.top = Math.max(60, Math.min(g.height - 360, e.clientY - g.top - 300)) + 'px';
+  pop.querySelector('.v2-head button').onclick = closePop;
+  pop.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+    closePop(); emote(me(), b.dataset.e); sfx.blip(); progress('d_emote');
+    if (!S.emoted.includes(q.id)) { S.emoted.push(q.id); save(); if (S.emoted.length >= 3) unlock('social'); }
+    setTimeout(() => emote(q, pick(['happy', 'laugh', 'hearts', b.dataset.e])), 900);
+  });
+  pop.querySelector('[data-a="duel"]').onclick = () => { closePop(); opponent = q; showGames(); };
+  pop.querySelector('[data-a="walk"]').onclick = () => { closePop(); walkTo(q.x - 14, q.y); };
+  game.append(pop); icons();
+}
+/* emote button */
+$('#btnEmote').onclick = e => {
+  const ex = game.querySelector('.v2-emotebar'); if (ex) return ex.remove();
+  const bar = el('div', 'dh-panel v2-emotebar v2-pop', `<div class="v2-emogrid">${EMO_MENU.map(k => `<button data-e="${k}" aria-label="${k}"><i style="${emoStyle(k, 32)}"></i></button>`).join('')}</div>`);
+  bar.style.cssText = 'right:16px;bottom:120px;left:auto;top:auto;padding:10px;width:250px';
+  bar.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
+    bar.remove(); emote(me(), b.dataset.e); sfx.blip(); progress('d_emote');
+    for (const q of people) if (!q.me && Math.hypot(q.x - me().x, q.y - me().y) < 90 && Math.random() < .7) setTimeout(() => emote(q, pick(['happy', 'laugh', 'hearts', b.dataset.e])), rnd(600, 1400));
+  });
+  game.append(bar);
+};
+
+/* ---------- games ---------- */
+let opponent = null, gameTimers = [];
+const clearGame = () => { gameTimers.forEach(clearTimeout); gameTimers.forEach(clearInterval); gameTimers = []; };
+const later = (fn, ms) => gameTimers.push(setTimeout(fn, ms));
+function nearestNPC() { const p = me(); return people.filter(q => !q.me).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; }
+function finishGame(kind, won, xp) {
+  progress('d_game');
+  if (won) { S.wins[kind] = (S.wins[kind] || 0) + 1; save(); sfx.win(); if (xp) addXP(xp); if (kind === 'rps' && S.wins.rps >= 3) unlock('duelist'); if (kind === 'draw') unlock('fast_hand'); }
+  else sfx.lose();
+}
+function showGames() {
+  opponent ||= nearestNPC();
+  const G = [['dice', 'dice-5', 'Dice duel', 'Highest roll wins. Doubles score twice.'], ['rps', 'swords', 'Rock paper scissors', 'Best of three. Picks are locked in first.'],
+    ['draw', 'zap', 'Quick Draw', 'Wait for DRAW!, then tap. Too soon = out.'], ['hl', 'arrow-up-down', 'Higher or lower', 'Coming soon'], ['wyr', 'messages-square', 'Would you rather', 'Coming soon'], ['four', 'grid-3x3', 'Four in a row', 'Coming soon']];
+  const p = modal(`${head('Games table', 'dice-5')}
+    <div class="v2-item"><span class="dh-portrait" style="${headStyle(opponent.ch, 32)}"></span><span style="display:grid"><span class="s">Playing with</span><span class="t">${esc(opponent.name)}</span></span><button class="dh-btn dh-btn--quiet" id="gmSwap"><i data-lucide="shuffle"></i>Swap</button></div>
+    <div class="v2-games">${G.map(([k, ic, t, s]) => `<button class="v2-game ${['hl', 'wyr', 'four'].includes(k) ? 'soon' : ''}" data-g="${k}"><span class="gi"><i data-lucide="${ic}"></i></span><b>${t}</b><span>${s}</span></button>`).join('')}</div>
+    <p class="v2-note">Every game counts toward today’s challenge. Wins give +15 XP.</p>`, 'games');
+  p.querySelector('#gmSwap').onclick = () => { const others = people.filter(q => !q.me && q !== opponent && q.id !== 'omar'); opponent = pick(others); showGames(); };
+  p.querySelectorAll('[data-g]').forEach(b => b.onclick = () => ({ dice: gameDice, rps: gameRPS, draw: gameDraw })[b.dataset.g]?.());
+}
+const backBtn = '<button class="dh-btn dh-btn--quiet" id="gBack"><i data-lucide="arrow-left"></i>All games</button>';
+const wireBack = p => p.querySelector('#gBack').onclick = showGames;
+
+function gameDice() {
+  const o = opponent;
+  const p = modal(`${head('Dice duel', 'dice-5')}
+    <div class="v2-vs"><div class="side" id="dsMe"><span class="dh-portrait" style="${headStyle(me().ch, 32)}"></span><b>You</b><div class="v2-dice"><i class="v2-die" style="${dieStyle(7)}"></i><i class="v2-die" style="${dieStyle(7)}"></i></div><span class="v2-score" id="dsMeS">–</span></div>
+    <span class="x">vs</span>
+    <div class="side" id="dsO"><span class="dh-portrait" style="${headStyle(o.ch, 32)}"></span><b>${esc(o.name)}</b><div class="v2-dice"><i class="v2-die" style="${dieStyle(7)}"></i><i class="v2-die" style="${dieStyle(7)}"></i></div><span class="v2-score" id="dsOS">–</span></div></div>
+    <div class="v2-result" id="dsRes"></div>
+    <button class="dh-btn" id="dsRoll"><i data-lucide="dice-5"></i>Roll</button>${backBtn}`, 'game');
+  wireBack(p);
+  p.querySelector('#dsRoll').onclick = e => {
+    const btn = e.currentTarget; btn.disabled = true; sfx.dice();
+    const dice = [...p.querySelectorAll('.v2-die')]; dice.forEach(d => d.classList.add('roll'));
+    const spin = setInterval(() => dice.forEach(d => d.setAttribute('style', dieStyle(1 + Math.floor(Math.random() * 6)))), 70); gameTimers.push(spin);
+    const r = () => 1 + Math.floor(Math.random() * 6), mine = [r(), r()], theirs = [r(), r()];
+    const score = a => (a[0] + a[1]) * (a[0] === a[1] ? 2 : 1);
+    later(() => {
+      clearInterval(spin); dice.forEach(d => d.classList.remove('roll'));
+      [...mine, ...theirs].forEach((n, i) => dice[i].setAttribute('style', dieStyle(n)));
+      const a = score(mine), b = score(theirs);
+      p.querySelector('#dsMeS').textContent = a + (mine[0] === mine[1] ? ' ×2' : ''); p.querySelector('#dsOS').textContent = b + (theirs[0] === theirs[1] ? ' ×2' : '');
+      const res = p.querySelector('#dsRes'); res.className = 'v2-result ' + (a > b ? 'win' : a < b ? 'lose' : '');
+      res.textContent = a > b ? 'You win! +15 XP' : a < b ? `${o.name} wins` : 'Draw — roll again';
+      p.querySelector(a >= b ? '#dsMe' : '#dsO').classList.toggle('win', a !== b);
+      finishGame('dice', a > b, 15); if (mine[0] === 6 && mine[1] === 6) unlock('high_roller');
+      emote(o, a > b ? 'sad' : a < b ? 'laugh' : 'question');
+      btn.disabled = false; btn.innerHTML = '<i data-lucide="rotate-ccw"></i>Roll again'; icons();
+    }, 900);
+  };
+}
+
+function gameRPS() {
+  const o = opponent, H = { rock: '✊', paper: '✋', scissors: '✌️' }, beats = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+  let sc = [0, 0], round = 1;
+  const p = modal(`${head('Rock paper scissors', 'swords')}
+    <div class="v2-vs"><div class="side"><b>You</b><div class="v2-hand" id="rpMe">❔</div><span class="v2-score" id="rpA">0</span></div><span class="x" id="rpRound">Round 1</span>
+    <div class="side"><b>${esc(o.name)}</b><div class="v2-hand hidden" id="rpO">✊</div><span class="v2-score" id="rpB">0</span></div></div>
+    <div class="v2-result" id="rpRes">Pick one. First to 2 wins.</div>
+    <div class="v2-rps">${Object.entries(H).map(([k, e]) => `<button data-h="${k}">${e}<small>${k}</small></button>`).join('')}</div>${backBtn}`, 'game');
+  wireBack(p);
+  const btns = [...p.querySelectorAll('[data-h]')], res = p.querySelector('#rpRes');
+  btns.forEach(b => b.onclick = () => {
+    if (sc[0] >= 2 || sc[1] >= 2) { sc = [0, 0]; round = 1; p.querySelector('#rpA').textContent = p.querySelector('#rpB').textContent = 0; }
+    const m = b.dataset.h, t = pick(Object.keys(H)); btns.forEach(x => x.disabled = true); sfx.blip();
+    p.querySelector('#rpMe').textContent = H[m]; const oh = p.querySelector('#rpO'); oh.className = 'v2-hand hidden'; oh.textContent = '✊';
+    res.className = 'v2-result'; res.textContent = `Both locked in… 3`;
+    later(() => res.textContent = 'Both locked in… 2', 330); later(() => res.textContent = 'Both locked in… 1', 660);
+    later(() => {
+      oh.className = 'v2-hand'; oh.textContent = H[t]; sfx.blip();
+      if (beats[m] === t) { sc[0]++; res.className = 'v2-result win'; res.textContent = `${H[m]} beats ${H[t]}`; }
+      else if (beats[t] === m) { sc[1]++; res.className = 'v2-result lose'; res.textContent = `${H[t]} beats ${H[m]}`; }
+      else res.textContent = 'Same pick — go again';
+      p.querySelector('#rpA').textContent = sc[0]; p.querySelector('#rpB').textContent = sc[1];
+      p.querySelector('#rpRound').textContent = 'Round ' + (++round);
+      if (sc[0] >= 2 || sc[1] >= 2) {
+        const won = sc[0] > sc[1]; res.className = 'v2-result ' + (won ? 'win' : 'lose'); res.textContent = won ? 'You win the duel! +15 XP' : `${o.name} wins the duel`;
+        finishGame('rps', won, 15); emote(o, won ? 'anger' : 'laugh');
+      }
+      btns.forEach(x => x.disabled = false);
+    }, 1000);
+  });
+}
+
+function gameDraw() {
+  const rivals = people.filter(q => !q.me && q.id !== 'omar').sort(() => Math.random() - .5).slice(0, 2);
+  const p = modal(`${head('Quick Draw', 'zap')}<p class="v2-note">You vs ${rivals.map(r => esc(r.name)).join(' and ')}. Tap the box (or press Space) the moment it says DRAW!</p>
+    <div class="v2-draw" id="qd" tabindex="0"><div><b>Tap to start</b><div class="v2-note" style="margin-top:6px">Get ready…</div></div></div>
+    <div class="v2-list" id="qdRes"></div>${backBtn}`, 'game');
+  wireBack(p);
+  const box = p.querySelector('#qd'), out = p.querySelector('#qdRes'); let state = 'idle', t0 = 0;
+  const go = () => {
+    if (state === 'idle' || state === 'done') {
+      state = 'ready'; out.innerHTML = ''; box.className = 'v2-draw ready'; box.innerHTML = '<div><b>Wait for it…</b></div>';
+      later(() => { if (state !== 'ready') return; state = 'go'; t0 = performance.now(); box.className = 'v2-draw go'; box.innerHTML = '<div><b>DRAW!</b></div>'; sfx.bang(); }, rnd(1300, 3600));
+    } else if (state === 'ready') {
+      state = 'done'; clearGame(); box.className = 'v2-draw foul'; box.innerHTML = '<div><b>Too soon!</b><div class="v2-note" style="margin-top:6px">Tap to try again</div></div>'; finishGame('draw', false);
+    } else if (state === 'go') {
+      state = 'done'; const mine = Math.round(performance.now() - t0);
+      const rows = [{ p: me(), ms: mine }, ...rivals.map(r => ({ p: r, ms: Math.round(rnd(250, 520)) }))].sort((a, b) => a.ms - b.ms);
+      const won = rows[0].p.me;
+      box.className = 'v2-draw'; box.innerHTML = `<div><b style="color:${won ? 'var(--ok)' : 'var(--error)'}">${won ? 'You win! +15 XP' : rows[0].p.name + ' was faster'}</b><div class="v2-note" style="margin-top:6px">Your time: ${mine} ms · tap to go again</div></div>`;
+      out.innerHTML = rows.map((r, i) => `<div class="v2-board-row ${r.p.me ? 'me' : ''}"><span class="rk ${i === 0 ? 'top' : ''}">${i + 1}</span><span class="dh-portrait" style="${headStyle(r.p.ch, 32)}"></span><b>${r.p.me ? 'You' : esc(r.p.name)}</b><span class="v2-xpchip">${r.ms} ms</span></div>`).join('');
+      finishGame('draw', won, 15);
+    }
+  };
+  box.addEventListener('pointerdown', e => { e.preventDefault(); go(); });
+  box.addEventListener('keydown', e => { if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); go(); } });
+  box.focus();
+}
+
+/* ---------- settings: sound, mic, room, demo ---------- */
+function showSettings(tab = 'sound') {
+  const p = modal(`${head('Settings', 'settings')}${tabs([['sound', 'volume-2', 'Sound'], ['mic', 'mic', 'Mic'], ['room', 'door-open', 'Room'], ['demo', 'sparkles', 'Demo']], tab)}<div id="stBody" style="display:grid;gap:14px"></div>`, 'settings');
+  p.querySelectorAll('[data-tab]').forEach(t => t.onclick = () => { p.querySelectorAll('[data-tab]').forEach(n => n.setAttribute('aria-selected', String(n === t))); body(t.dataset.tab); });
+  const B = p.querySelector('#stBody');
+  let meterT = null;
+  function body(t) {
+    clearInterval(meterT);
+    if (t === 'sound') {
+      const SL = [['master', 'volume-2', 'Master', null], ['voices', 'users', 'Voices', 'voice'], ['game', 'gamepad-2', 'Game sounds', 'knock'], ['music', 'music', 'Music & jingles', 'levelup'], ['radio', 'radio', 'Walkie & whisper', 'squelchOff']];
+      B.innerHTML = SL.map(([k, ic, l, prev]) => `<div class="v2-sl"><span class="lab">${l}</span><i data-lucide="${ic}"></i><input type="range" class="dh-range" min="0" max="100" value="${SND[k]}" data-k="${k}" aria-label="${l}"><span class="val" id="v_${k}">${SND[k]}%</span>${prev ? `<button class="dh-iconbtn" data-p="${prev}" aria-label="Play a sample"><i data-lucide="play"></i></button>` : '<span></span>'}</div>`).join('') +
+        `<div class="dh-divider"></div>
+        ${[['sfx', 'Sound effects', 'Clicks, dice, game sounds'], ['doors', 'Door and knock sounds', ''], ['chimes', 'Join and leave chimes', ''], ['hideMute', 'Mute when the tab is hidden', 'Silences everything while you’re in another app']].map(([k, l, s]) => `<label class="dh-row"><span class="txt">${l}${s ? `<small>${s}</small>` : ''}</span><input type="checkbox" class="dh-switch" data-t="${k}" ${SND[k] ? 'checked' : ''}></label>`).join('')}
+        <p class="v2-note">To change one friend’s volume, tap them in a room. Saved on this device.</p>`;
+      B.querySelectorAll('[data-k]').forEach(r => r.oninput = () => { SND[r.dataset.k] = +r.value; B.querySelector('#v_' + r.dataset.k).textContent = r.value + '%'; audio(); applyGains(); saveSnd(); });
+      B.querySelectorAll('[data-k]').forEach(r => r.onchange = () => { const k = r.dataset.k; ({ master: sfx.blip, voices: sfx.voice, game: sfx.knock, music: sfx.coin, radio: sfx.squelchOff })[k](); });
+      B.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { audio(); sfx[b.dataset.p](); });
+      B.querySelectorAll('[data-t]').forEach(c => c.onchange = () => { SND[c.dataset.t] = c.checked; saveSnd(); applyGains(); });
+    }
+    if (t === 'mic') {
+      B.innerHTML = `<div class="v2-mstate"><button class="dh-mic" data-state="${mic}" tabindex="-1"><i data-lucide="${MIC[mic][0]}"></i></button><div style="display:grid;gap:2px"><b style="font-family:var(--font-display)">${{ live: 'Mic on', muted: 'Muted', ptt: 'Push to talk', talking: 'Talking', blocked: 'Blocked by the browser', nomic: 'No mic found', silent: 'Mic seems silent' }[mic]}</b><span class="v2-note">${['blocked', 'nomic', 'silent'].includes(mic) ? '<button class="dh-btn" id="mcFix" style="min-height:36px;font-size:13px;margin-top:6px"><i data-lucide="refresh-cw"></i>Try again</button>' : 'People in your room can hear you when it’s green.'}</span></div></div>
+        <div style="display:grid;gap:6px"><label class="dh-label" for="mcDev">Microphone</label><select class="dh-input" id="mcDev"><option>Default — Built-in microphone</option><option>AirPods Pro</option><option>USB headset</option></select></div>
+        <div style="display:grid;gap:6px"><span class="dh-label">Input level · say something</span><div class="v2-meter" id="mcMeter">${'<i></i>'.repeat(16)}</div></div>
+        <button class="dh-btn dh-btn--quiet" id="mcTest"><i data-lucide="audio-lines"></i>Test: record 3 s and play back</button>
+        <div style="display:grid;gap:6px"><label class="dh-label" for="mcOut">Speaker</label><select class="dh-input" id="mcOut"><option>Default — Speakers</option><option>AirPods Pro</option></select></div>
+        <label class="dh-row"><span class="txt">Push to talk<small>Hold the mic button or Space. Off by default on phones.</small></span><input type="checkbox" class="dh-switch" id="mcPtt" ${ptt ? 'checked' : ''}></label>`;
+      const bars = [...B.querySelectorAll('#mcMeter i')];
+      meterT = setInterval(() => { const ok = mic === 'live' || mic === 'talking'; const n = ok ? Math.floor(Math.max(0, Math.sin(Date.now() / 160) * 7 + rnd(2, 9))) : 0; bars.forEach((b, i) => { b.className = i < n ? 'on' + (i > 11 ? ' hot' : '') : ''; }); }, 90);
+      B.querySelector('#mcPtt').onchange = e => { ptt = e.target.checked; setMic(ptt ? 'ptt' : 'live'); };
+      B.querySelector('#mcTest').onclick = e => { const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="v2-dots"><i></i><i></i><i></i></span> Recording 3 s…'; setTimeout(() => { b.innerHTML = '<i data-lucide="play"></i> Playing it back…'; icons(); sfx.voice(); setTimeout(sfx.voice, 500); setTimeout(() => { b.disabled = false; b.innerHTML = '<i data-lucide="audio-lines"></i>Test: record 3 s and play back'; icons(); }, 1600); }, 3000); };
+      B.querySelector('#mcFix')?.addEventListener('click', () => { setMic('live'); sfx.join(); body('mic'); });
+    }
+    if (t === 'room') {
+      const r = D.rooms.room_02;
+      B.innerHTML = `<div style="display:grid;gap:6px"><label class="dh-label" for="stName">Room name</label><input class="dh-input" id="stName" maxlength="32" value="${esc(r.name)}"></div>
+        <div style="display:grid;gap:6px"><span class="dh-label">Door</span><div class="seg" id="stDoor"></div></div>
+        <div style="display:grid;gap:6px"><span class="dh-label">Mood</span><div class="moods" id="stMood"></div></div>`;
+      B.querySelector('#stName').oninput = e => { r.name = e.target.value || 'My room'; renderPlates(); };
+      B.querySelector('#stName').onchange = () => unlock('decor');
+      const seg = B.querySelector('#stDoor');
+      for (const [k, [ic, lab]] of Object.entries(DOOR)) { const b = el('button', '', `<i data-lucide="${ic}"></i>${lab}`); b.setAttribute('aria-pressed', String(r.door === k)); b.onclick = () => { r.door = k; seg.querySelectorAll('button').forEach(n => n.setAttribute('aria-pressed', String(n === b))); renderPlates(); sfx.blip(); }; seg.append(b); }
+      const moods = B.querySelector('#stMood');
+      for (const [k, [ic, lab]] of Object.entries(MOOD)) { const b = el('button', 'dh-mood', `<i data-lucide="${ic}"></i>${lab}`); b.dataset.mood = k; b.setAttribute('aria-pressed', String(r.mood === k)); b.onclick = () => { r.mood = k; moods.querySelectorAll('button').forEach(n => n.setAttribute('aria-pressed', String(n === b))); renderPlates(); renderPill(); sfx.blip(); }; moods.append(b); }
+    }
+    if (t === 'demo') {
+      B.innerHTML = `<p class="v2-note">Try the moments that are hard to stage on your own.</p><div class="v2-demo">
+        <button class="dh-btn dh-btn--quiet" data-d="knock"><i data-lucide="hand"></i>Someone knocks</button>
+        <button class="dh-btn dh-btn--quiet" data-d="walkie"><i data-lucide="radio"></i>Walkie call</button>
+        <button class="dh-btn dh-btn--quiet" data-d="reconnect"><i data-lucide="wifi-off"></i>Lose connection</button>
+        <button class="dh-btn dh-btn--quiet" data-d="xp"><i data-lucide="star"></i>+100 XP</button>
+        <button class="dh-btn dh-btn--quiet" data-d="blocked"><i data-lucide="mic-off"></i>Mic blocked</button>
+        <button class="dh-btn dh-btn--quiet" data-d="nomic"><i data-lucide="mic-off"></i>No mic found</button>
+        <button class="dh-btn dh-btn--quiet" data-d="tips"><i data-lucide="lightbulb"></i>Show tips again</button>
+        <button class="dh-btn dh-btn--quiet" data-d="reset"><i data-lucide="rotate-ccw"></i>Reset progress</button></div>
+        <div class="dh-divider"></div><div class="dh-row"><button class="dh-btn dh-btn--quiet" style="flex:1" id="stCred">Credits</button><button class="dh-btn dh-btn--quiet" style="flex:1" id="stOut"><i data-lucide="log-out"></i> Sign out</button></div>`;
+      B.querySelectorAll('[data-d]').forEach(b => b.onclick = () => demo(b.dataset.d));
+      B.querySelector('#stOut').onclick = signOut;
+      B.querySelector('#stCred').onclick = showCredits;
+    }
+    icons();
+  }
+  body(tab);
+}
+function showCredits() {
+  modal(`${head('Credits', 'heart')}<div class="v2-facts">
+    <div><i data-lucide="sofa"></i><span><b>LimeZu</b> · Modern Interiors (free)</span></div>
+    <div><i data-lucide="smile"></i><span><b>Kenney</b> · emotes, playing cards & dice, UI and audio packs (CC0)</span></div>
+    <div><i data-lucide="award"></i><span><b>OpenGameArt</b> · pixel medals (CC0)</span></div>
+    <div><i data-lucide="music"></i><span><b>Juhani Junkala</b> · retro sound effects (CC0)</span></div>
+    <div><i data-lucide="shapes"></i><span><b>Lucide</b> icons</span></div></div><p class="v2-note">Sounds in this mock are made live with Web Audio; the game uses the packs above.</p>`);
+}
+function demo(k) {
+  if (k === 'knock') { closeModals(); sfx.knock(); toast({ face: 'bob', who: 'Yusuf is knocking', what: `at ${esc(D.rooms.room_02.name)}`, ttl: 0, actions: [['Let in', false, () => { sfx.door(); const y = byId('yusuf'); const s = randomSpot('room_02'); y.home = 'room_02'; y.path = findPath(y.x, y.y, s[0], s[1]); toast({ icon: 'door-open', who: 'Yusuf is on his way', what: 'His pass lasts 12 hours.', small: true, ttl: 2400 }); }], ['Not now', true]] }); }
+  if (k === 'walkie') { closeModals(); if (zone !== 'hallway') toast({ icon: 'radio', who: 'Walkie works in the hallway', what: 'Step out of the room to hear it.', small: true, ttl: 2200 }); else npcWalkie(byId('zak'), 'Zak to Diesel: dice at the table?'); }
+  if (k === 'reconnect') { closeModals(); reconnect(); }
+  if (k === 'xp') { closeModals(); addXP(100); }
+  if (['blocked', 'nomic'].includes(k)) { closeModals(); if (zone === 'hallway') { const s = randomSpot('room_02'); me().x = s[0]; me().y = s[1]; } micAsked = true; setTimeout(() => { setMic(k); toast({ icon: 'mic-off', who: k === 'blocked' ? 'Mic blocked' : 'No mic found', what: 'Tap the mic button for help.', small: true, ttl: 2400 }); }, 100); }
+  if (k === 'tips') { closeModals(); S.tips = false; coach(); }
+  if (k === 'reset') { store.set('dh.v2.state', {}); location.reload(); }
+}
+
+/* ---------- reconnect (FIXES #3): never ask for a reload ---------- */
+let connPill = null;
+function reconnect() {
+  if (connPill) return;
+  connPill = el('div', 'v2-conn', `<i data-lucide="wifi-off"></i>Reconnecting <span class="v2-dots"><i></i><i></i><i></i></span>`); $('#toasts').prepend(connPill); icons();
+  for (const q of people) if (!q.me) q.el.style.opacity = .4;
+  setTimeout(() => {
+    connPill.className = 'v2-conn ok'; connPill.innerHTML = `<i data-lucide="wifi"></i>Back · ${people.length - 1} friends here`; icons();
+    for (const q of people) q.el.style.opacity = '';
+    setTimeout(() => { connPill.remove(); connPill = null; }, 1600);
+  }, 1800);
+}
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  applyGains();
+  if (document.hidden) { hiddenAt = Date.now(); joyRelease(); keys.clear(); stopWalkie(true); }
+  else if (!loggedOut && Date.now() - hiddenAt > 10000) reconnect();
+});
+addEventListener('online', () => !loggedOut && reconnect());
+
+/* ---------- chat ---------- */
+const chatLog = {
+  room_01: { unread: 1, list: [
+    { who: 'sami', t: '21:02', text: 'Who’s on tonight?', reacts: { '👀': 2 } },
+    { who: 'amira', t: '21:03', text: 'Me! Just made tea' },
+    { who: 'amira', t: '21:03', text: 'Diesel are you coming in or just lurking in the hallway', reacts: { '😂': 3 } },
+    { who: 'sami', t: '21:05', text: 'Dice at the games table after? Loser makes tea' } ] },
+};
+let chatEl = null, chatDraw = null;
+const hhmm = () => new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+function chatPush(rid, who, text) {
+  const c = chatLog[rid] ||= { list: [] }; c.list.push({ who, t: hhmm(), text });
+  if (chatEl && zone === rid) chatDraw(); else if (zone === rid) { c.unread = 1; $('#unread').hidden = false; }
+}
+function closeChat() { if (chatEl) { chatEl.remove(); chatEl = null; } }
+function openChat() {
+  if (chatEl) return closeChat();
+  const c = chatLog[zone] ||= { list: [] }; c.unread = 0; $('#unread').hidden = true;
+  const r = D.rooms[zone];
+  chatEl = el('div', 'dh-sheet dh-sheet--side'); chatEl.style.zIndex = 50;
+  chatEl.innerHTML = `<div><div class="dh-grip" hidden></div><div class="dh-sheet__head"><i data-lucide="message-square" style="width:18px"></i><span class="grow">${esc(r.name)}</span>
+    <button class="dh-iconbtn" style="width:36px;height:36px" aria-label="Close chat"><i data-lucide="x"></i></button></div></div>
+    <div class="dh-sheet__body" id="msgs"></div>
+    <form class="dh-sheet__foot"><input class="dh-input" placeholder="Message ${esc(r.name)}" maxlength="500" aria-label="Message" enterkeyhint="send"><button class="dh-iconbtn" aria-label="Send" style="background:var(--lamp);color:var(--panel-edge)"><i data-lucide="send"></i></button></form>`;
+  chatEl.querySelector('.dh-sheet__head button').onclick = closeChat;
+  const box = chatEl.querySelector('#msgs'), log = c.list;
+  chatDraw = () => {
+    box.innerHTML = log.length ? '<div class="dh-day">Today</div>' : '<div class="empty">No messages yet. Say hi.</div>';
+    let prev = null;
+    log.forEach(m => {
+      const p = byId(m.who);
+      const row = el('div', 'dh-msg' + (prev === m.who ? ' dh-msg--cont' : ''));
+      row.innerHTML = `<div class="dh-portrait" style="${headStyle(p.ch, 32)}"></div><div class="meta"><span class="name">${esc(p.name)}</span><span class="time">${m.t}</span></div><div class="text"></div>`;
+      row.querySelector('.text').textContent = m.text;
+      if (m.reacts && Object.keys(m.reacts).length) {
+        const rs = el('div', 'dh-reacts');
+        for (const [em, n] of Object.entries(m.reacts)) { const b = el('button', 'dh-react', `${em}<span>${n}</span>`); b.setAttribute('aria-pressed', String(!!(m.mine && m.mine[em]))); b.onclick = ev => { ev.stopPropagation(); react(m, em); }; rs.append(b); }
+        row.append(rs);
+      }
+      row.onclick = () => {
+        box.querySelectorAll('.dh-reactbar').forEach(n => n.remove());
+        const bar = el('div', 'dh-reactbar'); bar.style.gridColumn = '2';
+        for (const em of ['👍', '😂', '🔥', '❤️', '😮', '👀']) { const b = el('button', '', em); b.onclick = ev => { ev.stopPropagation(); react(m, em); }; bar.append(b); }
+        row.append(bar);
+      };
+      box.append(row); prev = m.who;
+    });
+    box.scrollTop = box.scrollHeight;
+  };
+  const react = (m, em) => { m.reacts ||= {}; m.mine ||= {}; if (m.mine[em]) { m.mine[em] = 0; m.reacts[em]--; if (!m.reacts[em]) delete m.reacts[em]; } else { m.mine[em] = 1; m.reacts[em] = (m.reacts[em] || 0) + 1; } chatDraw(); };
+  chatEl.querySelector('form').onsubmit = e => {
+    e.preventDefault(); const inp = e.target.querySelector('input'); const text = inp.value.trim(); if (!text) return;
+    log.push({ who: 'me', t: hhmm(), text }); inp.value = ''; chatDraw(); sfx.blip(); progress('d_chat');
+    if (text.length <= 40) bubble(me(), text);
+    const here = occupants(zone).filter(q => !q.me);
+    if (here.length) setTimeout(() => { const q = pick(here); const line = pick(['haha', 'hey Diesel 👋', 'same', 'omg yes', 'come to the games table after?']); chatPush(zone, q.id, line); bubble(q, line); }, rnd(1200, 2400));
+  };
+  game.append(chatEl); chatDraw(); icons();
+  chatEl.querySelector('.dh-grip').hidden = game.clientWidth > 640;
+}
+chatBtn.onclick = openChat;
+$('#btnSettings').onclick = () => showSettings();
+$('#btnChallenges').onclick = () => showChallenges();
+$('#btnPeople').onclick = showPeople;
+$('#xpChip').onclick = () => showProfile();
+
+/* ---------- first-run tips ---------- */
+function coach() {
+  if (S.tips) return;
+  const phone = matchMedia('(pointer: coarse)').matches;
+  const steps = [
+    ['footprints', 'Walk around', phone ? 'Use the joystick, or tap the floor to walk there.' : 'WASD or arrow keys. Or hold the mouse where you want to go.'],
+    ['door-open', 'Walk into a room to talk', 'Signs over the doors show who’s inside. Step back out and it goes quiet.'],
+    ['ear', 'Whisper in the hallway', 'Stand close to someone (inside the purple circle) to whisper. Hold the walkie to talk to everyone.'],
+    ['dice-5', 'Games and challenges', 'The games table is at the west end of the hallway. Daily challenges earn XP and badges.'],
+  ];
+  let i = 0; const box = el('div', 'v2-coach'); game.append(box);
+  const draw = () => {
+    const [ic, t, s] = steps[i];
+    box.innerHTML = `<div class="dh-panel"><div class="step"><span class="ico"><i data-lucide="${ic}"></i></span><div><b>${t}</b><span class="v2-note">${s}</span></div></div>
+      <div class="dh-row" style="min-height:0"><div class="v2-pips">${steps.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div><div style="display:flex;gap:10px"><button class="dh-btn dh-btn--quiet" data-s style="min-height:38px;font-size:14px">Skip</button><button class="dh-btn" data-n style="min-height:38px;font-size:14px">${i === steps.length - 1 ? 'Let’s go' : 'Next'}</button></div></div></div>`;
+    box.querySelector('[data-s]').onclick = done; box.querySelector('[data-n]').onclick = () => { sfx.blip(); if (++i >= steps.length) done(); else draw(); };
+    icons();
+  };
+  const done = () => { box.remove(); S.tips = true; save(); };
+  draw();
+}
+
+/* ---------- login ---------- */
+const login = $('#login'), canvas = $('#scene'), ctx = canvas.getContext('2d');
+let doorOpen = 0, doorTarget = 0, loginRaf = 0;
+const LI = {}; let liN = 0;
+for (const [k, src] of Object.entries({ scene: IM.LOGIN, adam: IM.adam_idle, amelia: IM.amelia_idle })) { const im = new Image(); im.onload = () => { if (++liN === 3) { layoutScene(); loginRaf = requestAnimationFrame(frameScene); } }; im.src = src; LI[k] = im; }
+let s = 3, ox = 0, dpr = 1; const SW = 384, SH = 176, DOOR_X = 12 * T;
+function layoutScene() {
+  dpr = Math.min(window.devicePixelRatio || 1, 3); canvas.width = Math.round(innerWidth * dpr); canvas.height = Math.round(innerHeight * dpr);
+  s = Math.max(2, Math.ceil(Math.max(canvas.width / SW, canvas.height / SH)));
+  ox = Math.min(0, Math.max(canvas.width - SW * s, Math.round(canvas.width / 2 - DOOR_X * s))); ctx.imageSmoothingEnabled = false;
+}
+addEventListener('resize', () => { if (!loggedOut) return; layoutScene(); });
+function sglow(x, y, r, color, a) { const g = ctx.createRadialGradient(ox + x * s, y * s, 0, ox + x * s, y * s, r * s); g.addColorStop(0, color.replace('A', a)); g.addColorStop(1, color.replace('A', 0)); ctx.fillStyle = g; ctx.fillRect(ox + (x - r) * s, (y - r) * s, r * 2 * s, r * 2 * s); }
+function frameScene(t) {
+  if (!loggedOut) return;
+  const sec = t / 1000; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#140f1c'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(LI.scene, ox, 0, SW * s, SH * s);
+  const f = Math.floor(sec * 7) % 6;
+  ctx.drawImage(LI.amelia, f * 16, 0, 16, 32, ox + 8.4 * T * s, 3.6 * T * s, 16 * s, 32 * s);
+  ctx.drawImage(LI.adam, ((doorTarget ? 6 : 18) + f) * 16, 0, 16, 32, ox + 11.5 * T * s, 4.1 * T * s, 16 * s, 32 * s);
+  ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = '#6b5c86'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'lighter';
+  sglow(20 * T, 2.9 * T, 70, 'rgba(244,150,60,A)', (.45 + .12 * Math.sin(sec * 9) + .06 * Math.sin(sec * 23)) * .55);
+  [[2.5, 2], [8, 2], [14, 2], [21, 2]].forEach(([tx, ty], i) => sglow(tx * T + 16, ty * T + 6, 34, 'rgba(255,226,170,A)', (.4 + .18 * Math.sin(sec * 2.2 + i * 1.7)) * .45));
+  sglow(6.5 * T, 3 * T, 40, 'rgba(150,180,255,A)', .12);
+  doorOpen += (doorTarget - doorOpen) * .06; if (doorOpen > .01) sglow(DOOR_X, 3.4 * T, 30 + 40 * doorOpen, 'rgba(255,200,120,A)', .7 * doorOpen);
+  ctx.globalCompositeOperation = 'source-over';
+  const v = ctx.createLinearGradient(0, 0, 0, canvas.height); v.addColorStop(0, 'rgba(20,15,28,.35)'); v.addColorStop(.45, 'rgba(20,15,28,0)'); v.addColorStop(1, 'rgba(20,15,28,.75)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  loginRaf = requestAnimationFrame(frameScene);
+}
+const lgErr = $('#lgErr');
+$('#lgFill').onclick = () => { $('#lgName').value = 'admin'; $('#lgPass').value = 'admin'; $('#lgGo').focus(); };
+$('#lgEye').onclick = e => { const i = $('#lgPass'); i.type = i.type === 'password' ? 'text' : 'password'; e.currentTarget.innerHTML = `<i data-lucide="${i.type === 'password' ? 'eye' : 'eye-off'}"></i>`; icons(); };
+$('#loginForm').onsubmit = e => {
+  e.preventDefault(); audio();
+  const n = $('#lgName').value.trim().toLowerCase(), pw = $('#lgPass').value;
+  if (n !== 'admin' || pw !== 'admin') {
+    lgErr.hidden = false; lgErr.textContent = !n || !pw ? 'Type your name and password.' : 'That name and password don’t match. (Demo: admin / admin)';
+    const c = $('#login .card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); return;
+  }
+  enter(false);
+};
+$('#lgGuest').onclick = () => { audio(); enter(true); };
+function enter(asGuest) {
+  guest = asGuest; lgErr.hidden = true; doorTarget = 1; sfx.knock();
+  $('#lgGo').textContent = 'Opening the door…'; $('#lgGo').disabled = true;
+  if (guest) { me().name = 'Guest'; me().ch = 'bob'; } else { me().name = S.name; me().ch = S.ch; }
+  renderTag(me()); renderXP(); renderPlates();
+  setTimeout(() => { sfx.door(); login.classList.add('out'); loggedOut = false; fit(true); }, 900);
+  setTimeout(() => {
+    sfx.join();
+    toast({ face: me().ch, who: guest ? 'Welcome, guest!' : `Welcome back, ${esc(me().name)}`, what: `${people.length - 1} friends are in the house.`, small: true, ttl: 2600 });
+    const h = new Date().getHours(); if (!guest && h < 5) unlock('night_owl');
+    coach();
+  }, 1300);
+}
+function signOut() {
+  closeModals(); closeChat(); loggedOut = true; login.classList.remove('out'); doorTarget = 0;
+  $('#lgGo').textContent = 'Knock on the door'; $('#lgGo').disabled = false; $('#lgPass').value = '';
+  game.querySelector('.v2-coach')?.remove(); layoutScene(); loginRaf = requestAnimationFrame(frameScene);
+}
+
+/* ---------- start ---------- */
+window.__v2 = { people, S, get zone() { return zone; } };
+fit(true); setMic('live'); zone = zoneAt(me().x, me().y); onZoneChange(null); renderXP(); renderPlates(); icons();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

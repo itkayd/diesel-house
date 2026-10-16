@@ -51,9 +51,13 @@ export class VoiceControls {
       if (this.blocked) return this.cb.onBlockedTap();
       if (!this.ptt) this.setMuted(!this.muted);
     });
+    let held: number | null = null; // the finger holding push-to-talk (other fingers can use the joystick)
     this.micBtn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       this.longPressed = false;
       if (this.ptt && !this.blocked) {
+        if (held !== null) return;
+        held = e.pointerId;
         this.micBtn.setPointerCapture(e.pointerId);
         this.setTalking(true);
         return;
@@ -63,13 +67,20 @@ export class VoiceControls {
         this.showDetail(true);
       }, LONG_PRESS);
     });
-    const release = () => {
+    const release = (e?: PointerEvent) => {
+      if (e && held !== null && e.pointerId !== held) return;
+      held = null;
       clearTimeout(this.pressTimer);
       if (this.longPressed) setTimeout(() => this.showDetail(false), 1500);
       if (this.ptt) this.setTalking(false);
     };
     this.micBtn.addEventListener('pointerup', release);
     this.micBtn.addEventListener('pointercancel', release);
+    this.micBtn.addEventListener('lostpointercapture', release);
+    // Never left talking: let go when the app is switched or the phone sleeps.
+    addEventListener('blur', () => release());
+    addEventListener('pagehide', () => release());
+    document.addEventListener('visibilitychange', () => document.hidden && release());
     this.micBtn.addEventListener('pointerenter', (e) => e.pointerType === 'mouse' && this.showDetail(true));
     this.micBtn.addEventListener('pointerleave', (e) => e.pointerType === 'mouse' && this.showDetail(false));
     this.micBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on phones

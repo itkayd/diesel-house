@@ -23,20 +23,37 @@ export class Joystick {
     this.base.appendChild(this.knob);
     hudBottomLeft().appendChild(this.base);
 
-    this.base.addEventListener('pointerdown', (e) => {
-      this.pointerId = e.pointerId;
-      this.base.setPointerCapture(e.pointerId);
-      this.move(e);
-    });
+    // Its own finger only (multi-touch: another thumb on the mic button is a different pointer). No text
+    // selection, long-press menu or scrolling from touches that start here.
+    this.base.addEventListener(
+      'pointerdown',
+      (e) => {
+        e.preventDefault();
+        if (this.pointerId !== null) return; // already held by another finger
+        this.pointerId = e.pointerId;
+        this.base.setPointerCapture(e.pointerId);
+        this.move(e);
+      },
+      { passive: false },
+    );
+    this.base.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    this.base.addEventListener('contextmenu', (e) => e.preventDefault());
     this.base.addEventListener('pointermove', (e) => e.pointerId === this.pointerId && this.move(e));
-    const release = (e: PointerEvent) => {
-      if (e.pointerId !== this.pointerId) return;
-      this.pointerId = null;
-      this.vector.x = this.vector.y = 0;
-      this.knob.style.transform = '';
-    };
+    const release = (e: PointerEvent) => e.pointerId === this.pointerId && this.release();
     this.base.addEventListener('pointerup', release);
     this.base.addEventListener('pointercancel', release);
+    this.base.addEventListener('lostpointercapture', release);
+    // Never stay stuck: let go when the app is switched, the phone sleeps or the page goes away.
+    addEventListener('blur', () => this.release());
+    addEventListener('pagehide', () => this.release());
+    document.addEventListener('visibilitychange', () => document.hidden && this.release());
+  }
+
+  release() {
+    if (this.pointerId !== null && this.base.hasPointerCapture?.(this.pointerId)) this.base.releasePointerCapture(this.pointerId);
+    this.pointerId = null;
+    this.vector.x = this.vector.y = 0;
+    this.knob.style.transform = '';
   }
 
   private move(e: PointerEvent) {

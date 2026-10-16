@@ -4,6 +4,23 @@
 
 const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable]');
 
+// Text that may still be selected (and long-pressed): typing, chat messages, codes to copy.
+const SELECTABLE = 'input, textarea, select, [contenteditable], #msgs .text, .dh-selectable';
+const selectable = (t: EventTarget | null) => t instanceof Element && !!t.closest(SELECTABLE);
+
+// No text selection or long-press menu over the game: holding the joystick or a button highlighted the
+// HUD text and opened "Copy / Search", which stole the touch and locked the joystick.
+export function installNoSelect() {
+  document.addEventListener('selectstart', (e) => !selectable(e.target) && e.preventDefault());
+  document.addEventListener('contextmenu', (e) => !selectable(e.target) && e.preventDefault());
+  // If a selection still appears (e.g. iOS double-tap), clear it unless it's in allowed text.
+  document.addEventListener('selectionchange', () => {
+    if (isTyping(document.activeElement)) return; // selections inside text boxes are fine
+    const sel = document.getSelection();
+    if (sel && !sel.isCollapsed && !selectable(sel.anchorNode?.parentElement ?? null)) sel.removeAllRanges();
+  });
+}
+
 export function installNoZoom() {
   // iPhone pinch (Safari's own gesture events).
   for (const type of ['gesturestart', 'gesturechange', 'gestureend'])

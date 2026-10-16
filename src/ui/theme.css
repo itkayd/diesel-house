@@ -334,3 +334,12 @@ html, body { margin: 0; height: 100%; background: var(--night); color: var(--cre
 .moods .dh-mood { font-size: 13px; padding: 4px 8px 5px; cursor: pointer; border: 0; }
 .moods .dh-mood svg { width: 14px; height: 14px; }
 .moods .dh-mood[aria-pressed="false"] { filter: saturate(.25) brightness(.7); }
+
+/* No text selection, long-press menu or tap flash anywhere in the game (it stole touches from the
+   joystick). Typing, chat messages and codes to copy stay selectable. */
+html, body, #game, #overlay, #overlay * {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+#overlay input, #overlay textarea, #overlay select, #overlay [contenteditable], #msgs .text, .dh-selectable {
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
+}

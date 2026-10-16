@@ -39,6 +39,7 @@ export function addGuestSettings(memberId: () => string | null) {
         }
         const code = el('div', '', gc.code);
         code.id = 'guest-code';
+        code.classList.add('dh-selectable');
         code.style.cssText = `font-family:var(--font-display);font-size:30px;letter-spacing:.08em;text-align:center;color:${gc.enabled ? 'var(--lamp)' : 'var(--faint)'}`;
         const copies = el('div');
         copies.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap';

@@ -34,8 +34,8 @@ Console → **Account → API keys & tokens → Create API key** (type: Standard
 
 ## 4. Let your friends in
 1. **First remove the test members** Tester and Visitor on the door list (**Remove** next to each). The house allows 8 accounts in total, so they'd take two places.
-2. Open , type your .
-3. Under **Add codes you already have**, paste your 8 codes, one per line, with who each is for: . (Or tap **Make an invite code** to have one made for you.)
+2. Open `https://<your-site>/admin.html`, type your `ADMIN_PASSCODE`.
+3. Under **Add codes you already have**, paste your 8 codes, one per line, with who each is for: `Sami: ABCD-1234`. (Or tap **Make an invite code** to have one made for you.)
 4. Send each friend their code. They open the site → **Join the house** → code, name, password. The code then belongs to them and stops working for anyone else; from then on they sign in with name + password on any device.
 5. On a phone: Share → **Add to Home Screen** (iPhone) or ⋮ → **Install app** (Android) and it opens full-screen like an app.
 

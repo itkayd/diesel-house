@@ -11,14 +11,32 @@ type Callbacks = {
 
 const PTT_KEY = 'diesel-house.ptt';
 const LONG_PRESS = 500; // ms
-type MicState = 'live' | 'muted' | 'ptt' | 'talking' | 'blocked';
+// What the button shows. The last five are problems: others can't hear you, and tapping helps fix it.
+type MicState = 'live' | 'muted' | 'ptt' | 'talking' | 'off' | 'blocked' | 'nomic' | 'busy' | 'silent';
 const LABELS: Record<MicState, string> = {
   live: 'Mute',
   muted: 'Unmute',
   ptt: 'Hold to talk',
   talking: 'Talking',
-  blocked: 'Mic blocked — listening only',
+  off: 'Mic off (listening only): tap to turn it on',
+  blocked: 'Mic blocked: tap to fix',
+  nomic: 'No mic found: tap for help',
+  busy: 'Mic busy (another app): tap to fix',
+  silent: 'Mic silent: tap to fix',
 };
+// Always-visible caption under the button.
+const CAPTIONS: Record<MicState, string> = {
+  live: 'Mic on',
+  muted: 'Muted',
+  ptt: 'Hold to talk',
+  talking: 'Talking',
+  off: 'Mic off',
+  blocked: 'Mic blocked',
+  nomic: 'No mic found',
+  busy: 'Mic busy',
+  silent: 'Mic silent',
+};
+const PROBLEMS: MicState[] = ['off', 'blocked', 'nomic', 'busy', 'silent'];
 
 // The big mic button (bottom-right, only inside a room), as in design/game/mvp.html. Its corner square
 // shows the voice connection (green ok, amber connecting, red blocked); long-press or hover for detail.
@@ -31,6 +49,8 @@ export class VoiceControls {
   private ptt = false;
   private talking = false;
   private blocked = false;
+  private problem: MicState | null = null; // set while the mic isn't reaching anyone
+  private caption: HTMLDivElement;
   private pressTimer = 0;
   private longPressed = false;
 
@@ -45,17 +65,20 @@ export class VoiceControls {
     this.micBtn.type = 'button';
     this.micBtn.id = 'mic-button';
     this.micBtn.className = 'dh-mic';
+    this.caption = document.createElement('div');
+    this.caption.id = 'mic-caption';
+    this.caption.className = 'dh-mic-caption';
 
     this.micBtn.addEventListener('click', () => {
       if (this.longPressed) return; // that press only showed the detail
-      if (this.blocked) return this.cb.onBlockedTap();
+      if (this.problem) return this.cb.onBlockedTap();
       if (!this.ptt) this.setMuted(!this.muted);
     });
     let held: number | null = null; // the finger holding push-to-talk (other fingers can use the joystick)
     this.micBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.longPressed = false;
-      if (this.ptt && !this.blocked) {
+      if (this.ptt && !this.problem) {
         if (held !== null) return;
         held = e.pointerId;
         this.micBtn.setPointerCapture(e.pointerId);
@@ -85,7 +108,7 @@ export class VoiceControls {
     this.micBtn.addEventListener('pointerleave', (e) => e.pointerType === 'mouse' && this.showDetail(false));
     this.micBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press menu on phones
 
-    this.box.append(this.detail, this.micBtn);
+    this.box.append(this.detail, this.micBtn, this.caption);
     hudBottomRight().appendChild(this.box);
 
     // Space bar = hold to talk on desktop (only in push-to-talk mode).
@@ -151,7 +174,7 @@ export class VoiceControls {
   }
 
   private get state(): MicState {
-    if (this.blocked) return 'blocked';
+    if (this.problem) return this.problem;
     if (this.ptt) return this.talking ? 'talking' : 'ptt';
     return this.muted ? 'muted' : 'live';
   }
@@ -162,9 +185,12 @@ export class VoiceControls {
     const conn = document.createElement('span');
     conn.className = 'dh-conn';
     conn.dataset.s = this.conn;
-    this.micBtn.replaceChildren(icon(s === 'muted' || s === 'blocked' ? 'mic-off' : 'mic'), conn);
+    this.micBtn.replaceChildren(icon(s === 'live' || s === 'ptt' || s === 'talking' ? 'mic' : 'mic-off'), conn);
     this.micBtn.setAttribute('aria-label', LABELS[s]);
-    this.micBtn.title = this.ptt && !this.blocked ? 'Hold to talk (or hold Space)' : LABELS[s];
+    this.micBtn.title = this.ptt && !this.problem ? 'Hold to talk (or hold Space)' : LABELS[s];
+    this.caption.textContent = CAPTIONS[s];
+    this.caption.dataset.state = s;
+    this.caption.dataset.problem = String(PROBLEMS.includes(s));
   }
 
   show(status: VoiceStatus) {
@@ -175,8 +201,14 @@ export class VoiceControls {
     } else if (status.state === 'in-room') {
       const others = status.total === 0 ? 'nobody else here' : `${status.connected}/${status.total} connected`;
       this.blocked = status.mic === 'blocked';
-      this.detail.textContent = this.blocked ? `Mic blocked · listening · ${others}` : `Voice · ${others}`;
-      this.conn = this.blocked ? 'error' : status.connected < status.total ? 'warn' : 'ok';
+      const p = status.problem;
+      this.problem = status.silent
+        ? 'silent'
+        : !this.blocked
+          ? null
+          : p === 'declined' ? 'off' : p === 'none' ? 'nomic' : p === 'busy' ? 'busy' : 'blocked';
+      this.detail.textContent = this.problem ? `${CAPTIONS[this.problem]} · listening · ${others}` : `Voice · ${others}`;
+      this.conn = this.problem ? 'error' : status.connected < status.total ? 'warn' : 'ok';
     }
     this.render();
   }

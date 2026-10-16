@@ -73,6 +73,12 @@ export function showMicHelp(problem: MicProblem): Promise<boolean> {
     buttons.append(again, listen);
     panel.append(title, el('p', 'dh-lede', 'People in the room can hear each other, but not you yet.'), list, buttons);
     again.addEventListener('click', () => {
+      // Ask for the mic right here, inside the tap (iPhones only show the permission prompt from a tap);
+      // the room then picks it up when voice rejoins.
+      void navigator.mediaDevices
+        ?.getUserMedia({ audio: true })
+        .then((s) => s.getTracks().forEach((t) => t.stop()))
+        .catch(() => {});
       close();
       resolve(true);
     });

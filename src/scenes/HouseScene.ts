@@ -420,6 +420,7 @@ export class HouseScene extends Phaser.Scene {
       onBlockedTap: async () => {
         // No mic: if the browser or phone refused it, explain how to fix that first. Then ask again
         // (rejoining the room re-runs the mic card and the browser prompt).
+        if (this.voice!.isSilent) return void this.voice!.restartMic(); // silent mic: reopen it now
         const problem = this.voice!.micProblem;
         if (problem && problem !== 'declined' && !(await showMicHelp(problem))) return;
         resetMicDecline();

@@ -23,7 +23,7 @@ async function player(name, init) {
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
-  await page.goto('http://localhost:5173/?test');
+  await page.goto('http://localhost:5173/?test&silentms=4000');
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 });
   return { name, page, id: await page.evaluate(() => window.__house.presence.id) };
 }

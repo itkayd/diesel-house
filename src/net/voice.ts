@@ -61,11 +61,13 @@ type Peer = {
 export type VoiceStatus =
   | { state: 'off' }
   | { state: 'joining' }
-  | { state: 'in-room'; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean };
+  | { state: 'in-room'; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean; problem: MicProblemKind; silent: boolean };
+export type MicProblemKind = 'declined' | 'denied' | 'busy' | 'none' | 'unsupported' | null;
 // What others get from our mic: sending sound, muted (or push-to-talk not held), no mic, or a mic that
 // only gives silence (on Android, usually another app holding it).
 export type MicState = 'on' | 'muted' | 'off' | 'silent';
-const SILENT_AFTER = 10_000; // ms of exact digital silence from a live mic before we call it broken
+// ms of exact digital silence from a live mic before we call it broken (dev ?silentms= shortens it for tests)
+const SILENT_AFTER = (import.meta.env.DEV && Number(new URLSearchParams(location.search).get('silentms'))) || 20_000;
 
 type Handlers = {
   onSpeaking: (id: string, speaking: boolean) => void;
@@ -144,7 +146,7 @@ export class Voice {
 
   // Why there's no mic, for the fix-it card: you chose "Just listen", the browser blocked it, another app
   // has it, there's none, or this browser can't use one (e.g. an app's built-in browser).
-  micProblem: 'declined' | 'denied' | 'busy' | 'none' | 'unsupported' | null = null;
+  micProblem: MicProblemKind = null;
 
   async join(room: RoomId) {
     if (this.room === room) return;
@@ -242,6 +244,10 @@ export class Voice {
     this.loudUntil.clear();
     this.room = null;
     this.h.onStatus({ state: 'off' });
+  }
+
+  get isSilent() {
+    return this.silent;
   }
 
   get micState(): MicState {
@@ -636,8 +642,12 @@ export class Voice {
         this.restartedForSilence = true;
         this.lastSound = now;
         void this.restartMic();
-      } else this.silent = true;
+      } else {
+        this.silent = true;
+        this.report();
+      }
     }
+    if (this.silent && mine > 0) this.report();
     this.reportMic();
     for (const p of this.peers.values())
       set(p.id, p.pc.connectionState === 'connected' && (p.meter?.level() ?? 0) > SPEAKING_LEVEL);
@@ -653,6 +663,8 @@ export class Voice {
       total: this.peers.size,
       mic: this.stream ? 'on' : 'blocked',
       turn: this.ice?.turn ?? false,
+      problem: this.stream ? null : this.micProblem,
+      silent: this.silent,
     });
   }
 

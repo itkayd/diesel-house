@@ -2,7 +2,8 @@ import { audioContext } from '../net/audio';
 import { mixer, type Category } from './mixer';
 
 // Sound effects and jingles from public/assets/sfx/ (name.ogg and/or name.mp3, made by
-// scripts/build-sfx.mjs from the Kenney, Juhani Junkala and SoundPack01 packs; see ASSETS.md). Each is decoded once and
+// scripts/build-sfx.mjs from the Kenney, Juhani Junkala and SoundPack01 packs; see ASSETS.md). The
+// walkie-talkie sounds are made in code instead (src/ui/radioSfx.ts). Each is decoded once and
 // played through its category on the mixer (src/ui/mixer.ts), so the Sound settings apply everywhere.
 // Missing files are skipped silently. Settings: Sound effects on/off, Door and knock sounds, Join/leave
 // chimes.
@@ -10,7 +11,8 @@ import { mixer, type Category } from './mixer';
 export type Sfx =
   | 'knock' | 'doorbell' | 'door_open' | 'join' | 'leave' | 'footstep' | 'footstep2'
   | 'click' | 'confirm' | 'error' | 'coin' | 'powerup' | 'emote'
-  | 'levelup' | 'challenge' | 'win' | 'lose';
+  | 'levelup' | 'challenge' | 'win' | 'lose'
+  | 'dice_shake' | 'dice_throw' | 'card_place' | 'card_flip' | 'card_shuffle' | 'chips';
 type Kind = { category: Category; group: 'doors' | 'chimes' | 'ui' | 'music' };
 const SOUNDS: Record<Sfx, Kind> = {
   knock: { category: 'game', group: 'doors' },
@@ -26,6 +28,12 @@ const SOUNDS: Record<Sfx, Kind> = {
   coin: { category: 'game', group: 'ui' },
   powerup: { category: 'game', group: 'ui' },
   emote: { category: 'game', group: 'ui' },
+  dice_shake: { category: 'game', group: 'ui' },
+  dice_throw: { category: 'game', group: 'ui' },
+  card_place: { category: 'game', group: 'ui' },
+  card_flip: { category: 'game', group: 'ui' },
+  card_shuffle: { category: 'game', group: 'ui' },
+  chips: { category: 'game', group: 'ui' },
   levelup: { category: 'music', group: 'music' },
   challenge: { category: 'music', group: 'music' },
   win: { category: 'music', group: 'music' },

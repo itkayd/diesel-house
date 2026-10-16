@@ -291,6 +291,54 @@
       ],
       "seconds": 0.32,
       "source": "Kenney · Digital Audio (CC0): Audio/pepSound1.ogg"
+    },
+    "dice_shake": {
+      "files": [
+        "public/assets/sfx/dice_shake.ogg",
+        "public/assets/sfx/dice_shake.mp3"
+      ],
+      "seconds": 1.2,
+      "source": "Kenney · Casino Audio (CC0): Audio/dice-shake-1.ogg"
+    },
+    "dice_throw": {
+      "files": [
+        "public/assets/sfx/dice_throw.ogg",
+        "public/assets/sfx/dice_throw.mp3"
+      ],
+      "seconds": 0.51,
+      "source": "Kenney · Casino Audio (CC0): Audio/dice-throw-1.ogg"
+    },
+    "card_place": {
+      "files": [
+        "public/assets/sfx/card_place.ogg",
+        "public/assets/sfx/card_place.mp3"
+      ],
+      "seconds": 0.46,
+      "source": "Kenney · Casino Audio (CC0): Audio/card-place-1.ogg"
+    },
+    "card_flip": {
+      "files": [
+        "public/assets/sfx/card_flip.ogg",
+        "public/assets/sfx/card_flip.mp3"
+      ],
+      "seconds": 0.24,
+      "source": "Kenney · Casino Audio (CC0): Audio/card-slide-1.ogg"
+    },
+    "card_shuffle": {
+      "files": [
+        "public/assets/sfx/card_shuffle.ogg",
+        "public/assets/sfx/card_shuffle.mp3"
+      ],
+      "seconds": 1.6,
+      "source": "Kenney · Casino Audio (CC0): Audio/card-shuffle.ogg"
+    },
+    "chips": {
+      "files": [
+        "public/assets/sfx/chips.ogg",
+        "public/assets/sfx/chips.mp3"
+      ],
+      "seconds": 0.12,
+      "source": "Kenney · Casino Audio (CC0): Audio/chips-collide-1.ogg"
     }
   },
   "ui": {
@@ -300,6 +348,54 @@
       "count": 12,
       "order": "src/ui/profile.ts BADGES",
       "source": "OpenGameArt · oga_medals.png (CC0), cropped for design/game/v2.html"
+    }
+  },
+  "v2": {
+    "cards": {
+      "files": [
+        "public/assets/games/cards.png",
+        "public/assets/games/cards.json"
+      ],
+      "frames": 67,
+      "cell": "32x32",
+      "bytes": 12755,
+      "source": "Kenney · Playing Cards Pack (CC0): Tilesheet/cardsMedium_tilemap_packed.png"
+    },
+    "emotes": {
+      "files": [
+        "public/assets/emotes/emotes.png",
+        "public/assets/emotes/emotes.json"
+      ],
+      "frames": 30,
+      "cell": "16x16",
+      "bytes": 918,
+      "source": "Kenney · Emotes Pack (CC0): Spritesheets/pixel_style1 (Pixel, Style 1)"
+    },
+    "prompts": {
+      "files": [
+        "public/assets/prompts/prompts.png",
+        "public/assets/prompts/prompts.json"
+      ],
+      "frames": [
+        "key_q",
+        "key_e",
+        "key_t",
+        "key_space",
+        "tap",
+        "mic"
+      ],
+      "cell": "16x16",
+      "bytes": 528,
+      "source": "Kenney · Input Prompts Pixel 1-bit (CC0): Tilemap/tilemap_white_packed.png"
+    },
+    "uiPack": {
+      "files": [
+        "public/assets/ui/ui-pack.png"
+      ],
+      "frame": "16x16",
+      "tiles": 161,
+      "bytes": 3762,
+      "source": "Kenney · UI Pack Pixel Adventure (CC0): Tilesheets/Small tiles/Thick outline/tilemap_packed.png"
     }
   }
 }

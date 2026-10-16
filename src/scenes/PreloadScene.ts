@@ -12,6 +12,12 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('limezu_interiors', 'assets/furniture/limezu_interiors.png');
     this.load.tilemapTiledJSON('house', JSON.parse(houseMap));
     loadCharacterSheets(this.load);
+    // v2 packs (UPDATE.md Phase 9, built by scripts/build-v2-assets.mjs): cards + dice, emotes, key/tap
+    // prompts, and the pixel UI tiles.
+    this.load.atlas('cards', 'assets/games/cards.png', 'assets/games/cards.json');
+    this.load.atlas('emotes', 'assets/emotes/emotes.png', 'assets/emotes/emotes.json');
+    this.load.atlas('prompts', 'assets/prompts/prompts.png', 'assets/prompts/prompts.json');
+    this.load.spritesheet('ui_pack', 'assets/ui/ui-pack.png', { frameWidth: 16, frameHeight: 16 });
   }
 
   create() {

@@ -1,5 +1,5 @@
 // Builds public/assets/sfx/<name>.ogg + .mp3 from the raw packs in assets/raw/new-packs/ (unzipped there):
-// mono, 22.05 kHz, ≤ 64 kbps, each file ≤ 40 KB, all new audio ≤ 600 KB (FIXES.md 7). Also lists every
+// mono, 22.05 kHz, ≤ 64 kbps, each file ≤ 40 KB, all new audio ≤ 600 KB (FIXES.md 7, UPDATE.md 9). Also lists every
 // file in assets/manifest.json.
 //   node scripts/build-sfx.mjs
 // Decoding uses headless Edge (decodeAudioData); encoding uses wasm-media-encoders (dev dependency only).
@@ -19,6 +19,7 @@ const PACKS = {
   jingles: ['kenney_music-jingles', 'Kenney · Music Jingles (CC0)'],
   juhani: [JUHANI, 'Juhani Junkala · The Essential Retro Video Game Sound Effects Collection (CC0)'],
   pack01: ['SoundPack01', 'SoundPack01 (CC0)'],
+  casino: ['kenney_casino-audio', 'Kenney · Casino Audio (CC0)'],
 };
 const find = (pack, name) => {
   const root = path.join(RAW, PACKS[pack][0]);
@@ -47,6 +48,13 @@ const PICKS = [
   { name: 'coin', pack: 'pack01', file: 'Coin01.aif', max: 1 },
   { name: 'powerup', pack: 'digital', file: 'powerUp3.ogg', max: 1.2 },
   { name: 'emote', pack: 'digital', file: 'pepSound1.ogg', max: 0.6 },
+  // Games (UPDATE.md Phase 9): dice, cards, chips.
+  { name: 'dice_shake', pack: 'casino', file: 'dice-shake-1.ogg', max: 1.2 },
+  { name: 'dice_throw', pack: 'casino', file: 'dice-throw-1.ogg', max: 1.2 },
+  { name: 'card_place', pack: 'casino', file: 'card-place-1.ogg', max: 0.6 },
+  { name: 'card_flip', pack: 'casino', file: 'card-slide-1.ogg', max: 0.6 },
+  { name: 'card_shuffle', pack: 'casino', file: 'card-shuffle.ogg', max: 1.6 },
+  { name: 'chips', pack: 'casino', file: 'chips-collide-1.ogg', max: 0.8 },
 ];
 
 // AIFF (big-endian PCM) → WAV, so the browser can decode it.

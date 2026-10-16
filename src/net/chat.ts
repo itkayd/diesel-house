@@ -8,7 +8,7 @@ import { supabase } from './supabase';
 export type Message = {
   id: number;
   room_id: RoomId;
-  author_id: string;
+  author_id: string | null; // null once a guest's account has been tidied away
   author_name: string;
   author_character: number;
   author_guest: boolean;

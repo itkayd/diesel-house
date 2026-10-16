@@ -7,7 +7,7 @@ export const NAME_MIN = 1;
 export const NAME_MAX = 24;
 export const PASSWORD_MIN = 8;
 export const MAX_MEMBERS = 8; // the house has 8 rooms, one per friend
-const DOMAIN = 'members.diesel-house.invalid';
+export const DOMAIN = 'members.diesel-house.invalid';
 
 export const cleanName = (name: string) => name.trim().replace(/\s+/g, ' ');
 

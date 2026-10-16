@@ -202,7 +202,7 @@ export class ChatPanel {
         lastDay = day;
         prev = null;
       }
-      const cont = !!prev && prev.author_id === m.author_id && when.getTime() - new Date(prev.created_at).getTime() < GROUP_MS;
+      const cont = !!prev && !!m.author_id && prev.author_id === m.author_id && when.getTime() - new Date(prev.created_at).getTime() < GROUP_MS;
       const row = el('div', 'dh-msg' + (cont ? ' dh-msg--cont' : ''));
       row.dataset.message = String(m.id);
       row.tabIndex = 0;

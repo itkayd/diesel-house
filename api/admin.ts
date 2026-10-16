@@ -2,7 +2,7 @@
 // Makes single-use invite codes (or adds codes Diesel already has), lists members, resets forgotten passwords, removes members.
 // Protected by ADMIN_PASSCODE; uses the server-side secret key (never sent to a browser).
 import { isCodeShape, isMemberLogin, PASSWORD_MIN, showCode } from '../src/shared/members';
-import { adminDb, hashCode, json, newCode, same, slowDown, type Env } from './_server';
+import { adminDb, hashCode, json, memberAccounts, newCode, same, slowDown, type Env } from './_server';
 
 type Body = { passcode?: string; action?: string; label?: string; id?: number; userId?: string; password?: string; codes?: { code?: string; label?: string }[] };
 
@@ -25,18 +25,17 @@ export async function handle(request: Request, env: Env): Promise<Response> {
 
   switch (body.action) {
     case 'list': {
-      const [codes, profiles, users] = await Promise.all([
+      const [codes, profiles, accounts, visiting] = await Promise.all([
         db.from('invite_codes').select('id, label, created_at, used_at, used_by, revoked_at').order('created_at', { ascending: false }).limit(50),
         db.from('profiles').select('id, display_name'),
-        db.auth.admin.listUsers({ perPage: 200 }),
+        memberAccounts(db),
+        db.from('guest_admissions').select('user_id', { count: 'exact', head: true }).gt('expires_at', new Date().toISOString()),
       ]);
-      const err = codes.error ?? profiles.error ?? users.error;
+      const err = codes.error ?? profiles.error ?? accounts.error ?? visiting.error;
       if (err) return json({ error: err.message }, 500);
       const names = new Map((profiles.data ?? []).map((p) => [p.id, p.display_name]));
-      const members = users.data.users
-        .filter((u) => isMemberLogin(u.email))
-        .map((u) => ({ id: u.id, name: names.get(u.id) ?? String(u.user_metadata?.display_name ?? '?'), joined: u.created_at, lastSeen: u.last_sign_in_at ?? null }));
-      const guests = users.data.users.filter((u) => u.is_anonymous).length;
+      const members = (accounts.data ?? []).map((u) => ({ id: u.id, name: names.get(u.id) ?? '?', joined: u.created_at, lastSeen: u.last_sign_in_at }));
+      const guests = visiting.count ?? 0; // guests whose visit hasn't run out
       return json({ codes: (codes.data ?? []).map((c) => ({ ...c, usedByName: c.used_by ? (names.get(c.used_by) ?? null) : null })), members, guests });
     }
 

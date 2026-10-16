@@ -1,7 +1,7 @@
 // Vercel function: POST /api/join { code, name, password } -> makes a member account.
 // The invite code (made by Diesel on the door list) works once. No email is involved: the browser then
 // signs in with name + password (src/shared/members.ts maps the name to the account's login).
-import { cleanName, isMemberLogin, MAX_MEMBERS, memberLogin, NAME_MAX, NAME_MIN, PASSWORD_MIN } from '../src/shared/members';
+import { cleanName, DOMAIN, MAX_MEMBERS, memberLogin, NAME_MAX, NAME_MIN, PASSWORD_MIN } from '../src/shared/members';
 import { adminDb, hashCode, json, slowDown, type Env } from './_server';
 
 type Body = { code?: string; name?: string; password?: string };
@@ -22,9 +22,10 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   if (password.length < PASSWORD_MIN) return json({ error: `Your password needs at least ${PASSWORD_MIN} characters.` }, 400);
 
   // Only 8 accounts, ever at once: one per room.
-  const users = await db.auth.admin.listUsers({ perPage: 200 });
-  if (users.error) return json({ error: "Couldn't make your account. Try again." }, 500);
-  if (users.data.users.filter((u) => isMemberLogin(u.email)).length >= MAX_MEMBERS)
+  // Counted from the guest list, not by listing accounts (guests have accounts too, any number of them).
+  const members = await db.from('allowed_emails').select('email', { count: 'exact', head: true }).like('email', `%@${DOMAIN}`);
+  if (members.error || members.count === null) return json({ error: "Couldn't make your account. Try again." }, 500);
+  if (members.count >= MAX_MEMBERS)
     return json({ error: 'The house is full: all 8 places are taken. Ask Diesel.' }, 409);
 
   // Claim the code in one step, so two people can't use it at once.

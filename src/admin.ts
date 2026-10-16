@@ -292,7 +292,7 @@ async function load() {
         ...used.map((c) =>
           el('div', 'dh-lede', c.revoked_at ? `${c.label || 'A code'} was cancelled` : `${c.label || 'A code'} was used by ${c.usedByName ?? 'someone'} on ${when(c.used_at!)}`),
         ),
-        el('div', 'dh-lede', `Guest visits so far: ${d.guests}`),
+        el('div', 'dh-lede', `Guests visiting now: ${d.guests}`),
       ),
     );
   }

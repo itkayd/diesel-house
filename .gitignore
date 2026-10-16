@@ -10,3 +10,6 @@ Thumbs.db
 assets/raw/*
 !assets/raw/.gitkeep
 tests/e2e/output/
+
+# Screenshots some checks write in the project root
+/output/

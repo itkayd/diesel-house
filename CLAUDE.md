@@ -1,6 +1,6 @@
 # CLAUDE.md — Diesel House build brief
 
-**Read `NEXT.md` first** — it's the latest review and revised plan (Phase 4.5 onwards) and overrides this file where they differ.
+**Read `NEXT.md` first**, then **`UPDATE.md`** (v2: hallway whisper + walkie-talkie, mini-games, challenges — Phases 9–14). Newer files win where they differ.
 
 Read `CONCEPT.md` and `ASSETS.md` before starting. Build in phases. Finish one phase, confirm its "Done when" test passes, commit and push, then stop and tell the user what to test before starting the next phase.
 

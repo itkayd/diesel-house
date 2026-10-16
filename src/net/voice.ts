@@ -4,6 +4,7 @@ import { audioContext, audioLocked } from './audio';
 import { savedMicDevice, saveMicDevice } from '../prefs';
 import { devTest } from './mode';
 import { countMessage } from './stats';
+import { net } from './netQuality';
 import { supabase } from './supabase';
 
 // Per-room voice: a full mesh of peer-to-peer WebRTC connections (max 8 people), signalled over a
@@ -17,6 +18,7 @@ const ALIVE_CHECK = 2_500; // ms between "is anything still arriving?" checks on
 const DROP_AFTER = 4_000; // ms a connection may stay 'disconnected' before we drop it (other side closed the tab)
 const SPEAKING_LEVEL = 0.02; // RMS above which someone counts as speaking
 const LEVEL_EVERY = 60; // ms between speaking checks
+const STATS_EVERY = 5_000; // ms between call-quality readings (for the connection bars)
 const SPEAKING_HOLD = 350; // ms the glow stays on after the last loud moment, so it doesn't flicker
 const MIC: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
 // Opus tuning we ask the other side to send us: in-band FEC (survives lost packets on mobile/Middle East
@@ -124,6 +126,8 @@ export class Voice {
   private restartedForSilence = false;
   private reportedMic: MicState | null = null;
   private maintainTimer = 0;
+  private statsTimer = 0;
+  private lastCounts = new Map<string, { lost: number; got: number }>();
   private speaking = new Set<string>();
   private loudUntil = new Map<string, number>();
   private muted = false;
@@ -207,6 +211,7 @@ export class Voice {
     this.channel = ch;
     this.levelTimer = window.setInterval(() => this.checkLevels(), LEVEL_EVERY);
     this.maintainTimer = window.setInterval(() => this.maintain(), MAINTAIN_EVERY);
+    this.statsTimer = window.setInterval(() => void this.callStats(), STATS_EVERY);
     this.report();
     if (audioLocked()) this.h.onAudioLocked();
   }
@@ -230,6 +235,8 @@ export class Voice {
     this.stream = null;
     clearInterval(this.levelTimer);
     clearInterval(this.maintainTimer);
+    clearInterval(this.statsTimer);
+    this.lastCounts.clear();
     for (const id of this.speaking) this.h.onSpeaking(id, false);
     this.speaking.clear();
     this.loudUntil.clear();
@@ -451,6 +458,36 @@ export class Voice {
   private async contact(id: string) {
     if (this.myId < id) await this.startPeer(id, this.opts.forceRelay ?? false);
     else this.send({ kind: 'hello', from: this.myId, to: id });
+  }
+
+  // Round trip and lost audio packets across our calls, for the connection bars (see netQuality.ts).
+  private async callStats() {
+    const rtts: number[] = [];
+    let lost = 0;
+    let got = 0;
+    for (const p of this.peers.values()) {
+      if (p.pc.connectionState !== 'connected') continue;
+      const stats = await p.pc.getStats().catch(() => null);
+      if (!stats) continue;
+      let pl = 0;
+      let pr = 0;
+      stats.forEach((s) => {
+        if (s.type === 'candidate-pair' && s.state === 'succeeded' && s.nominated && typeof s.currentRoundTripTime === 'number')
+          rtts.push(s.currentRoundTripTime * 1000);
+        if (s.type === 'inbound-rtp' && s.kind === 'audio') {
+          pl += s.packetsLost ?? 0;
+          pr += s.packetsReceived ?? 0;
+        }
+      });
+      const before = this.lastCounts.get(p.id);
+      this.lastCounts.set(p.id, { lost: pl, got: pr });
+      if (before) {
+        lost += Math.max(0, pl - before.lost);
+        got += Math.max(0, pr - before.got);
+      }
+    }
+    if (!rtts.length) return;
+    net.setCallStats(rtts.reduce((a, b) => a + b, 0) / rtts.length, lost + got > 0 ? lost / (lost + got) : 0);
   }
 
   // Safety net for lost messages: call anyone in the room we have no connection to, and restart

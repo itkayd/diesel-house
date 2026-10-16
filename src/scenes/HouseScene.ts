@@ -258,6 +258,27 @@ export class HouseScene extends Phaser.Scene {
     return this.hosts.get(id) ?? null;
   }
 
+  // Why you might not hear someone in your room: shown on their name tag.
+  private showMicNote(id: string) {
+    const r = this.remotes.get(id);
+    if (!r) return;
+    const inRoom = !!r.info.zone && r.info.zone !== 'hallway';
+    const notes = { off: 'mic off', muted: 'muted', silent: 'mic not working' } as const;
+    r.avatar.setNote(inRoom && r.info.mic && r.info.mic !== 'on' ? notes[r.info.mic] : null);
+  }
+
+  // Our mic is on but gives only silence (another app has it, usually): tell them, offer to try again.
+  private warnSilentMic() {
+    toast({
+      icon: 'mic-off',
+      id: 'mic-silent-toast',
+      who: "Your mic isn't picking up any sound",
+      what: 'Another app may be using it (a call, WhatsApp). Close it, then tap Try again.',
+      ttl: 0,
+      actions: [{ label: 'Try again', id: 'mic-silent-retry', onClick: () => void this.voice?.restartMic() }],
+    });
+  }
+
   private showHost(p: PlayerInfo) {
     if (p.guest) void this.hostOf(p.id).then((h) => this.remotes.get(p.id)?.avatar.setHost(h));
   }
@@ -351,6 +372,10 @@ export class HouseScene extends Phaser.Scene {
         onAudioLocked: showSoundBanner,
         askMic: askForMic,
         volumeFor: (id) => savedVolume(id),
+        onMicState: (s) => {
+          this.presence?.update({ mic: s });
+          if (s === 'silent') this.warnSilentMic();
+        },
       },
       { forceRelay },
     );
@@ -605,6 +630,7 @@ export class HouseScene extends Phaser.Scene {
     avatar.setVisible(false); // shown once we know where they are
     avatar.setGuest(!!p.guest);
     this.showHost(p);
+    queueMicrotask(() => this.showMicNote(p.id));
     avatar.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapAvatar(p.id));
     this.remotes.set(p.id, { avatar, info: p, motion: null, glide: { dx: 0, dy: 0, at: 0 }, clockOffset: Infinity, lastHeard: 0, active: false });
     this.sendMove(true); // so the newcomer sees us straight away
@@ -649,7 +675,8 @@ export class HouseScene extends Phaser.Scene {
     if (r.info.name !== p.name) r.avatar.setName(p.name);
     r.avatar.setGuest(!!p.guest);
     this.showHost(p);
-    r.info = { ...p, zone: r.info.zone }; // zone from position updates is fresher than presence
+    r.info = { ...p, zone: r.info.zone };
+    this.showMicNote(p.id); // zone from position updates is fresher than presence
   }
 
   private receiveMove(m: MoveMsg) {
@@ -669,6 +696,7 @@ export class HouseScene extends Phaser.Scene {
       else if (r.info.zone === this.zone) play('leave', 0.5);
     }
     r.info.zone = m.zone;
+    if (moved) this.showMicNote(m.id);
     r.lastHeard = now;
     if (moved && r.active) this.showPresenceStatus(this.presenceState);
     if (!r.active) {

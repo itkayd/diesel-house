@@ -60,6 +60,10 @@ export type VoiceStatus =
   | { state: 'off' }
   | { state: 'joining' }
   | { state: 'in-room'; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean };
+// What others get from our mic: sending sound, muted (or push-to-talk not held), no mic, or a mic that
+// only gives silence (on Android, usually another app holding it).
+export type MicState = 'on' | 'muted' | 'off' | 'silent';
+const SILENT_AFTER = 10_000; // ms of exact digital silence from a live mic before we call it broken
 
 type Handlers = {
   onSpeaking: (id: string, speaking: boolean) => void;
@@ -70,6 +74,8 @@ type Handlers = {
   askMic: (cancelled: Promise<void>) => Promise<boolean>;
   // How loud this person should be for us (0..1), when their audio starts.
   volumeFor: (id: string) => number;
+  // Our mic's state changed (shared with everyone so they can see why they can't hear us).
+  onMicState?: (s: MicState) => void;
 };
 
 // Total bytes received over a connection (audio, plus the control messages that flow even when muted).
@@ -113,6 +119,10 @@ export class Voice {
   private joinToken = 0;
   private cancelJoin: (() => void) | null = null;
   private levelTimer = 0;
+  private lastSound = 0; // when the live mic last gave anything but exact silence
+  private silent = false;
+  private restartedForSilence = false;
+  private reportedMic: MicState | null = null;
   private maintainTimer = 0;
   private speaking = new Set<string>();
   private loudUntil = new Map<string, number>();
@@ -138,6 +148,7 @@ export class Voice {
     this.room = room;
     const token = ++this.joinToken;
     this.h.onStatus({ state: 'joining' });
+    this.restartedForSilence = false;
 
     this.ctx = audioContext();
     void this.ctx.resume();
@@ -151,9 +162,7 @@ export class Voice {
       stream?.getTracks().forEach((t) => t.stop());
       return; // left (or moved rooms) while we were waiting
     }
-    this.stream = stream;
-    if (stream) this.localMeter = new Meter(this.ctx, stream);
-    this.applyMute();
+    this.useStream(stream);
 
     if (!supabase) return;
     // Back in the same room straight after leaving (e.g. "Try again" on the mic): finish closing the old
@@ -228,6 +237,60 @@ export class Voice {
     this.h.onStatus({ state: 'off' });
   }
 
+  get micState(): MicState {
+    if (!this.stream) return 'off';
+    if (this.muted || (this.pushToTalk && !this.talking)) return 'muted';
+    return this.silent ? 'silent' : 'on';
+  }
+
+  private reportMic() {
+    const s = this.micState;
+    if (s === this.reportedMic) return;
+    this.reportedMic = s;
+    this.h.onMicState?.(s);
+  }
+
+  // Starts using a mic stream: meter, mute state, and a restart if the system takes the mic away (a phone
+  // call, another app).
+  private useStream(stream: MediaStream | null) {
+    this.stream = stream;
+    this.localMeter?.disconnect();
+    this.localMeter = stream && this.ctx ? new Meter(this.ctx, stream) : null;
+    this.lastSound = Date.now();
+    this.silent = false;
+    stream?.getAudioTracks().forEach((t) => (t.onended = () => this.stream === stream && void this.restartMic()));
+    this.applyMute();
+  }
+
+  // Opens the mic again and swaps it into every call (no reconnect). Used after the mic stopped or went
+  // silent, and by "Try again".
+  async restartMic() {
+    if (!this.room) return;
+    const sendsAudio = (p: Peer) => p.pc.getSenders().some((x) => x.track?.kind === 'audio');
+    if (!this.stream || [...this.peers.values()].some((p) => !sendsAudio(p))) {
+      // Calls set up listening only can't take a mic without renegotiating: rejoin the room instead.
+      const room = this.room;
+      this.leave();
+      return void this.join(room);
+    }
+    const next = await this.openMic();
+    if (!next) {
+      this.stream?.getTracks().forEach((t) => t.stop());
+      this.useStream(null);
+      this.report();
+      return;
+    }
+    const track = next.getAudioTracks()[0];
+    for (const p of this.peers.values()) {
+      const sender = p.pc.getSenders().find((x) => x.track?.kind === 'audio');
+      await sender?.replaceTrack(track).catch(() => {});
+    }
+    const old = this.stream;
+    this.useStream(next);
+    old?.getTracks().forEach((t) => t.stop());
+    this.report();
+  }
+
   setMuted(muted: boolean) {
     this.muted = muted;
     this.applyMute();
@@ -274,11 +337,9 @@ export class Voice {
       const sender = p.pc.getSenders().find((x) => x.track?.kind === 'audio');
       await sender?.replaceTrack(track);
     }
-    this.stream.getTracks().forEach((t) => t.stop());
-    this.localMeter?.disconnect();
-    this.stream = next;
-    if (this.ctx) this.localMeter = new Meter(this.ctx, next);
-    this.applyMute();
+    const old = this.stream;
+    this.useStream(next);
+    old.getTracks().forEach((t) => t.stop());
   }
 
   get micLive() {
@@ -288,6 +349,8 @@ export class Voice {
   private applyMute() {
     const live = this.micLive;
     this.stream?.getAudioTracks().forEach((t) => (t.enabled = live));
+    this.lastSound = Date.now(); // muting/unmuting restarts the silence check
+    this.reportMic();
   }
 
   private async openMic(): Promise<MediaStream | null> {
@@ -524,7 +587,21 @@ export class Voice {
       else this.speaking.delete(id);
       this.h.onSpeaking(id, on);
     };
-    set(this.myId, this.micLive && (this.localMeter?.level() ?? 0) > SPEAKING_LEVEL);
+    const mine = this.localMeter?.level() ?? 0;
+    set(this.myId, this.micLive && mine > SPEAKING_LEVEL);
+    // A live mic that gives exact digital silence for a while isn't really working (real mics always
+    // pick up a little noise). Try reopening it once; if it's still silent, say so.
+    if (!this.micLive || mine > 0) {
+      this.lastSound = now;
+      if (this.silent && mine > 0) this.silent = false;
+    } else if (!this.silent && now - this.lastSound > SILENT_AFTER) {
+      if (!this.restartedForSilence) {
+        this.restartedForSilence = true;
+        this.lastSound = now;
+        void this.restartMic();
+      } else this.silent = true;
+    }
+    this.reportMic();
     for (const p of this.peers.values())
       set(p.id, p.pc.connectionState === 'connected' && (p.meter?.level() ?? 0) > SPEAKING_LEVEL);
   }

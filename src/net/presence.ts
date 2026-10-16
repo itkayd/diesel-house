@@ -7,7 +7,8 @@ import { countMessage } from './stats';
 import { supabase } from './supabase';
 
 // Who someone is (shared via Realtime presence; changes rarely). `id` is their account id.
-export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean };
+// `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
+export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent' };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -154,12 +155,12 @@ export class Presence {
         continue;
       }
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
-      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest };
+      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);
       if (!old) this.h.onJoin(p);
-      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest) this.h.onInfo(p);
+      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic) this.h.onInfo(p);
     }
     for (const id of [...this.known.keys()]) {
       if (!seen.has(id)) {

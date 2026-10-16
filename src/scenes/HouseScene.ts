@@ -37,6 +37,7 @@ import { HouseLook } from './houseLook';
 import { reloadForUpdate } from '../ui/update';
 
 const SPEED = 80; // px per second
+const ZONE_SETTLE_MS = 150; // a zone change counts once you have been in the new zone this long
 const SLOW = 0.5; // joystick half-push speed, as a fraction of SPEED
 // Movement messages: one when movement changes, a correction every 500 ms while walking, a heartbeat
 // every 15 s while standing still. Other screens extrapolate in between (dead reckoning).
@@ -80,6 +81,8 @@ export class HouseScene extends Phaser.Scene {
   private remotes = new Map<string, Remote>();
   private hosts = new Map<string, string>(); // guest id -> the member who invited them
   private hostsAsked = 0;
+  private zoneCandidate: Zone | null = null;
+  private zoneSince = 0;
   private micWarned = false; // "Others can't hear you" shown this visit
   // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
   private earlyMoves = new Map<string, MoveMsg>();
@@ -760,7 +763,15 @@ export class HouseScene extends Phaser.Scene {
     this.me.animate(moving, dir);
     this.me.sync();
 
-    const zone = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y - 3))?.name ?? null;
+    // Standing on a doorway line flips between hallway and room; only count a change that lasts
+    // ZONE_SETTLE_MS (and ignore gaps between zones), so voice, chat and presence don't flicker.
+    const here = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y - 3))?.name ?? null;
+    if (here !== this.zoneCandidate) {
+      this.zoneCandidate = here;
+      this.zoneSince = this.time.now;
+    }
+    const settled = this.zone === null || this.time.now - this.zoneSince >= ZONE_SETTLE_MS;
+    const zone = here !== null && settled ? here : this.zone;
     if (zone !== this.zone) {
       const was = this.zone;
       this.zone = zone;

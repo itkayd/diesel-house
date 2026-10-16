@@ -12,8 +12,10 @@ import { hideLogin, loginDone, showLogin } from './ui/login';
 import { PreloadScene } from './scenes/PreloadScene';
 import { HouseScene } from './scenes/HouseScene';
 import { installUpdateReload } from './ui/update';
+import { installNoZoom } from './ui/noZoom';
 
 installUpdateReload();
+installNoZoom();
 
 export const NIGHT = '#140f1c';
 

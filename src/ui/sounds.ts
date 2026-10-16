@@ -27,10 +27,14 @@ function write(k: string, v: string) {
   }
 }
 
+// The sound files in public/assets/sfx/ when the site was built (see vite.config.ts), so missing ones
+// aren't even asked for.
+declare const __SFX_FILES__: string[];
+
 // Finds which sounds exist (the dev server answers missing files with the page itself, so check the type).
 export async function loadSounds() {
   await Promise.all(
-    NAMES.map(async (n) => {
+    NAMES.filter((n) => __SFX_FILES__.includes(`${n}.mp3`)).map(async (n) => {
       const url = `assets/sfx/${n}.mp3`;
       const res = await fetch(url, { method: 'HEAD' }).catch(() => null);
       if (res?.ok && (res.headers.get('content-type') ?? '').startsWith('audio')) available.set(n, url);

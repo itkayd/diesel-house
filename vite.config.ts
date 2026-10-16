@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import vercel from './vercel.json';
+import { existsSync, readdirSync } from 'node:fs';
 
 // Runs the Vercel functions in api/ during `npm run dev` (Vercel runs them in production).
 // /api/turn requests from this computer may skip the sign-in check (used by the voice tests).
@@ -47,6 +48,8 @@ export default defineConfig(({ mode }) => {
   return {
     // `npm run dev:https` serves over https so phones on the Wi-Fi can use the microphone.
     plugins: [devApi(env), ...(mode === 'https' ? [basicSsl()] : [])],
+    // Which sound effects exist (src/ui/sounds.ts only loads these). Restart the dev server after adding one.
+    define: { __SFX_FILES__: JSON.stringify(existsSync('public/assets/sfx') ? readdirSync('public/assets/sfx') : []) },
     server: { host: true }, // reachable from a phone on the same Wi-Fi
     // `npm run build && npx vite preview` serves the built site with the same security headers as Vercel.
     preview: { headers: Object.fromEntries(vercel.headers[0].headers.map((h) => [h.key, h.value])) },

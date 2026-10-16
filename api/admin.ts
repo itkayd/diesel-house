@@ -1,8 +1,8 @@
 // Vercel function: POST /api/admin, used by admin.html (Diesel's door list) only.
 // Makes single-use invite codes (or adds codes Diesel already has), lists members, resets forgotten passwords, removes members.
 // Protected by ADMIN_PASSCODE; uses the server-side secret key (never sent to a browser).
-import { isCodeShape, isMemberLogin, PASSWORD_MIN, showCode } from '../src/shared/members';
-import { adminDb, hashCode, json, memberAccounts, newCode, same, slowDown, type Env } from './_server';
+import { isCodeShape, isMemberLogin, PASSWORD_MIN, showCode } from '../src/shared/members.js';
+import { adminDb, hashCode, json, memberAccounts, newCode, same, slowDown, type Env } from './_server.js';
 
 type Body = { passcode?: string; action?: string; label?: string; id?: number; userId?: string; password?: string; codes?: { code?: string; label?: string }[] };
 

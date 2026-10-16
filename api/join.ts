@@ -1,8 +1,8 @@
 // Vercel function: POST /api/join { code, name, password } -> makes a member account.
 // The invite code (made by Diesel on the door list) works once. No email is involved: the browser then
 // signs in with name + password (src/shared/members.ts maps the name to the account's login).
-import { cleanName, DOMAIN, MAX_MEMBERS, memberLogin, NAME_MAX, NAME_MIN, PASSWORD_MIN } from '../src/shared/members';
-import { adminDb, hashCode, json, slowDown, type Env } from './_server';
+import { cleanName, DOMAIN, MAX_MEMBERS, memberLogin, NAME_MAX, NAME_MIN, PASSWORD_MIN } from '../src/shared/members.js';
+import { adminDb, hashCode, json, slowDown, type Env } from './_server.js';
 
 type Body = { code?: string; name?: string; password?: string };
 

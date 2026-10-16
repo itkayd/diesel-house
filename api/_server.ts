@@ -1,7 +1,7 @@
 // Helpers for the server functions (files starting with _ are not endpoints on Vercel).
 import { createClient } from '@supabase/supabase-js';
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
-import { makeCode, normaliseCode } from '../src/shared/members';
+import { makeCode, normaliseCode } from '../src/shared/members.js';
 
 export type Env = Record<string, string | undefined>;
 

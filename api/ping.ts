@@ -3,7 +3,7 @@
 // accounts whose visit ended over a week ago (needs SUPABASE_SERVICE_ROLE_KEY).
 // If CRON_SECRET is set (Vercel sends it as a bearer token to its own cron calls), only those calls count.
 
-import { adminDb, json, removeStaleGuests, type Env } from './_server';
+import { adminDb, json, removeStaleGuests, type Env } from './_server.js';
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   const secret = env.CRON_SECRET;

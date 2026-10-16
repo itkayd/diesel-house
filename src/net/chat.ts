@@ -12,6 +12,7 @@ export type Message = {
   author_name: string;
   author_character: number;
   author_guest: boolean;
+  author_host: string | null; // guests: the member who invited them
   text: string;
   created_at: string;
 };
@@ -23,7 +24,7 @@ export async function loadChat(room: RoomId): Promise<{ messages: Message[]; rea
   if (!supabase) return { messages: [], reactions: [] };
   const { data } = await supabase
     .from('messages')
-    .select('id, room_id, author_id, author_name, author_character, author_guest, text, created_at')
+    .select('id, room_id, author_id, author_name, author_character, author_guest, author_host, text, created_at')
     .eq('room_id', room)
     .order('created_at', { ascending: false })
     .limit(HISTORY);

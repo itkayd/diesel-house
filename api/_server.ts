@@ -1,7 +1,7 @@
 // Helpers for the server functions (files starting with _ are not endpoints on Vercel).
 import { createClient } from '@supabase/supabase-js';
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
-import { CODE_ALPHABET, normaliseCode } from '../src/shared/members';
+import { makeCode, normaliseCode } from '../src/shared/members';
 
 export type Env = Record<string, string | undefined>;
 
@@ -18,8 +18,7 @@ export function adminDb(env: Env) {
 export const hashCode = (code: string) => createHash('sha256').update(normaliseCode(code)).digest('hex');
 
 export function newCode() {
-  const pick = () => Array.from({ length: 4 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
-  return `${pick()}-${pick()}`;
+  return makeCode((n) => randomInt(n));
 }
 
 export function same(given: string | undefined, expected: string) {

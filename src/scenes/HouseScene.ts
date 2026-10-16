@@ -9,6 +9,7 @@ import { signOut } from '../net/auth';
 import { currentUser, loadNames, loadProfile, saveProfile } from '../net/profile';
 import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import { letIn, myPasses, removeFromRoom } from '../net/passes';
+import { guestHosts } from '../net/guestCodes';
 import type { DoorMsg } from '../net/presence';
 import { addSoundSettings, loadSounds, play } from '../ui/sounds';
 import { ChatPanel } from '../ui/chat';
@@ -76,6 +77,8 @@ export class HouseScene extends Phaser.Scene {
 
   private presence: Presence | null = null;
   private remotes = new Map<string, Remote>();
+  private hosts = new Map<string, string>(); // guest id -> the member who invited them
+  private hostsAsked = 0;
   // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
   private earlyMoves = new Map<string, MoveMsg>();
   private sent: Sent | null = null;
@@ -206,7 +209,8 @@ export class HouseScene extends Phaser.Scene {
         credits.style.flex = out.style.flex = '1';
         const row = el('div', 'dh-row');
         row.append(credits, out);
-        const who = el('small', 'dh-lede', user.guest ? `Visiting as a guest (${this.name})` : `Signed in as ${this.name}`);
+        const host = this.hosts.get(user.id);
+        const who = el('small', 'dh-lede', !user.guest ? `Signed in as ${this.name}` : host ? `Visiting as ${host}'s friend (${this.name})` : `Visiting as a guest (${this.name})`);
         box.append(who, row);
       },
       true,
@@ -228,8 +232,22 @@ export class HouseScene extends Phaser.Scene {
       // New here: offer the picker, prefilled with anything this device remembers.
       return void this.choose();
     }
+    if (user?.guest) void this.hostOf(user.id); // for the settings line
     if (saved === null || name === null) void this.choose();
     else void this.start();
+  }
+
+  // Whose friend a guest is. Asks the database again (at most every 3 s) when someone new turns up.
+  private async hostOf(id: string): Promise<string | null> {
+    if (!this.hosts.has(id) && Date.now() - this.hostsAsked > 3000) {
+      this.hostsAsked = Date.now();
+      this.hosts = await guestHosts();
+    }
+    return this.hosts.get(id) ?? null;
+  }
+
+  private showHost(p: PlayerInfo) {
+    if (p.guest) void this.hostOf(p.id).then((h) => this.remotes.get(p.id)?.avatar.setHost(h));
   }
 
   private applyIdentity(character: number, name: string) {
@@ -548,6 +566,7 @@ export class HouseScene extends Phaser.Scene {
     const avatar = new Avatar(this, 0, 0, p.character, p.name);
     avatar.setVisible(false); // shown once we know where they are
     avatar.setGuest(!!p.guest);
+    this.showHost(p);
     avatar.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapAvatar(p.id));
     this.remotes.set(p.id, { avatar, info: p, motion: null, glide: { dx: 0, dy: 0, at: 0 }, clockOffset: Infinity, lastHeard: 0, active: false });
     this.sendMove(true); // so the newcomer sees us straight away
@@ -590,6 +609,7 @@ export class HouseScene extends Phaser.Scene {
     if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
     if (r.info.name !== p.name) r.avatar.setName(p.name);
     r.avatar.setGuest(!!p.guest);
+    this.showHost(p);
     r.info = { ...p, zone: r.info.zone }; // zone from position updates is fresher than presence
   }
 

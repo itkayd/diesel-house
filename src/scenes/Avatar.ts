@@ -23,6 +23,7 @@ export class Avatar {
   private isSpeaking = false;
   private name: string;
   private guest = false;
+  private host: string | null = null;
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
@@ -72,11 +73,17 @@ export class Avatar {
 
   setName(name: string) {
     this.name = name;
-    this.tagText.setText(this.guest ? `${name} · guest` : name);
+    this.tagText.setText(!this.guest ? name : this.host ? `${name} · friend of ${this.host}` : `${name} · guest`);
     this.drawTagBg();
   }
 
-  // Guests (no account) get a muted tag that says so.
+  // Guests (no account) get a muted tag saying whose friend they are ("Sam · friend of Diesel").
+  setHost(host: string | null) {
+    if (host === this.host) return;
+    this.host = host;
+    this.setName(this.name);
+  }
+
   setGuest(on: boolean) {
     if (on === this.guest) return;
     this.guest = on;

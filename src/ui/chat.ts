@@ -208,7 +208,7 @@ export class ChatPanel {
       row.tabIndex = 0;
       const meta = el('div', 'meta');
       meta.append(
-        el('span', 'name', m.author_guest ? `${m.author_name} · guest` : m.author_name),
+        el('span', 'name', !m.author_guest ? m.author_name : m.author_host ? `${m.author_name} · friend of ${m.author_host}` : `${m.author_name} · guest`),
         el('span', 'time', when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })),
       );
       const text = el('div', 'text', m.text);

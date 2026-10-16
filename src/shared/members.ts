@@ -19,6 +19,12 @@ export function memberLogin(name: string) {
 
 export const isMemberLogin = (email: string | undefined) => !!email && email.endsWith(`@${DOMAIN}`);
 
-// Invite codes look like "K7QM-3XPH": no 0/O or 1/I/L, so they're easy to read out.
-export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+// Invite and guest codes look like "ABCD-1234": four letters (no I, L or O, so they can't be mistaken for
+// numbers), then four digits. `random(n)` returns a whole number from 0 to n-1.
+const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+export function makeCode(random: (n: number) => number) {
+  const letters = Array.from({ length: 4 }, () => CODE_LETTERS[random(CODE_LETTERS.length)]).join('');
+  const digits = Array.from({ length: 4 }, () => random(10)).join('');
+  return `${letters}-${digits}`;
+}
 export const normaliseCode = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '');

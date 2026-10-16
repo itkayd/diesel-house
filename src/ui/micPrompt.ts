@@ -23,6 +23,61 @@ async function micAlreadyAllowed() {
   }
 }
 
+// The mic didn't work: say why, how to fix it on this phone, and offer to try again. Resolves true for
+// "Try again".
+export type MicProblem = 'denied' | 'busy' | 'none' | 'unsupported';
+export function showMicHelp(problem: MicProblem): Promise<boolean> {
+  const ua = navigator.userAgent;
+  const inApp = /; wv\)|FBAN|FBAV|Instagram|Snapchat|Line\/|WhatsApp|TikTok/i.test(ua);
+  const iphone = /iPhone|iPad|iPod/.test(ua);
+  const steps: Record<MicProblem, string[]> = {
+    denied: inApp
+      ? ["This is an app's built-in browser, which can't use the mic.", `Open ${location.host} in ${iphone ? 'Safari' : 'Chrome'} instead.`]
+      : iphone
+        ? ['Tap aA (or the page icon) next to the web address.', 'Website Settings → Microphone → Allow.', 'Then tap Try again.']
+        : ['Tap the icon to the left of the web address.', 'Permissions (or Site settings) → Microphone → Allow.', 'Then tap Try again.'],
+    busy: ['Another app is using your microphone: a phone or WhatsApp call, a voice note, or another browser tab.', 'Close it, then tap Try again.'],
+    none: ['No microphone was found on this device.', 'Plug one in or connect your headphones, then tap Try again.'],
+    unsupported: inApp
+      ? ["This is an app's built-in browser, which can't use the mic.", `Open ${location.host} in ${iphone ? 'Safari' : 'Chrome'} instead.`]
+      : [`This browser can't use the mic here. Open ${location.host} in ${iphone ? 'Safari' : 'Chrome'}.`],
+  };
+  const titles: Record<MicProblem, string> = {
+    denied: 'Your mic is blocked',
+    busy: 'Your mic is busy',
+    none: 'No mic found',
+    unsupported: "This browser can't use the mic",
+  };
+  return new Promise((resolve) => {
+    const { panel, close } = openModal('mic-help', { dismissable: true, onDismiss: () => resolve(false), label: 'mic-help-title' });
+    const title = el('h2', '', titles[problem]);
+    title.id = 'mic-help-title';
+    const list = el('ol');
+    list.style.cssText = 'margin:0;padding-left:20px;display:grid;gap:6px';
+    for (const s of steps[problem]) list.append(el('li', 'dh-lede', s));
+    const again = el('button', 'dh-btn');
+    again.type = 'button';
+    again.id = 'mic-help-retry';
+    again.append(icon('mic'), 'Try again');
+    const listen = el('button', 'dh-btn dh-btn--quiet');
+    listen.type = 'button';
+    listen.id = 'mic-help-listen';
+    listen.append(icon('headphones'), 'Keep listening');
+    const buttons = el('div');
+    buttons.style.cssText = 'display:grid;gap:10px';
+    buttons.append(again, listen);
+    panel.append(title, el('p', 'dh-lede', 'People in the room can hear each other, but not you yet.'), list, buttons);
+    again.addEventListener('click', () => {
+      close();
+      resolve(true);
+    });
+    listen.addEventListener('click', () => {
+      close();
+      resolve(false);
+    });
+  });
+}
+
 // "Your mic, your call" (design/game/mvp.html `showMicCard`), before the browser's own prompt.
 // Resolves true to go ahead, false to just listen. `cancelled` resolves if you walk out first.
 export async function askForMic(cancelled: Promise<void>): Promise<boolean> {

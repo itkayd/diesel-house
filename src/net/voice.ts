@@ -128,6 +128,10 @@ export class Voice {
     private opts: { forceRelay?: boolean } = {},
   ) {}
 
+  // Why there's no mic, for the fix-it card: you chose "Just listen", the browser blocked it, another app
+  // has it, there's none, or this browser can't use one (e.g. an app's built-in browser).
+  micProblem: 'declined' | 'denied' | 'busy' | 'none' | 'unsupported' | null = null;
+
   async join(room: RoomId) {
     if (this.room === room) return;
     this.leave();
@@ -141,6 +145,8 @@ export class Voice {
     const wantMic = await this.h.askMic(cancelled);
     if (token !== this.joinToken) return;
     const [stream] = await Promise.all([wantMic ? this.openMic() : null, this.iceServers()]);
+    if (!wantMic) this.micProblem = 'declined';
+    else if (stream) this.micProblem = null;
     if (token !== this.joinToken) {
       stream?.getTracks().forEach((t) => t.stop());
       return; // left (or moved rooms) while we were waiting
@@ -150,6 +156,13 @@ export class Voice {
     this.applyMute();
 
     if (!supabase) return;
+    // Back in the same room straight after leaving (e.g. "Try again" on the mic): finish closing the old
+    // channel first, or Supabase hands that one back.
+    for (const old of supabase.getChannels()) if (old.topic === `realtime:voice:${room}`) await supabase.removeChannel(old);
+    if (token !== this.joinToken) {
+      stream?.getTracks().forEach((t) => t.stop());
+      return;
+    }
     // Private: guest-list members only (and from Phase 6, only people the door lets in).
     const ch = supabase.channel(`voice:${room}`, { config: { private: !devTest, broadcast: { self: false }, presence: { key: this.myId } } });
     ch.on('broadcast', { event: 'signal' }, ({ payload }) => {
@@ -278,6 +291,10 @@ export class Voice {
   }
 
   private async openMic(): Promise<MediaStream | null> {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.micProblem = 'unsupported';
+      return null;
+    }
     try {
       const device = savedMicDevice();
       if (device) {
@@ -291,6 +308,12 @@ export class Voice {
       return await navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
     } catch (e) {
       console.warn('Microphone unavailable — joining to listen only', e);
+      const name = e instanceof DOMException ? e.name : '';
+      this.micProblem =
+        name === 'NotAllowedError' || name === 'SecurityError' ? 'denied'
+        : name === 'NotReadableError' || name === 'AbortError' ? 'busy'
+        : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'none'
+        : 'unsupported';
       return null;
     }
   }

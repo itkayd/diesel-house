@@ -25,7 +25,7 @@ import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addProfileButton, pickCharacter } from '../ui/picker';
-import { askForMic, resetMicDecline } from '../ui/micPrompt';
+import { askForMic, resetMicDecline, showMicHelp } from '../ui/micPrompt';
 import { modalOpen } from '../ui/modal';
 import { addSettingsSection, switchRow } from '../ui/settings';
 import { addVoiceSettings } from '../ui/voiceSettings';
@@ -80,6 +80,7 @@ export class HouseScene extends Phaser.Scene {
   private remotes = new Map<string, Remote>();
   private hosts = new Map<string, string>(); // guest id -> the member who invited them
   private hostsAsked = 0;
+  private micWarned = false; // "Others can't hear you" shown this visit
   // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
   private earlyMoves = new Map<string, MoveMsg>();
   private sent: Sent | null = null;
@@ -335,7 +336,15 @@ export class HouseScene extends Phaser.Scene {
       this.presence.id,
       {
         onSpeaking: (id, on) => (id === this.presence!.id ? this.me : this.remotes.get(id)?.avatar)?.setSpeaking(on),
-        onStatus: (s) => this.voiceControls?.show(s),
+        onStatus: (s) => {
+          this.voiceControls?.show(s);
+          // Tried to use the mic and it failed: say so once, so nobody talks without being heard.
+          const problem = this.voice?.micProblem;
+          if (s.state === 'in-room' && s.mic === 'blocked' && problem && problem !== 'declined' && !this.micWarned) {
+            this.micWarned = true;
+            toast({ icon: 'mic-off', id: 'mic-toast', who: "Others can't hear you", what: 'Tap the mic button to fix it.', ttl: 8000 });
+          }
+        },
         onAudioLocked: showSoundBanner,
         askMic: askForMic,
         volumeFor: (id) => savedVolume(id),
@@ -346,8 +355,11 @@ export class HouseScene extends Phaser.Scene {
       onMute: (m) => this.voice!.setMuted(m),
       onPushToTalk: (on) => this.voice!.setPushToTalk(on),
       onTalking: (t) => this.voice!.setTalking(t),
-      onBlockedTap: () => {
-        // Mic blocked: ask again (rejoining the room re-runs the mic card and the browser prompt).
+      onBlockedTap: async () => {
+        // No mic: if the browser or phone refused it, explain how to fix that first. Then ask again
+        // (rejoining the room re-runs the mic card and the browser prompt).
+        const problem = this.voice!.micProblem;
+        if (problem && problem !== 'declined' && !(await showMicHelp(problem))) return;
         resetMicDecline();
         const room = this.voice!.room;
         this.voice!.leave();

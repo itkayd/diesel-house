@@ -48,6 +48,7 @@ const holdUp = async (p, ms) => {
 };
 async function setDoor(p, state) {
   await p.page.click('#settings-button');
+  await p.page.click('#settings-tab-room');
   await p.page.waitForSelector(`#door-${state}`);
   await p.page.click(`#door-${state}`);
   await p.page.waitForFunction(() => document.getElementById('room-save-status')?.textContent === 'Saved', null, { timeout: 8000 }).catch(() => {});

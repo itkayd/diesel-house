@@ -92,7 +92,13 @@ await B.page.mouse.click(spot.x, spot.y);
 await B.page.waitForSelector('#volume-popover', { timeout: 3000 }).catch(() => {});
 check('tapping a character in your room opens their volume slider', { open: await B.page.locator('#volume-popover').isVisible().catch(() => false) }, await B.page.locator('#volume-popover').isVisible().catch(() => false));
 await B.page.locator('#volume-slider').fill('30');
-const vol = await B.page.evaluate((id) => document.querySelector(`audio[data-peer="${id}"]`)?.volume, A.id);
+// Played at that friend's volume × the Master and Voices sliders (src/ui/mixer.ts).
+const playedAt = (id) => B.page.evaluate(async (id) => {
+  const { mixer } = await import('/src/ui/mixer.ts');
+  const a = document.querySelector(`audio[data-peer="${id}"]`);
+  return a ? a.volume / (mixer.levels.master * mixer.levels.voices) : null;
+}, id);
+const vol = await playedAt(A.id);
 const bAfter = await B.page.evaluate(() => ({ x: window.__house.player.x, y: window.__house.player.y }));
 check('slider sets A to 30% on B, and the tap did not walk B anywhere', { volume: vol, moved: bAfter.x !== bStart.x || bAfter.y !== bStart.y }, Math.abs(vol - 0.3) < 0.001 && bAfter.x === bStart.x && bAfter.y === bStart.y);
 await B.page.mouse.click(20, 600); // tap elsewhere closes it
@@ -101,12 +107,13 @@ await B.page.waitForTimeout(800);
 await tp(B, ...ROOM4);
 await connectedTo(B, A);
 await B.page.waitForTimeout(800);
-const volAgain = await B.page.evaluate((id) => document.querySelector(`audio[data-peer="${id}"]`)?.volume, A.id);
+const volAgain = await playedAt(A.id);
 check('the volume is remembered next time', { volume: volAgain, popoverClosed: !(await B.page.locator('#volume-popover').count()) }, Math.abs(volAgain - 0.3) < 0.001);
 
 // 3. Mic picker: switch B to another (fake) microphone mid-call; A keeps hearing B.
 await connectedTo(A, B);
 await B.page.click('#settings-button');
+await B.page.click('#settings-tab-mic');
 await B.page.waitForSelector('#mic-select');
 const options = await B.page.$$eval('#mic-select option', (os) => os.map((o) => ({ v: o.value, t: o.textContent })));
 const before = await B.page.evaluate(() => window.__house.voice.stream?.getAudioTracks()[0]?.getSettings().deviceId);

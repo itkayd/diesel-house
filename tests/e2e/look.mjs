@@ -81,8 +81,12 @@ check('furniture blocks: walking up into room 1\'s sofa stops you at its base', 
 
 // Settings: mic picker, push to talk and "show my name tag" all live there.
 await A.page.click('#settings-button');
-await A.page.waitForSelector('#show-own-tag'); // sections fill in after the mic list loads
-const items = await A.page.evaluate(() => ['mic-select', 'ptt-toggle', 'show-own-tag'].map((id) => !!document.getElementById(id)));
+await A.page.click('#settings-tab-mic');
+await A.page.waitForSelector('#ptt-toggle'); // sections fill in after the mic list loads
+const micTab = await A.page.evaluate(() => ['mic-select', 'ptt-toggle'].map((id) => !!document.getElementById(id)));
+await A.page.click('#settings-tab-more');
+await A.page.waitForSelector('#show-own-tag');
+const items = [...micTab, await A.page.evaluate(() => !!document.getElementById('show-own-tag'))];
 await A.page.uncheck('#show-own-tag');
 const tagHidden = await A.page.evaluate(() => !window.__house.me.tag.visible);
 await A.page.check('#show-own-tag');

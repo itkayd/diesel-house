@@ -84,6 +84,7 @@ export function addRoomSettings(myRoom: () => Room | null, save: (change: Partia
         status,
       );
     },
-    true,
+    false,
+    'room',
   );
 }

@@ -38,6 +38,7 @@ const fonts = await page.evaluate(() => document.fonts.check('16px "Pixelify San
 check('built site: member signs in and the game starts, fonts load', { inside, fonts }, inside && fonts);
 
 await page.click('#settings-button');
+await page.click('#settings-tab-more');
 await page.click('#credits-button');
 const credits = await page.$$eval('#credits li a', (as) => as.map((a) => a.textContent));
 check('settings → Credits lists every pack', { credits }, ['Modern Interiors', 'Modern Chibis', 'Roguelike Indoors', 'Lucide', 'OpenMoji'].every((c) => credits.includes(c)));

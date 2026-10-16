@@ -43,6 +43,7 @@ const ROOM2 = [272, 120];
 // Tester's guest code: new format, and switched on.
 const A = await signIn(A_);
 await A.page.click('#settings-button');
+await A.page.click('#settings-tab-more');
 await A.page.waitForSelector('#guest-code, #make-guest-code', { timeout: 10000 });
 if (await A.page.locator('#make-guest-code').count()) {
   await A.page.click('#make-guest-code');
@@ -88,6 +89,8 @@ check('other friends see the guest tagged with whose friend they are', { tag }, 
 const settingsLine = await G.page.evaluate(async () => {
   document.getElementById('settings-button').click();
   await new Promise((r) => setTimeout(r, 300));
+  document.getElementById('settings-tab-more')?.click();
+  await new Promise((r) => setTimeout(r, 300));
   const t = [...document.querySelectorAll('.dh-lede')].map((e) => e.textContent).find((t) => /Visiting/.test(t));
   window.__guestCanInvite = !!document.querySelector('#guest-code, #make-guest-code, #open-house-switch, #open-house');
   document.getElementById('settings-close')?.click();
@@ -122,6 +125,8 @@ await G.page.click('#msgs [data-delete]').catch(() => {});
 await G.page.waitForTimeout(800);
 await G.page.evaluate(async () => {
   document.getElementById('settings-button').click();
+  await new Promise((r) => setTimeout(r, 300));
+  document.getElementById('settings-tab-more')?.click();
   await new Promise((r) => setTimeout(r, 300));
   document.getElementById('sign-out')?.click();
 });

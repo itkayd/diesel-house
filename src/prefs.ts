@@ -62,3 +62,6 @@ export const saveShowOwnTag = (on: boolean) => write(OWN_TAG_KEY, on ? '1' : '0'
 const MIC_KEY = 'diesel-house.mic-device';
 export const savedMicDevice = () => read(MIC_KEY) ?? '';
 export const saveMicDevice = (id: string) => write(MIC_KEY, id);
+const SPEAKER_KEY = 'diesel-house.speaker';
+export const savedSpeaker = () => read(SPEAKER_KEY) ?? '';
+export const saveSpeaker = (id: string) => write(SPEAKER_KEY, id);

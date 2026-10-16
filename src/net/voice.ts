@@ -1,7 +1,8 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { RoomId } from '../config';
 import { audioContext, audioLocked } from './audio';
-import { savedMicDevice, saveMicDevice } from '../prefs';
+import { savedMicDevice, saveMicDevice, savedSpeaker, saveSpeaker } from '../prefs';
+import { mixer } from '../ui/mixer';
 import { devTest } from './mode';
 import { countMessage } from './stats';
 import { net } from './netQuality';
@@ -142,7 +143,11 @@ export class Voice {
     private myId: string,
     private h: Handlers,
     private opts: { forceRelay?: boolean } = {},
-  ) {}
+  ) {
+    mixer.onChange(() => {
+      for (const id of this.peers.keys()) this.applyVolume(id);
+    });
+  }
 
   // Why there's no mic, for the fix-it card: you chose "Just listen", the browser blocked it, another app
   // has it, there's none, or this browser can't use one (e.g. an app's built-in browser).
@@ -319,11 +324,33 @@ export class Voice {
     this.applyMute();
   }
 
-  // Per-person volume, 0..1. (iPhones ignore volume on audio elements; elsewhere it works.)
+  // Per-person volume, 0..1, times the Master and Voices sliders. (iPhones ignore volume on audio
+  // elements; elsewhere it works.)
   setVolume(id: string, v: number) {
     this.volumes.set(id, v);
+    this.applyVolume(id);
+  }
+
+  private applyVolume(id: string) {
     const a = this.peers.get(id)?.audio;
-    if (a) a.volume = v;
+    if (a) a.volume = mixer.voiceVolume(this.volumes.get(id) ?? this.h.volumeFor(id));
+  }
+
+  // The live mic stream while we're in a room (Settings → Mic meters and tests it).
+  get micStream() {
+    return this.stream;
+  }
+
+  // Which speaker voices play on, where the browser lets us choose (setSinkId). '' = system default.
+  static speakerChoice = typeof (HTMLMediaElement.prototype as { setSinkId?: unknown }).setSinkId === 'function';
+  async listSpeakers() {
+    const all = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    return all.filter((d) => d.kind === 'audiooutput').map((d, i) => ({ id: d.deviceId, label: d.label || `Speaker ${i + 1}` }));
+  }
+  setSpeaker(id: string) {
+    saveSpeaker(id);
+    for (const p of this.peers.values()) if (p.audio) void (p.audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId?.(id).catch(() => {});
+    void (this.ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> } | null)?.setSinkId?.(id).catch(() => {});
   }
 
   hasPeer(id: string) {
@@ -561,7 +588,9 @@ export class Voice {
         document.body.appendChild(peer.audio);
       }
       peer.audio.srcObject = stream;
-      peer.audio.volume = this.volumes.get(id) ?? this.h.volumeFor(id);
+      this.applyVolume(id);
+      const speaker = savedSpeaker();
+      if (speaker) void (peer.audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId?.(speaker).catch(() => {});
       void peer.audio.play().catch(() => this.h.onAudioLocked());
       peer.meter?.disconnect();
       if (this.ctx) peer.meter = new Meter(this.ctx, stream);

@@ -11,7 +11,8 @@ import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import { letIn, myPasses, removeFromRoom } from '../net/passes';
 import { guestHosts } from '../net/guestCodes';
 import type { DoorMsg } from '../net/presence';
-import { addSoundSettings, loadSounds, play } from '../ui/sounds';
+import { loadSounds, play } from '../ui/sounds';
+import { addSoundSettings } from '../ui/soundSettings';
 import { ChatPanel } from '../ui/chat';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
@@ -190,13 +191,17 @@ export class HouseScene extends Phaser.Scene {
 
     addProfileButton(() => void this.choose());
     if (!savedShowOwnTag()) this.me.setTagVisible(false);
-    addSettingsSection(30, (box) =>
-      box.append(
-        switchRow('show-own-tag', 'Show my name tag', 'Others always see it', savedShowOwnTag(), (on) => {
-          saveShowOwnTag(on);
-          this.me.setTagVisible(on);
-        }),
-      ),
+    addSettingsSection(
+      30,
+      (box) =>
+        box.append(
+          switchRow('show-own-tag', 'Show my name tag', 'Others always see it', savedShowOwnTag(), (on) => {
+            saveShowOwnTag(on);
+            this.me.setTagVisible(on);
+          }),
+        ),
+      false,
+      'more',
     );
     addSettingsSection(
       90,
@@ -329,6 +334,20 @@ export class HouseScene extends Phaser.Scene {
     void this.start();
   }
 
+  // The mic isn't reaching anyone: if the browser or phone refused it, explain how to fix that first;
+  // then ask again (rejoining the room re-runs the mic card and the browser prompt). A silent mic is
+  // simply reopened.
+  private async fixMic() {
+    if (!this.voice) return;
+    if (this.voice.isSilent) return void this.voice.restartMic();
+    const problem = this.voice.micProblem;
+    if (problem && problem !== 'declined' && !(await showMicHelp(problem))) return;
+    resetMicDecline();
+    const room = this.voice.room;
+    this.voice.leave();
+    if (room) void this.voice.join(room);
+  }
+
   // Joins the house once we know who we are.
   private async start() {
     this.canMove = true;
@@ -417,21 +436,14 @@ export class HouseScene extends Phaser.Scene {
       onMute: (m) => this.voice!.setMuted(m),
       onPushToTalk: (on) => this.voice!.setPushToTalk(on),
       onTalking: (t) => this.voice!.setTalking(t),
-      onBlockedTap: async () => {
-        // No mic: if the browser or phone refused it, explain how to fix that first. Then ask again
-        // (rejoining the room re-runs the mic card and the browser prompt).
-        if (this.voice!.isSilent) return void this.voice!.restartMic(); // silent mic: reopen it now
-        const problem = this.voice!.micProblem;
-        if (problem && problem !== 'declined' && !(await showMicHelp(problem))) return;
-        resetMicDecline();
-        const room = this.voice!.room;
-        this.voice!.leave();
-        if (room) void this.voice!.join(room);
-      },
+      onBlockedTap: () => void this.fixMic(),
     });
     this.chat = new ChatPanel(() => ({ id: this.presence!.id, name: this.name, character: this.character }));
     this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
-    addVoiceSettings(this.voice, this.voiceControls);
+    addVoiceSettings(this.voice, this.voiceControls, () => {
+      document.getElementById('settings-close')?.click();
+      void this.fixMic();
+    });
     addRoomSettings(
       () => [...this.rooms.values()].find((r) => r.owner_id && r.owner_id === currentUser()?.id) ?? null,
       async (change) => {

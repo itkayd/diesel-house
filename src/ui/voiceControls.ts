@@ -49,7 +49,7 @@ export class VoiceControls {
   private ptt = false;
   private talking = false;
   private blocked = false;
-  private problem: MicState | null = null; // set while the mic isn't reaching anyone
+  private problem_: MicState | null = null; // set while the mic isn't reaching anyone
   private caption: HTMLDivElement;
   private pressTimer = 0;
   private longPressed = false;
@@ -71,14 +71,14 @@ export class VoiceControls {
 
     this.micBtn.addEventListener('click', () => {
       if (this.longPressed) return; // that press only showed the detail
-      if (this.problem) return this.cb.onBlockedTap();
+      if (this.problem_) return this.cb.onBlockedTap();
       if (!this.ptt) this.setMuted(!this.muted);
     });
     let held: number | null = null; // the finger holding push-to-talk (other fingers can use the joystick)
     this.micBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.longPressed = false;
-      if (this.ptt && !this.problem) {
+      if (this.ptt && !this.problem_) {
         if (held !== null) return;
         held = e.pointerId;
         this.micBtn.setPointerCapture(e.pointerId);
@@ -135,6 +135,14 @@ export class VoiceControls {
     this.setPushToTalk(saved);
   }
 
+  // What the caption under the button says ("Mic on", "Mic blocked"…), and whether it's a problem.
+  get captionText() {
+    return CAPTIONS[this.state];
+  }
+  get problem() {
+    return this.problem_;
+  }
+
   get pushToTalk() {
     return this.ptt;
   }
@@ -174,7 +182,7 @@ export class VoiceControls {
   }
 
   private get state(): MicState {
-    if (this.problem) return this.problem;
+    if (this.problem_) return this.problem_;
     if (this.ptt) return this.talking ? 'talking' : 'ptt';
     return this.muted ? 'muted' : 'live';
   }
@@ -187,7 +195,7 @@ export class VoiceControls {
     conn.dataset.s = this.conn;
     this.micBtn.replaceChildren(icon(s === 'live' || s === 'ptt' || s === 'talking' ? 'mic' : 'mic-off'), conn);
     this.micBtn.setAttribute('aria-label', LABELS[s]);
-    this.micBtn.title = this.ptt && !this.problem ? 'Hold to talk (or hold Space)' : LABELS[s];
+    this.micBtn.title = this.ptt && !this.problem_ ? 'Hold to talk (or hold Space)' : LABELS[s];
     this.caption.textContent = CAPTIONS[s];
     this.caption.dataset.state = s;
     this.caption.dataset.problem = String(PROBLEMS.includes(s));
@@ -202,13 +210,13 @@ export class VoiceControls {
       const others = status.total === 0 ? 'nobody else here' : `${status.connected}/${status.total} connected`;
       this.blocked = status.mic === 'blocked';
       const p = status.problem;
-      this.problem = status.silent
+      this.problem_ = status.silent
         ? 'silent'
         : !this.blocked
           ? null
           : p === 'declined' ? 'off' : p === 'none' ? 'nomic' : p === 'busy' ? 'busy' : 'blocked';
-      this.detail.textContent = this.problem ? `${CAPTIONS[this.problem]} · listening · ${others}` : `Voice · ${others}`;
-      this.conn = this.problem ? 'error' : status.connected < status.total ? 'warn' : 'ok';
+      this.detail.textContent = this.problem_ ? `${CAPTIONS[this.problem_]} · listening · ${others}` : `Voice · ${others}`;
+      this.conn = this.problem_ ? 'error' : status.connected < status.total ? 'warn' : 'ok';
     }
     this.render();
   }

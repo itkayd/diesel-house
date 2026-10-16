@@ -125,6 +125,7 @@ check('A unmutes: B hears again', unmuted, unmuted > HEARD);
 
 // Push to talk (the switch lives in settings)
 await A.page.click('#settings-button');
+await A.page.click('#settings-tab-mic');
 await A.page.waitForSelector('#ptt-toggle');
 await A.page.check('#ptt-toggle');
 await A.page.waitForTimeout(500);

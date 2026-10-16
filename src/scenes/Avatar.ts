@@ -34,6 +34,9 @@ export class Avatar {
   private radioImg: Phaser.GameObjects.Image | null = null; // on the walkie-talkie
   private whisperImg: Phaser.GameObjects.Image | null = null; // "…" while whispering to us
   private whisperRing: Phaser.GameObjects.Graphics | null = null; // our whisper range (own avatar) // e.g. "mic off", when others can't hear them
+  private emoteImg: Phaser.GameObjects.Image | null = null; // an emote popping over their head
+  private emoteTimer: Phaser.Time.TimerEvent | null = null;
+  emote: string | null = null; // the emote showing (read by automated checks)
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
@@ -226,6 +229,25 @@ export class Avatar {
     });
   }
 
+  // An emote (Kenney Emotes frame) pops up over their head for 2.5 s (UPDATE.md Phase 11).
+  showEmote(frame: string) {
+    const scene = this.sprite.scene;
+    if (!scene.textures.exists('emotes')) return;
+    this.emoteTimer?.remove();
+    this.emoteImg?.destroy();
+    this.emote = frame;
+    this.emoteImg = scene.add.image(0, 0, 'emotes', frame).setOrigin(0.5, 1).setDepth(100003).setScale(0.2);
+    this.sync();
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      scene.tweens.add({ targets: this.emoteImg, scale: 1, duration: 220, ease: 'Back.Out' });
+    else this.emoteImg.setScale(1);
+    this.emoteTimer = scene.time.delayedCall(2500, () => {
+      this.emoteImg?.destroy();
+      this.emoteImg = null;
+      this.emote = null;
+    });
+  }
+
   // Keeps depth sorting, the ring and the name tag in step with the sprite.
   sync() {
     this.sprite.setDepth(this.sprite.y);
@@ -235,6 +257,10 @@ export class Avatar {
     this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
     this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
     this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(this.sprite.y - 1);
+    // Above the chat bubble if there is one, else just above the tag (beside the radio).
+    this.emoteImg
+      ?.setPosition(Math.round(this.sprite.x - (this.radioImg && !this.bubble ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11)))
+      .setVisible(this.sprite.visible);
   }
 
   animate(moving: boolean, dir: Dir = this.facing) {
@@ -268,5 +294,7 @@ export class Avatar {
     this.radioImg?.destroy();
     this.whisperImg?.destroy();
     this.whisperRing?.destroy();
+    this.emoteImg?.destroy();
+    this.emoteTimer?.remove();
   }
 }

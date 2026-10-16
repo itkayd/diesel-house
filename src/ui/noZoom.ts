@@ -29,14 +29,17 @@ export function installNoZoom() {
   // Two-finger pinch elsewhere.
   document.addEventListener('touchmove', (e) => e.touches.length > 1 && e.preventDefault(), { passive: false });
 
-  // Double tap: a second tap within 350 ms would zoom, so it doesn't get the browser's default.
-  let lastTap = 0;
+  // Double tap: a second tap within 350 ms in about the same spot would zoom, so it doesn't get the
+  // browser's default. (Only the same spot: a quick tap on a different button, like an emote straight after
+  // the emote button, must still be a click.)
+  let lastTap = { t: 0, x: 0, y: 0 };
   document.addEventListener(
     'touchend',
     (e) => {
-      const now = Date.now();
-      if (now - lastTap < 350 && !isTyping(e.target)) e.preventDefault();
-      lastTap = now;
+      const p = e.changedTouches[0];
+      const tap = { t: Date.now(), x: p?.clientX ?? 0, y: p?.clientY ?? 0 };
+      if (tap.t - lastTap.t < 350 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 40 && !isTyping(e.target)) e.preventDefault();
+      lastTap = tap;
     },
     { passive: false },
   );

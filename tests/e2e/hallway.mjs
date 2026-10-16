@@ -44,7 +44,7 @@ await at(B, 316, 270);
 await at(C, 272, 120); // in room 2
 await A.page.waitForFunction(() => window.__house.voice.space === 'hallway', null, { timeout: 8000 });
 const near = await waitLink(B, A, "d && d.state === 'connected' && d.hear && d.hear.whisper > 0.2");
-await B.page.waitForTimeout(600);
+await B.page.waitForTimeout(1500); // the whisper volume eases in
 const aToB = await link(A, B);
 const bHears = await link(B, A);
 // Furniture can nudge people, so compare with the real distance: half volume up to 24 px, easing out by 64.

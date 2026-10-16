@@ -10,7 +10,7 @@ import { currentUser, loadNames, loadProfile, saveProfile } from '../net/profile
 import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import { letIn, myPasses, removeFromRoom } from '../net/passes';
 import { guestHosts } from '../net/guestCodes';
-import type { DoorMsg } from '../net/presence';
+import type { DoorMsg, EmoteMsg } from '../net/presence';
 import { loadSounds, play } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
 import { ChatPanel } from '../ui/chat';
@@ -31,7 +31,8 @@ import { askForMic, micAlreadyAllowed, resetMicDecline, showMicHelp } from '../u
 import { modalOpen } from '../ui/modal';
 import { addSettingsSection, switchRow } from '../ui/settings';
 import { addVoiceSettings } from '../ui/voiceSettings';
-import { showVolumePopover, volumePopoverOpen } from '../ui/volumePopover';
+import { friendMenuOpen, showFriendMenu } from '../ui/friendMenu';
+import { EMOTE_EVERY, EMOTES, EmoteButton, isEmote, type EmoteId } from '../ui/emotes';
 import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
@@ -105,6 +106,8 @@ export class HouseScene extends Phaser.Scene {
   // Hallway voice: whisper + walkie-talkie rules, and the walkie button (UPDATE.md Phase 10).
   private hallway: Hallway | null = null;
   private walkie: WalkieButton | null = null;
+  private lastEmote = 0; // when we last sent one
+  private lastEmoteFrom = new Map<string, number>(); // when each person's last emote was shown
   private starting = false;
   private presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
@@ -455,6 +458,7 @@ export class HouseScene extends Phaser.Scene {
         },
         onRoomChange: (room) => void this.roomChanged(room),
         onDoor: (m) => void this.doorMessage(m),
+        onEmote: (m) => this.receiveEmote(m),
         onChat: (e) => {
           this.chat?.event(e);
           // Short new messages pop up over the sender's head.
@@ -539,6 +543,19 @@ export class HouseScene extends Phaser.Scene {
       key: () => this.hallway?.walkieKey ?? 't',
     });
     addHallwaySettings(hall);
+    new EmoteButton((e) => this.sendEmote(e));
+    // Keys 1-6: quick emotes. Q: the menu for whoever is right next to us.
+    addEventListener('keydown', (e) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || modalOpen()) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && t.closest('input, textarea, select, [contenteditable]')) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
+      else if (e.key.toLowerCase() === 'q') {
+        const id = this.nearestRemote(48);
+        if (id) this.tapAvatar(id);
+      }
+    });
     this.chat = new ChatPanel(() => ({ id: this.presence!.id, name: this.name, character: this.character }));
     this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
     addVoiceSettings(this.voice, this.voiceControls, () => {
@@ -794,24 +811,73 @@ export class HouseScene extends Phaser.Scene {
     this.showPresenceStatus('online');
   }
 
-  // Tapping someone you're in a voice room with opens their volume slider.
+  // Tapping someone (or Q next to them) opens their menu: volume when we're in a call with them, emotes,
+  // and for room owners "Remove from my room".
   private tapAvatar(id: string) {
     this.tappedAvatar = true;
     const r = this.remotes.get(id);
-    if (!r || !this.voice?.hasPeer(id)) return;
+    if (!r || !r.active) return;
     const name = r.info.name;
     const room = r.info.zone && r.info.zone !== 'hallway' ? (r.info.zone as RoomId) : null;
     const mine = room && this.rooms.get(room)?.owner_id === currentUser()?.id ? room : null;
-    showVolumePopover(
+    const inCall = !!this.voice?.hasPeer(id) && this.voice.space === room;
+    const near = Math.hypot(r.avatar.sprite.x - this.body.center.x, r.avatar.sprite.y - this.body.bottom) <= WHISPER;
+    const where = room
+      ? room === this.zone
+        ? 'In this room with you.'
+        : `In ${zoneLabel(room)}. Walk in to hear them.`
+      : this.zone === 'hallway' && near
+        ? 'You’re close enough to whisper.'
+        : 'In the hallway. Get close to whisper.';
+    showFriendMenu({
       name,
-      r.info.character,
-      savedVolume(id),
-      (v) => {
-        saveVolume(id, v);
-        this.voice?.setVolume(id, v);
-      },
-      mine ? { label: 'Remove from my room', id: 'remove-guest', onClick: () => void this.removeFromMyRoom(mine, id) } : undefined,
-    );
+      character: r.info.character,
+      volume: inCall
+        ? {
+            value: savedVolume(id),
+            onChange: (v) => {
+              saveVolume(id, v);
+              this.voice?.setVolume(id, v);
+            },
+          }
+        : undefined,
+      where,
+      onEmote: (e) => this.sendEmote(e, id),
+      remove: mine ? { label: 'Remove from my room', id: 'remove-guest', onClick: () => void this.removeFromMyRoom(mine, id) } : undefined,
+    });
+  }
+
+  // The nearest visible person within `range` px, if any.
+  private nearestRemote(range: number) {
+    let best: string | null = null;
+    let bestD = range;
+    for (const [id, r] of this.remotes) {
+      if (!r.active || !r.avatar.sprite.visible) continue;
+      const d = Math.hypot(r.avatar.sprite.x - this.body.center.x, r.avatar.sprite.y - this.body.bottom);
+      if (d <= bestD) [best, bestD] = [id, d];
+    }
+    return best;
+  }
+
+  // Emotes (UPDATE.md Phase 11): over our head for everyone who can see us, at most one per 2 s.
+  private sendEmote(e: EmoteId, to?: string) {
+    const now = Date.now();
+    if (now - this.lastEmote < EMOTE_EVERY || !this.presence) return;
+    this.lastEmote = now;
+    this.me.showEmote(e);
+    play('emote', 0.6);
+    this.presence.sendEmote(to ? { e, to } : { e });
+  }
+
+  private receiveEmote(m: EmoteMsg) {
+    const r = this.remotes.get(m.from);
+    if (!r || !isEmote(m.e)) return;
+    // Same cap on the way in, so a modified client can't flood everyone's screen.
+    const now = Date.now();
+    if (now - (this.lastEmoteFrom.get(m.from) ?? 0) < EMOTE_EVERY - 300) return;
+    this.lastEmoteFrom.set(m.from, now);
+    r.avatar.showEmote(m.e);
+    if (r.avatar.sprite.visible) play('emote', m.to === this.presence?.id ? 0.6 : 0.3);
   }
 
   private removeRemote(id: string) {
@@ -1035,7 +1101,7 @@ export class HouseScene extends Phaser.Scene {
     // Mouse: hold to walk towards the pointer. Touch uses the joystick instead.
     const p = this.input.activePointer;
     if (!p.isDown) this.tappedAvatar = false;
-    if (!vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !volumePopoverOpen()) {
+    if (!vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !friendMenuOpen()) {
       const dx = p.worldX - this.player.x;
       const dy = p.worldY - (this.player.y - 8);
       if (Math.hypot(dx, dy) > 4) return eightWay(dx, dy).scale(SPEED);

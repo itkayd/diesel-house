@@ -89,8 +89,8 @@ const spot = await B.page.evaluate((id) => {
   return { x: canvas.left + (s.x - cam.worldView.x) * cam.zoom, y: canvas.top + (s.y - 12 - cam.worldView.y) * cam.zoom };
 }, A.id);
 await B.page.mouse.click(spot.x, spot.y);
-await B.page.waitForSelector('#volume-popover', { timeout: 3000 }).catch(() => {});
-check('tapping a character in your room opens their volume slider', { open: await B.page.locator('#volume-popover').isVisible().catch(() => false) }, await B.page.locator('#volume-popover').isVisible().catch(() => false));
+await B.page.waitForSelector('#friend-menu', { timeout: 3000 }).catch(() => {});
+check('tapping a character in your room opens their volume slider', { open: await B.page.locator('#friend-menu').isVisible().catch(() => false) }, await B.page.locator('#friend-menu').isVisible().catch(() => false));
 await B.page.locator('#volume-slider').fill('30');
 // Played at that friend's volume × the Master and Voices sliders (src/ui/mixer.ts).
 const playedAt = (id) => B.page.evaluate(async (id) => {
@@ -108,7 +108,7 @@ await tp(B, ...ROOM4);
 await connectedTo(B, A);
 await B.page.waitForTimeout(800);
 const volAgain = await playedAt(A.id);
-check('the volume is remembered next time', { volume: volAgain, popoverClosed: !(await B.page.locator('#volume-popover').count()) }, Math.abs(volAgain - 0.3) < 0.001);
+check('the volume is remembered next time', { volume: volAgain, popoverClosed: !(await B.page.locator('#friend-menu').count()) }, Math.abs(volAgain - 0.3) < 0.001);
 
 // 3. Mic picker: switch B to another (fake) microphone mid-call; A keeps hearing B.
 await connectedTo(A, B);

@@ -50,11 +50,17 @@ check('join with a made-up code: refused', { joinErr }, /doesn't work|switched o
 // 4. Guests need a friend's invite code (or an open house).
 await page.click('#join [data-go="signin"]');
 await page.click('#signin [data-go="guest"]');
-await page.fill('#gs-code', 'ZZZZ-ZZZZ');
-await page.click('#guest .knock');
-await page.waitForSelector('#guest .error:not([hidden])', { timeout: 10000 }).catch(() => {});
-const guestErr = await errorOf('guest');
-check('guest with a made-up code: refused, no way in', { guestErr }, /doesn't work|switched off|need an invite code/.test(guestErr ?? '') && !(await page.evaluate(() => !!window.__house)));
+// When Diesel has opened the house (door list), anyone may come in as a guest, so a bad code isn't refused
+// then, and trying it would let a test guest into the real house: only check this while the house is closed.
+const openHouse = await page.waitForSelector('#open-house:not([hidden])', { timeout: 3000 }).then(() => true, () => false);
+if (openHouse) console.log('SKIP  guest with a made-up code: the house is open right now (anyone may visit)');
+else {
+  await page.fill('#gs-code', 'ZZZZ-ZZZZ');
+  await page.click('#guest .knock');
+  await page.waitForSelector('#guest .error:not([hidden])', { timeout: 10000 }).catch(() => {});
+  const guestErr = await errorOf('guest');
+  check('guest with a made-up code: refused, no way in', { guestErr }, /doesn't work|switched off|need an invite code/.test(guestErr ?? '') && !(await page.evaluate(() => !!window.__house)));
+}
 // 5. Diesel's door list is passcode-locked (wrong passcode, or not set up yet, either way: no list).
 const admin = await browser.newPage();
 await admin.goto('http://localhost:5173/admin.html');

@@ -21,6 +21,8 @@ export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number
 // Door messages, addressed to one person: a knock (to the owner), let in / not now (to the visitor), or
 // being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
 export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
+// An emote (UPDATE.md Phase 11): `e` is an EmoteId; `to` when sent from the tap-a-friend menu.
+export type EmoteMsg = { from: string; e: string; to?: string };
 export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
@@ -37,6 +39,7 @@ type Handlers = {
   onReconnected: () => void;
   onRoomChange: (room: Room) => void;
   onDoor: (m: DoorMsg) => void;
+  onEmote: (m: EmoteMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
   // this person may see.
   onChat: (e: ChatChange) => void;
@@ -107,6 +110,10 @@ export class Presence {
       countMessage('received', 'door');
       const m = payload as DoorMsg;
       if (m.to === this.id && !this.replaced) this.h.onDoor(m);
+    });
+    ch.on('broadcast', { event: 'emote' }, ({ payload }) => {
+      countMessage('received', 'emote');
+      if (!this.replaced) this.h.onEmote(payload as EmoteMsg);
     });
     ch.on('presence', { event: 'sync' }, () => {
       this.lastHeard = Date.now();
@@ -277,6 +284,12 @@ export class Presence {
     if (this.channel?.state !== 'joined') return;
     countMessage('sent', 'door');
     void this.channel.send({ type: 'broadcast', event: 'door', payload: { ...m, from: this.id } });
+  }
+
+  sendEmote(m: Omit<EmoteMsg, 'from'>) {
+    if (this.replaced || this.channel?.state !== 'joined') return;
+    countMessage('sent', 'emote');
+    void this.channel.send({ type: 'broadcast', event: 'emote', payload: { ...m, from: this.id } });
   }
 
   // Tab closing: tell everyone straight away rather than waiting for the server to notice.

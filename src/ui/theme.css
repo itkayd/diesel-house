@@ -327,7 +327,7 @@ html, body { margin: 0; height: 100%; background: var(--night); color: var(--cre
 #overlay .dh-scrim, #overlay .vol-pop { pointer-events: auto; }
 [hidden] { display: none !important; }
 .dh-pill.dh-where { max-width: calc(100vw - 150px); overflow: hidden; text-overflow: ellipsis; }
-.vol-pop { position: absolute; width: 240px; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 50; pointer-events: auto; }
+.vol-pop { position: absolute; width: min(260px, calc(100% - 32px)); box-sizing: border-box; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 50; pointer-events: auto; }
 .dh-voice-detail { position: absolute; right: 0; bottom: calc(100% + 12px); visibility: hidden; font-family: var(--font-body); font-size: var(--fs-xs); }
 .dh-pick canvas { image-rendering: pixelated; width: 48px; height: 96px; }
 .dh-error { margin: 0; color: var(--error); font-size: var(--fs-sm); }
@@ -431,3 +431,13 @@ html, body, #game, #overlay, #overlay * {
   .dh-hud-tc { top: calc(80px + var(--safe-t)); }
   #net .dh-sub { display: none; }
 }
+
+/* Emotes (UPDATE.md Phase 11, design/game/v2.html). */
+.v2-emogrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.v2-emogrid button { aspect-ratio: 1; border: 0; cursor: pointer; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: grid; place-items: center; padding: 0; }
+.v2-emogrid button:hover, .v2-emogrid button:focus-visible { box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.dh-emo { display: block; image-rendering: pixelated; background-repeat: no-repeat; }
+.v2-emotebar { position: absolute; right: calc(16px + var(--safe-r)); bottom: calc(120px + var(--safe-b)); width: min(260px, calc(100% - 32px)); padding: 10px; z-index: 50; pointer-events: auto; box-sizing: border-box; }
+#overlay .v2-emotebar { pointer-events: auto; }
+.vol-pop .acts { display: flex; gap: 10px; }
+.vol-pop .acts .dh-btn { flex: 1; min-height: 40px; font-size: 14px; }

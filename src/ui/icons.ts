@@ -40,6 +40,8 @@ import {
   Ticket,
   Timer,
   Users,
+  SmilePlus,
+  Swords,
   X,
   type IconNode,
 } from 'lucide';
@@ -50,7 +52,7 @@ const ICONS = {
   house: House, lock: Lock, 'log-out': LogOut, 'message-circle-heart': MessageCircleHeart, 'message-square': MessageSquare,
   mic: Mic, 'mic-off': MicOff, moon: Moon, music: Music, send: Send, settings: Settings, sofa: Sofa, 'user-round': UserRound,
   'volume-1': Volume1, 'volume-2': Volume2, 'volume-x': VolumeX, x: X,
-  'audio-lines': AudioLines, 'award': Award, 'calendar': Calendar, 'clock': Clock, 'copy': Copy, 'ellipsis': Ellipsis, 'id-card': IdCard, 'info': Info, 'pencil': Pencil, 'play': Play, 'radio': Radio, 'refresh-cw': RefreshCw, 'share-2': Share2, 'speaker': Speaker, 'square': Square, 'ticket': Ticket, 'timer': Timer, 'users': Users,
+  'audio-lines': AudioLines, 'award': Award, 'calendar': Calendar, 'clock': Clock, 'copy': Copy, 'ellipsis': Ellipsis, 'id-card': IdCard, 'info': Info, 'pencil': Pencil, 'play': Play, 'radio': Radio, 'refresh-cw': RefreshCw, 'share-2': Share2, 'speaker': Speaker, 'square': Square, 'ticket': Ticket, 'timer': Timer, 'users': Users, 'smile-plus': SmilePlus, swords: Swords,
 } satisfies Record<string, IconNode>;
 export type IconName = keyof typeof ICONS;
 

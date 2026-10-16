@@ -11,6 +11,9 @@ import { supabase } from './net/supabase';
 import { hideLogin, loginDone, showLogin } from './ui/login';
 import { PreloadScene } from './scenes/PreloadScene';
 import { HouseScene } from './scenes/HouseScene';
+import { installUpdateReload } from './ui/update';
+
+installUpdateReload();
 
 export const NIGHT = '#140f1c';
 

@@ -34,6 +34,7 @@ import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 import { HouseLook } from './houseLook';
+import { reloadForUpdate } from '../ui/update';
 
 const SPEED = 80; // px per second
 const SLOW = 0.5; // joystick half-push speed, as a fraction of SPEED
@@ -230,7 +231,7 @@ export class HouseScene extends Phaser.Scene {
       if (profile && !profile.picked) {
         // Just joined: their name is known, the character isn't chosen yet.
         saveName(profile.display_name);
-        return void this.choose();
+        return void this.choose(true);
       }
       if (profile) {
         this.applyIdentity(profile.character_index, profile.display_name);
@@ -266,15 +267,17 @@ export class HouseScene extends Phaser.Scene {
     this.me.setName(name);
   }
 
-  private async choose() {
+  // `mustPick`: first visit, no way to close without choosing.
+  private async choose(mustPick = false) {
     this.canMove = false;
     this.body.setVelocity(0, 0);
     const guest = !!currentUser()?.guest;
     const remembered = savedCharacter();
     const current = guest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered;
-    const choice = await pickCharacter(this.textures, current, savedName(), undefined, guest ? GUEST_CHARACTERS : undefined);
+    const choice = await pickCharacter(this.textures, current, savedName(), mustPick ? false : undefined, guest ? GUEST_CHARACTERS : undefined);
     if (!choice) {
       this.canMove = true; // closed without changes
+      void this.start(); // still join the house (does nothing if already in)
       return;
     }
     const { character, name } = choice;
@@ -291,7 +294,16 @@ export class HouseScene extends Phaser.Scene {
     if (this.starting) return;
     this.starting = true;
     showWhere(this.zone, 'Connecting…', 'warn');
-    const [{ Presence }, { Voice }] = await Promise.all([import('../net/presence'), import('../net/voice')]);
+    let modules;
+    try {
+      modules = await Promise.all([import('../net/presence'), import('../net/voice')]);
+    } catch (e) {
+      // Usually an old copy of the game after an update (its files are gone): load the new one.
+      console.warn('Could not load the game files', e);
+      if (!reloadForUpdate()) showWhere(this.zone, 'Offline · reload the page', 'off');
+      return;
+    }
+    const [{ Presence }, { Voice }] = modules;
     this.presence = new Presence(
       currentUser()?.id ?? crypto.randomUUID(),
       { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest },

@@ -1,11 +1,16 @@
 import type { Room } from '../net/rooms';
 import { DOORS, icon, MOODS, type DoorState, type Mood } from './icons';
 import { el } from './modal';
-import { addSettingsSection, sectionLabel } from './settings';
+import { addSettingsSection, sectionLabel, switchRow } from './settings';
 
 // "Your room" in settings (design/game/mvp.html): name, door, mood. Only shown to a room's owner.
 // `myRoom()` is read each time settings opens, so it follows live changes and ownership.
-export function addRoomSettings(myRoom: () => Room | null, save: (change: Partial<Pick<Room, 'name' | 'door_state' | 'mood'>>) => Promise<string | null>) {
+// `tableGames`: for rooms with a game table, the games the owner can switch on and off (UPDATE.md Phase 12).
+export function addRoomSettings(
+  myRoom: () => Room | null,
+  save: (change: Partial<Pick<Room, 'name' | 'door_state' | 'mood' | 'games'>>) => Promise<string | null>,
+  tableGames: (room: Room) => { id: string; label: string }[] = () => [],
+) {
   addSettingsSection(
     50,
     (box) => {
@@ -81,8 +86,25 @@ export function addRoomSettings(myRoom: () => Room | null, save: (change: Partia
         field(sectionLabel('Room name', 'room-name'), name),
         field(el('span', 'dh-label', 'Door'), door),
         field(el('span', 'dh-label', 'Mood'), moods),
-        status,
       );
+      const games = tableGames(room);
+      if (games.length) {
+        const list = el('div');
+        list.id = 'room-games';
+        list.style.cssText = 'display:grid;gap:4px';
+        const on = new Set(room.games ?? games.map((g) => g.id));
+        for (const g of games)
+          list.append(
+            switchRow(`room-game-${g.id}`, g.label, '', on.has(g.id), (yes) => {
+              if (yes) on.add(g.id);
+              else on.delete(g.id);
+              // All on is saved as null ("everything", including games added later).
+              void saved({ games: games.every((x) => on.has(x.id)) ? null : games.map((x) => x.id).filter((id) => on.has(id)) });
+            }),
+          );
+        box.append(field(el('span', 'dh-label', 'Games at your table'), list));
+      }
+      box.append(status);
     },
     false,
     'room',

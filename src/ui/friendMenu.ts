@@ -14,11 +14,14 @@ export type FriendMenu = {
   // Otherwise a line on where they are ("In Diesel's room. Walk in to hear them.").
   where?: string;
   onEmote: (id: EmoteId) => void;
+  // Rock-paper-scissors (UPDATE.md Phase 12). Without it the button says why not.
+  duel?: () => void;
+  duelOff?: string;
   remove?: { label: string; id: string; onClick: () => void };
 };
 
 // Tap a friend (or press Q next to them), UPDATE.md Phase 11 / design/game/v2.html `friendMenu`:
-// face and name, their volume (in a call) or where they are, emotes, Duel (Phase 12).
+// face and name, their volume (in a call) or where they are, emotes, Duel (rock paper scissors).
 // Tap anywhere else to close.
 export function showFriendMenu(m: FriendMenu) {
   closeFriendMenu();
@@ -72,9 +75,15 @@ export function showFriendMenu(m: FriendMenu) {
   const duel = el('button', 'dh-btn dh-btn--quiet');
   duel.type = 'button';
   duel.id = 'friend-duel';
-  duel.disabled = true;
-  duel.title = 'Games are coming soon';
-  duel.append(icon('swords', { width: 18 }), document.createTextNode('Duel · soon'));
+  const startDuel = m.duel;
+  duel.disabled = !startDuel;
+  duel.title = startDuel ? 'Rock paper scissors, best of three' : (m.duelOff ?? '');
+  duel.append(icon('swords', { width: 18 }), document.createTextNode('Duel'));
+  if (startDuel)
+    duel.addEventListener('click', () => {
+      closeFriendMenu();
+      startDuel();
+    });
   acts.append(duel);
   pop.append(acts);
   if (m.remove) {

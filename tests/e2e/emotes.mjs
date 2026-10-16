@@ -112,7 +112,7 @@ await sees(B, A);
     duel: document.getElementById('friend-duel')?.disabled,
     slider: !!document.getElementById('volume-slider'),
   }));
-  check('tapping a friend opens their menu: where they are, 10 emotes, Duel (soon), no volume outside a call', { open, ...menu }, open && menu.emotes === 10 && menu.duel === true && !menu.slider && /whisper/.test(menu.where ?? ''));
+  check('tapping a friend opens their menu: where they are, 10 emotes, Duel, no volume outside a call', { open, ...menu }, open && menu.emotes === 10 && menu.duel === false && !menu.slider && /whisper/.test(menu.where ?? ''));
   const seen = watch(B, A, 'hearts');
   await A.page.click('#friend-menu [data-emote="hearts"]');
   const got = await seen;

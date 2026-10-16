@@ -15,6 +15,7 @@ export type Message = {
   author_host: string | null; // guests: the member who invited them
   text: string;
   created_at: string;
+  kind?: 'text' | 'roll'; // 'roll': a dice roll, shown as a system line
 };
 export type Reaction = { message_id: number; author_id: string; emoji: string };
 export const HISTORY = 100;
@@ -24,7 +25,7 @@ export async function loadChat(room: RoomId): Promise<{ messages: Message[]; rea
   if (!supabase) return { messages: [], reactions: [] };
   const { data } = await supabase
     .from('messages')
-    .select('id, room_id, author_id, author_name, author_character, author_guest, author_host, text, created_at')
+    .select('id, room_id, author_id, author_name, author_character, author_guest, author_host, text, created_at, kind')
     .eq('room_id', room)
     .order('created_at', { ascending: false })
     .limit(HISTORY);
@@ -35,9 +36,9 @@ export async function loadChat(room: RoomId): Promise<{ messages: Message[]; rea
 }
 
 // Guests' name and character go with the message; for members the database uses their profile.
-export async function postMessage(room: RoomId, text: string, me: { name: string; character: number }) {
+export async function postMessage(room: RoomId, text: string, me: { name: string; character: number }, kind: 'text' | 'roll' = 'text') {
   if (!supabase) return 'offline';
-  const { error } = await supabase.from('messages').insert({ room_id: room, text, author_name: me.name.slice(0, 24), author_character: me.character });
+  const { error } = await supabase.from('messages').insert({ room_id: room, text, author_name: me.name.slice(0, 24), author_character: me.character, kind });
   return error?.message ?? null;
 }
 

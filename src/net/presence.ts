@@ -2,6 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Dir } from '../characters';
 import type { RoomId, Zone } from '../config';
 import type { Room } from './rooms';
+import type { DuelMsg } from '../games/rps';
 import { devTest } from './mode';
 import type { NetQuality } from './netQuality';
 import { countMessage, countReconnect } from './stats';
@@ -23,6 +24,8 @@ export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number
 export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
 // An emote (UPDATE.md Phase 11): `e` is an EmoteId; `to` when sent from the tap-a-friend menu.
 export type EmoteMsg = { from: string; e: string; to?: string };
+// Games (UPDATE.md Phase 12): a dice roll over someone's head, and rock-paper-scissors duel messages.
+export type DiceMsg = { from: string; v: number[]; s: number };
 export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
@@ -40,6 +43,8 @@ type Handlers = {
   onRoomChange: (room: Room) => void;
   onDoor: (m: DoorMsg) => void;
   onEmote: (m: EmoteMsg) => void;
+  onDice: (m: DiceMsg) => void;
+  onDuel: (m: DuelMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
   // this person may see.
   onChat: (e: ChatChange) => void;
@@ -110,6 +115,15 @@ export class Presence {
       countMessage('received', 'door');
       const m = payload as DoorMsg;
       if (m.to === this.id && !this.replaced) this.h.onDoor(m);
+    });
+    ch.on('broadcast', { event: 'dice' }, ({ payload }) => {
+      countMessage('received', 'dice');
+      if (!this.replaced) this.h.onDice(payload as DiceMsg);
+    });
+    ch.on('broadcast', { event: 'duel' }, ({ payload }) => {
+      countMessage('received', 'duel');
+      const m = payload as DuelMsg;
+      if (!this.replaced && (m.to === this.id || m.k === 'end') && m.from !== this.id) this.h.onDuel(m);
     });
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => {
       countMessage('received', 'emote');
@@ -284,6 +298,18 @@ export class Presence {
     if (this.channel?.state !== 'joined') return;
     countMessage('sent', 'door');
     void this.channel.send({ type: 'broadcast', event: 'door', payload: { ...m, from: this.id } });
+  }
+
+  sendDice(m: Omit<DiceMsg, 'from'>) {
+    if (this.replaced || this.channel?.state !== 'joined') return;
+    countMessage('sent', 'dice');
+    void this.channel.send({ type: 'broadcast', event: 'dice', payload: { ...m, from: this.id } });
+  }
+
+  sendDuel(m: DuelMsg) {
+    if (this.replaced || this.channel?.state !== 'joined') return;
+    countMessage('sent', 'duel');
+    void this.channel.send({ type: 'broadcast', event: 'duel', payload: m });
   }
 
   sendEmote(m: Omit<EmoteMsg, 'from'>) {

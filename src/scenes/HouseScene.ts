@@ -10,7 +10,14 @@ import { currentUser, loadNames, loadProfile, saveProfile } from '../net/profile
 import { loadRooms, roomLabel, updateRoom, type Room } from '../net/rooms';
 import { letIn, myPasses, removeFromRoom } from '../net/passes';
 import { guestHosts } from '../net/guestCodes';
-import type { DoorMsg, EmoteMsg } from '../net/presence';
+import type { DiceMsg, DoorMsg, EmoteMsg } from '../net/presence';
+import { GameSpots } from './gameSpots';
+import { Games, TABLE_GAMES, type GameId } from '../games/controller';
+import { Duel, type DuelMsg } from '../games/rps';
+import { parseRoll, roll, rollText, type Roll } from '../games/dice';
+import { randomSeed } from '../games/fair';
+import { recordGame } from '../net/games';
+import { postMessage } from '../net/chat';
 import { loadSounds, play } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
 import { ChatPanel } from '../ui/chat';
@@ -108,6 +115,11 @@ export class HouseScene extends Phaser.Scene {
   private walkie: WalkieButton | null = null;
   private lastEmote = 0; // when we last sent one
   private lastEmoteFrom = new Map<string, number>(); // when each person's last emote was shown
+  private spots!: GameSpots;
+  private games: Games | null = null;
+  private duel: Duel | null = null;
+  private duelInvite: { id: string; to: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  private lastRoll = 0;
   private starting = false;
   private presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
@@ -152,6 +164,8 @@ export class HouseScene extends Phaser.Scene {
       map,
       this.zones.filter((z) => z.name !== 'hallway') as { name: RoomId; rect: Phaser.Geom.Rectangle }[],
     );
+
+    this.spots = new GameSpots(this, map);
 
     // Sprite position is the character's feet; the physics body is a small box around them.
     const spawn = map.findObject('zones', (o) => o.name === 'spawn')!;
@@ -459,11 +473,13 @@ export class HouseScene extends Phaser.Scene {
         onRoomChange: (room) => void this.roomChanged(room),
         onDoor: (m) => void this.doorMessage(m),
         onEmote: (m) => this.receiveEmote(m),
+        onDice: (m) => this.receiveDice(m),
+        onDuel: (m) => this.receiveDuel(m),
         onChat: (e) => {
           this.chat?.event(e);
           // Short new messages pop up over the sender's head.
           const text = String(e.row.text ?? '');
-          if (e.table === 'messages' && e.type === 'INSERT' && text.length < 40) {
+          if (e.table === 'messages' && e.type === 'INSERT' && e.row.kind !== 'roll' && text.length < 40) {
             const id = String(e.row.author_id);
             (id === this.presence?.id ? this.me : this.remotes.get(id)?.avatar)?.say(text);
           }
@@ -550,13 +566,31 @@ export class HouseScene extends Phaser.Scene {
       const t = e.target;
       if (t instanceof HTMLElement && t.closest('input, textarea, select, [contenteditable]')) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
+      if (e.key.toLowerCase() === 'e' && this.games?.promptFor) this.games.open(this.games.promptFor);
+      else if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
       else if (e.key.toLowerCase() === 'q') {
         const id = this.nearestRemote(48);
         if (id) this.tapAvatar(id);
       }
     });
-    this.chat = new ChatPanel(() => ({ id: this.presence!.id, name: this.name, character: this.character }));
+    this.chat = new ChatPanel(
+      () => ({ id: this.presence!.id, name: this.name, character: this.character }),
+      (text) => {
+        const r = parseRoll(text);
+        if (r) this.rollDice(roll(r.n, r.sides));
+        return !!r;
+      },
+    );
+    this.games = new Games({
+      me: () => ({ id: this.presence!.id, name: this.name, character: this.character, guest: !!currentUser()?.guest }),
+      names: (id) => (id === this.presence?.id ? { name: this.name, character: this.character } : (this.remotes.get(id)?.info ?? { name: '', character: 0 })),
+      nearby: () =>
+        [...this.remotes.values()].filter((r) => r.active && r.info.zone === this.zone).map((r) => ({ id: r.info.id, name: r.info.name, character: r.info.character })),
+      allowed: (spot) => (spot === 'hall' ? null : ((this.rooms.get(spot)?.games as GameId[] | null | undefined) ?? null)),
+      roll: (r) => this.rollDice(r),
+      challenge: (id) => this.startDuel(id),
+      record: (game, spot, players, winners, score, seed) => void recordGame(game, spot, players, winners, score, seed),
+    });
     this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
     addVoiceSettings(this.voice, this.voiceControls, () => {
       document.getElementById('settings-close')?.click();
@@ -571,6 +605,7 @@ export class HouseScene extends Phaser.Scene {
         if (!err) await this.roomChanged({ ...mine, ...change });
         return err;
       },
+      (room) => (this.spots.spots.some((sp) => sp.id === room.id) ? TABLE_GAMES : []),
     );
     addGuestSettings(() => {
       const u = currentUser();
@@ -843,6 +878,8 @@ export class HouseScene extends Phaser.Scene {
         : undefined,
       where,
       onEmote: (e) => this.sendEmote(e, id),
+      duel: this.duel || this.duelInvite ? undefined : () => this.startDuel(id),
+      duelOff: 'You’re already in a duel',
       remove: mine ? { label: 'Remove from my room', id: 'remove-guest', onClick: () => void this.removeFromMyRoom(mine, id) } : undefined,
     });
   }
@@ -869,6 +906,120 @@ export class HouseScene extends Phaser.Scene {
     this.presence.sendEmote(to ? { e, to } : { e });
   }
 
+  // Dice (UPDATE.md Phase 12): over our head for everyone, and in a room a line in the chat.
+  private rollDice(r: Roll) {
+    const now = Date.now();
+    if (now - this.lastRoll < 1500 || !this.presence) return;
+    this.lastRoll = now;
+    this.me.showDice(r.values, r.sides);
+    play('dice_throw', 0.7);
+    this.presence.sendDice({ v: r.values, s: r.sides });
+    const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
+    if (room) void postMessage(room, rollText(r), { name: this.name, character: this.character }, 'roll');
+  }
+
+  private receiveDice(m: DiceMsg) {
+    const r = this.remotes.get(m.from);
+    if (!r || !Array.isArray(m.v) || m.v.length < 1 || m.v.length > 6) return;
+    const sides = Math.max(2, Math.min(100, Number(m.s) || 6));
+    const v = m.v.map((x) => Math.max(1, Math.min(sides, Math.round(Number(x) || 1))));
+    r.avatar.showDice(v, sides);
+    if (r.avatar.sprite.visible) play('dice_throw', 0.4);
+  }
+
+  // Rock-paper-scissors duel: invite, wait for yes, then both open the duel card.
+  private startDuel(id: string) {
+    const r = this.remotes.get(id);
+    if (!r || !this.presence || this.duel || this.duelInvite) return;
+    const duelId = randomSeed().slice(0, 12);
+    this.presence.sendDuel({ k: 'invite', id: duelId, from: this.presence.id, to: id });
+    this.duelInvite = { id: duelId, to: id, timer: setTimeout(() => this.cancelInvite('no answer'), 20_000) };
+    toast({
+      icon: 'swords',
+      id: 'duel-wait',
+      who: `Challenged ${r.info.name}`,
+      what: 'Rock paper scissors. Waiting for them…',
+      ttl: 0,
+      actions: [{ label: 'Cancel', id: 'duel-cancel', onClick: () => this.cancelInvite('cancelled') }],
+    });
+  }
+
+  private cancelInvite(why: 'no answer' | 'cancelled' | 'declined' | 'left') {
+    const inv = this.duelInvite;
+    if (!inv) return;
+    clearTimeout(inv.timer);
+    this.duelInvite = null;
+    document.getElementById('duel-wait')?.remove();
+    if (why === 'cancelled') this.presence?.sendDuel({ k: 'quit', id: inv.id, from: this.presence.id, to: inv.to });
+    const name = this.remotes.get(inv.to)?.info.name ?? 'They';
+    const who = why === 'declined' ? `${name} said not now` : why === 'left' ? `${name} left` : `${name} didn’t answer`;
+    if (why !== 'cancelled') toast({ icon: 'swords', who, what: 'Maybe later.', small: true, ttl: 3000 });
+  }
+
+  private openDuel(id: string, them: string, host: boolean) {
+    const r = this.remotes.get(them);
+    if (!r || !this.presence) return;
+    const me = { id: this.presence.id, name: this.name, character: this.character };
+    this.duel = new Duel(
+      id,
+      me,
+      { id: them, name: r.info.name, character: r.info.character },
+      host,
+      {
+        send: (m) => this.presence?.sendDuel(m),
+        record: (players, winners, score) => void recordGame('rps', 'duel', players, winners, score),
+        onEnd: (winner, loser) => this.duelEnded(winner, loser),
+      },
+      () => (this.duel = null),
+    );
+    this.duel.open();
+  }
+
+  // Everyone sees it: a crown for the winner (30 s), a dizzy swirl for the loser.
+  private duelEnded(winner: string, loser: string) {
+    const av = (id: string) => (id === this.presence?.id ? this.me : this.remotes.get(id)?.avatar);
+    av(winner)?.setCrown(30_000);
+    av(loser)?.showEmote('swirl');
+  }
+
+  private receiveDuel(m: DuelMsg) {
+    if (m.k === 'end') return this.duelEnded(m.winner, m.loser);
+    const r = this.remotes.get(m.from);
+    if (!r || !this.presence) return;
+    const me = this.presence.id;
+    if (m.k === 'invite') {
+      if (this.duel || this.duelInvite) return this.presence.sendDuel({ k: 'decline', id: m.id, from: me, to: m.from });
+      play('powerup', 0.5);
+      const answer = (yes: boolean) => {
+        document.getElementById('duel-invite')?.remove();
+        this.presence?.sendDuel({ k: yes ? 'accept' : 'decline', id: m.id, from: me, to: m.from });
+        if (yes) this.openDuel(m.id, m.from, false);
+      };
+      toast({
+        icon: 'swords',
+        id: 'duel-invite',
+        who: `${r.info.name} challenges you`,
+        what: 'Rock paper scissors, best of three.',
+        ttl: 20_000,
+        actions: [
+          { label: 'Play', id: 'duel-accept', onClick: () => answer(true) },
+          { label: 'Not now', id: 'duel-decline', onClick: () => answer(false) },
+        ],
+      });
+      return;
+    }
+    const inv = this.duelInvite;
+    if (inv && m.id === inv.id && m.from === inv.to && (m.k === 'accept' || m.k === 'decline')) {
+      if (m.k === 'decline') return this.cancelInvite('declined');
+      clearTimeout(inv.timer);
+      this.duelInvite = null;
+      document.getElementById('duel-wait')?.remove();
+      return this.openDuel(m.id, m.from, true);
+    }
+    if (m.k === 'quit' && !this.duel) document.getElementById('duel-invite')?.remove();
+    this.duel?.onMessage(m);
+  }
+
   private receiveEmote(m: EmoteMsg) {
     const r = this.remotes.get(m.from);
     if (!r || !isEmote(m.e)) return;
@@ -881,6 +1032,8 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private removeRemote(id: string) {
+    if (this.duel?.them.id === id) this.duel.gone();
+    if (this.duelInvite?.to === id) this.cancelInvite('left');
     this.earlyMoves.delete(id);
     this.remotes.get(id)?.avatar.destroy();
     this.remotes.delete(id);
@@ -1075,6 +1228,10 @@ export class HouseScene extends Phaser.Scene {
 
     this.moveRemotes();
     // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
+    // Standing at a game spot: "Play games · E". Walk off and an open games panel closes.
+    const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
+    this.games?.showPrompt(modalOpen() ? null : spot);
+    if (this.games?.openSpot && !spot) this.games.close();
     // The walkie button follows where you are every frame, so it can never be left hidden in the hallway
     // (a missed zone update or a setup hiccup used to leave it off until you walked into a room and back).
     this.walkie?.setVisible(this.zone === 'hallway' && !!this.voice && !this.presence?.isReplaced);

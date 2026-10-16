@@ -148,7 +148,9 @@ const HALL = [['door_double', 20, 196, 'wall'], ['fairy_lights', 128, 194, WARM]
   ['picture_land', 166, 206, 'wall'], ['picture_c', 520, 206, 'wall'], ['picture_b', 340, 206, 'wall'],
   ['rug_small_red', 188, 250, 'flat'], ['rug_small_red', 368, 250, 'flat'], ['rug_small_red', 548, 250, 'flat'],
   ['plant_palm', 130, 272], ['plant_tree', 330, 279], ['plant_palm', 500, 272], ['plant_tree', 680, 279],
-  ['lamp_cream', 226, 226, WARM], ['lamp_cream', 586, 226, WARM]];
+  ['lamp_cream', 226, 226, WARM], ['lamp_cream', 586, 226, WARM],
+  // Games corner (UPDATE.md Phase 12, design/game/v2.html): a table and two stools at the west end.
+  ['table_wood', 64, 234], ['stool', 58, 262], ['stool', 98, 262]];
 
 const furniture = [];
 function place(key, x, y, flag) {
@@ -168,6 +170,17 @@ for (let i = 0; i < 8; i++) {
 }
 for (const [key, x, y, flag] of HALL) place(key, x, y, flag);
 
+// Game spots (UPDATE.md Phase 12): stand here for "Play games". The hallway's games table, and rooms with a
+// table or desk. A point just in front of the piece.
+const spots = [];
+const GAME_TABLES = [['hall', 'table_wood', 'hall'], ['room_03', 'desk_study', 'room_03'], ['room_04', 'desk_study', 'room_04'], ['room_06', 'table_wood', 'room_06']];
+for (const [id, key, zoneName] of GAME_TABLES) {
+  const z = zones.find((o) => o.name === (zoneName === 'hall' ? 'hallway' : zoneName));
+  const piece = furniture.find((o) => o.name === key && o.x >= z.x && o.x < z.x + z.width && o.y + o.height > z.y && o.y < z.y + z.height);
+  if (!piece) throw new Error('no ' + key + ' in ' + zoneName);
+  spots.push({ id: nextId++, name: id, type: 'spot', x: piece.x + Math.round(piece.width / 2), y: piece.y + piece.height + 11, width: 0, height: 0, point: true, rotation: 0, visible: true });
+}
+
 // Doors: one object per doorway (the gap through the wall), for door frames now and door states later.
 const doors = [];
 for (let i = 0; i < 8; i++) {
@@ -182,8 +195,8 @@ for (let i = 0; i < 8; i++) {
   });
 }
 
-// Spawn: west end of the hallway, just below its wall face.
-zones.push({ id: nextId++, name: 'spawn', type: 'spawn', x: 3 * 16, y: (HALL_Y + 4) * 16, width: 0, height: 0, point: true, rotation: 0, visible: true });
+// Spawn: west end of the hallway, in the clear lane below the games table (UPDATE.md Phase 12).
+zones.push({ id: nextId++, name: 'spawn', type: 'spawn', x: 3 * 16, y: (HALL_Y + 6) * 16, width: 0, height: 0, point: true, rotation: 0, visible: true });
 
 const tileLayer = (id, name, data, props = []) => ({
   id, name, type: 'tilelayer', x: 0, y: 0, width: W, height: H, opacity: 1, visible: true, data, properties: props,
@@ -200,7 +213,7 @@ const map = {
   height: H,
   tilewidth: 16,
   tileheight: 16,
-  nextlayerid: 10,
+  nextlayerid: 11,
   nextobjectid: nextId,
   layers: [
     tileLayer(1, 'floor', floorData),
@@ -208,6 +221,7 @@ const map = {
     { id: 3, name: 'zones', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: zones },
     { id: 8, name: 'doors', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: doors },
     { id: 9, name: 'furniture', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: furniture },
+    { id: 10, name: 'spots', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: spots },
   ],
   tilesets: [
     {

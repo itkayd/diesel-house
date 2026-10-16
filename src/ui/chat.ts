@@ -42,7 +42,11 @@ export class ChatPanel {
   private openBar: number | null = null;
   private loadToken = 0;
 
-  constructor(private me: () => Me) {
+  // `command`: chat commands like /roll; returns true when it handled the text.
+  constructor(
+    private me: () => Me,
+    private command: (text: string) => boolean = () => false,
+  ) {
     this.button = el('button', 'dh-iconbtn');
     this.button.type = 'button';
     this.button.id = 'chat-button';
@@ -125,6 +129,7 @@ export class ChatPanel {
       const text = input.value.trim();
       if (!text || !this.room) return;
       input.value = '';
+      if (text.startsWith('/') && this.command(text)) return;
       const err = await postMessage(this.room, text, this.me());
       if (err) {
         input.value = text;
@@ -201,6 +206,15 @@ export class ChatPanel {
         list.append(el('div', 'dh-day', dayLabel(when)));
         lastDay = day;
         prev = null;
+      }
+      // Dice rolls: a centred system line ("Sam rolled 2d6: 3 + 5 = 8").
+      if (m.kind === 'roll') {
+        const row = el('div', 'dh-msg roll');
+        row.dataset.message = String(m.id);
+        row.append(icon('dice-5', { width: 14, height: 14 }), document.createTextNode(` ${m.author_name} ${m.text}`));
+        list.append(row);
+        prev = null;
+        continue;
       }
       const cont = !!prev && !!m.author_id && prev.author_id === m.author_id && when.getTime() - new Date(prev.created_at).getTime() < GROUP_MS;
       const row = el('div', 'dh-msg' + (cont ? ' dh-msg--cont' : ''));

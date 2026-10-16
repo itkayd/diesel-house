@@ -36,7 +36,7 @@ const remoteA = () => B.page.evaluate((id) => { const r = window.__house.remotes
 const aPos = () => A.page.evaluate(() => ({ x: Math.round(window.__house.player.x), y: Math.round(window.__house.player.y) }));
 const tj = Date.now(); let r; while (Date.now() - tj < 20000) { r = await remoteA(); if (r?.visible) break; await B.page.waitForTimeout(100); }
 res.push(`info  B first saw A after ${Date.now() - tj} ms (after both channels said 2)`);
-check('B sees A at the spawn with name tag "Alice test"', r, r?.visible && r.name === 'Alice test' && r.x === 48 && r.y === 256);
+check('B sees A at the spawn with name tag "Alice test"', r, r?.visible && r.name === 'Alice test' && r.x === 48 && r.y === 288);
 
 // A walks right for 2s while B samples A's position every frame
 const samples = [];

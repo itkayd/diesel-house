@@ -37,6 +37,11 @@ export class Avatar {
   private emoteImg: Phaser.GameObjects.Image | null = null; // an emote popping over their head
   private emoteTimer: Phaser.Time.TimerEvent | null = null;
   emote: string | null = null; // the emote showing (read by automated checks)
+  private diceImgs: Phaser.GameObjects.Image[] = []; // a dice roll over their head
+  private diceTimer: Phaser.Time.TimerEvent | null = null;
+  dice: number[] | null = null; // the roll showing (read by automated checks)
+  private crownImg: Phaser.GameObjects.Image | null = null; // won a duel: a crown for 30 s
+  private crownTimer: Phaser.Time.TimerEvent | null = null;
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
@@ -248,6 +253,49 @@ export class Avatar {
     });
   }
 
+  // A dice roll lands over their head for 3 s (d6: the pixel dice; other dice: the total in a bubble).
+  showDice(values: number[], sides = 6) {
+    const scene = this.sprite.scene;
+    this.diceTimer?.remove();
+    this.diceImgs.forEach((d) => d.destroy());
+    this.diceImgs = [];
+    this.dice = values;
+    if (sides === 6 && values.length <= 3 && scene.textures.exists('cards')) {
+      this.diceImgs = values.map((v) => scene.add.image(0, 0, 'cards', `die_${v}`).setOrigin(0.5, 1).setScale(11 / 32).setDepth(100003));
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+        for (const d of this.diceImgs) scene.tweens.add({ targets: d, angle: { from: -40, to: 0 }, duration: 260, ease: 'Back.Out' });
+    } else this.say(`rolled ${values.reduce((a, b) => a + b, 0)}`);
+    this.sync();
+    this.diceTimer = scene.time.delayedCall(3000, () => {
+      this.diceImgs.forEach((d) => d.destroy());
+      this.diceImgs = [];
+      this.dice = null;
+    });
+  }
+
+  // Won a duel: a little pixel crown over the name tag (30 s).
+  setCrown(ms: number) {
+    const scene = this.sprite.scene;
+    if (!scene.textures.exists('tag-crown')) {
+      const g = scene.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0x0d0912, 1).fillRect(0, 1, 11, 8);
+      g.fillStyle(0xffd75e, 1).fillRect(1, 4, 9, 4).fillRect(1, 2, 1, 2).fillRect(5, 2, 1, 2).fillRect(9, 2, 1, 2);
+      g.fillStyle(0xff6b6b, 1).fillRect(5, 5, 1, 1);
+      g.generateTexture('tag-crown', 11, 9);
+      g.destroy();
+    }
+    this.crownTimer?.remove();
+    this.crownImg ??= scene.add.image(0, 0, 'tag-crown').setOrigin(0.5, 1).setDepth(100002);
+    this.sync();
+    this.crownTimer = scene.time.delayedCall(ms, () => {
+      this.crownImg?.destroy();
+      this.crownImg = null;
+    });
+  }
+  get crowned() {
+    return !!this.crownImg;
+  }
+
   // Keeps depth sorting, the ring and the name tag in step with the sprite.
   sync() {
     this.sprite.setDepth(this.sprite.y);
@@ -257,6 +305,9 @@ export class Avatar {
     this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
     this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
     this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(this.sprite.y - 1);
+    const top = Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11));
+    this.diceImgs.forEach((d, i) => d.setPosition(Math.round(this.sprite.x + (i - (this.diceImgs.length - 1) / 2) * 12), top).setVisible(this.sprite.visible));
+    this.crownImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 10)).setVisible(this.sprite.visible && !this.radioImg);
     // Above the chat bubble if there is one, else just above the tag (beside the radio).
     this.emoteImg
       ?.setPosition(Math.round(this.sprite.x - (this.radioImg && !this.bubble ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11)))
@@ -296,5 +347,9 @@ export class Avatar {
     this.whisperRing?.destroy();
     this.emoteImg?.destroy();
     this.emoteTimer?.remove();
+    this.diceImgs.forEach((d) => d.destroy());
+    this.diceTimer?.remove();
+    this.crownImg?.destroy();
+    this.crownTimer?.remove();
   }
 }

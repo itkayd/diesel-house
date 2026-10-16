@@ -41,6 +41,13 @@ import {
   Timer,
   Users,
   SmilePlus,
+  Dice5,
+  Zap,
+  ArrowLeft,
+  RotateCcw,
+  Grid3x3,
+  MessagesSquare,
+  ArrowUpDown,
   Swords,
   X,
   type IconNode,
@@ -53,6 +60,7 @@ const ICONS = {
   mic: Mic, 'mic-off': MicOff, moon: Moon, music: Music, send: Send, settings: Settings, sofa: Sofa, 'user-round': UserRound,
   'volume-1': Volume1, 'volume-2': Volume2, 'volume-x': VolumeX, x: X,
   'audio-lines': AudioLines, 'award': Award, 'calendar': Calendar, 'clock': Clock, 'copy': Copy, 'ellipsis': Ellipsis, 'id-card': IdCard, 'info': Info, 'pencil': Pencil, 'play': Play, 'radio': Radio, 'refresh-cw': RefreshCw, 'share-2': Share2, 'speaker': Speaker, 'square': Square, 'ticket': Ticket, 'timer': Timer, 'users': Users, 'smile-plus': SmilePlus, swords: Swords,
+  'dice-5': Dice5, zap: Zap, 'arrow-left': ArrowLeft, 'rotate-ccw': RotateCcw, 'grid-3x3': Grid3x3, 'messages-square': MessagesSquare, 'arrow-up-down': ArrowUpDown,
 } satisfies Record<string, IconNode>;
 export type IconName = keyof typeof ICONS;
 

@@ -180,8 +180,12 @@ export class HouseScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     cam.startFollow(this.player, true, 0.15, 0.15, 0, 16);
-    this.fitCamera();
-    this.scale.on('resize', this.fitCamera, this);
+    this.fitCamera(true);
+    this.scale.on('resize', () => this.fitCamera(), this);
+    // Turning the phone always re-fits (after the browser has settled on the new size).
+    const refit = () => setTimeout(() => this.fitCamera(true), 300);
+    addEventListener('orientationchange', refit);
+    screen.orientation?.addEventListener?.('change', refit);
 
     addProfileButton(() => void this.choose());
     if (!savedShowOwnTag()) this.me.setTagVisible(false);
@@ -760,17 +764,42 @@ export class HouseScene extends Phaser.Scene {
       const k = r.glide.at ? Math.max(0, 1 - (now - r.glide.at) / GLIDE_MS) : 0;
       x += r.glide.dx * k;
       y += r.glide.dy * k;
-      r.avatar.setPosition(x, y);
       const walking = (m.vx !== 0 || m.vy !== 0) && now - m.t < EXTRAPOLATE_MAX;
+      // While walking, never step back against the direction of travel: a correction that lands a little
+      // behind just holds them for a moment until the prediction catches up (no judder).
+      if (walking) {
+        const { x: px, y: py } = r.avatar.sprite;
+        if (m.vx && (x - px) * Math.sign(m.vx) < 0) x = px;
+        if (m.vy && (y - py) * Math.sign(m.vy) < 0) y = py;
+      }
+      r.avatar.setPosition(x, y);
       r.avatar.animate(walking, m.dir);
     }
   }
 
-  // About 19x12 tiles in view, zoom 2-4 (design/game/mvp.html `fit`).
-  private fitCamera() {
+  // About 19x12 tiles in view (design/game/mvp.html `fit`).
+  // Whole-number zoom only (2, 3 or 4: keeps pixels sharp). Phones fire resize when the address bar slides
+  // in or out and when the keyboard opens, so only re-fit when the size really changes (over 20%), never
+  // while typing, or when forced (first time, phone turned). Then re-centre on the player.
+  private fitSize = { w: 0, h: 0 };
+  private fitCamera(force = false) {
     const { width, height } = this.scale;
-    const zoom = Phaser.Math.Clamp(Math.min(width / (19 * TILE_SIZE), height / (12 * TILE_SIZE)), 2, 4);
-    this.cameras.main.setZoom(zoom);
+    if (!force) {
+      const typing = document.activeElement instanceof HTMLElement && !!document.activeElement.closest('input, textarea, select');
+      if (typing) return;
+      const changed = (a: number, b: number) => !b || Math.abs(a - b) / b > 0.2;
+      if (!changed(width, this.fitSize.w) && !changed(height, this.fitSize.h)) return;
+    }
+    this.fitSize = { w: width, h: height };
+    const cam = this.cameras.main;
+    const zoom = Phaser.Math.Clamp(Math.floor(Math.min(width / (19 * TILE_SIZE), height / (12 * TILE_SIZE))), 2, 4);
+    if (zoom !== cam.zoom) cam.setZoom(zoom);
+    if (this.player) cam.centerOn(this.player.x, this.player.y);
+  }
+
+  // Used by automated checks.
+  get cameraZoom() {
+    return this.cameras.main.zoom;
   }
 
 

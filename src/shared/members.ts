@@ -6,6 +6,7 @@
 export const NAME_MIN = 1;
 export const NAME_MAX = 24;
 export const PASSWORD_MIN = 8;
+export const MAX_MEMBERS = 8; // the house has 8 rooms, one per friend
 const DOMAIN = 'members.diesel-house.invalid';
 
 export const cleanName = (name: string) => name.trim().replace(/\s+/g, ' ');
@@ -28,3 +29,6 @@ export function makeCode(random: (n: number) => number) {
   return `${letters}-${digits}`;
 }
 export const normaliseCode = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, '');
+// Codes Diesel already has and types in on the door list: any four letters then four digits.
+export const isCodeShape = (code: string) => /^[A-Z]{4}[0-9]{4}$/.test(normaliseCode(code));
+export const showCode = (code: string) => normaliseCode(code).replace(/^(.{4})/, '$1-');

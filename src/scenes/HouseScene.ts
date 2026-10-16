@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ROOM_IDS, TILE_SIZE, type RoomId, type Zone } from '../config';
-import type { Dir } from '../characters';
+import { GUEST_CHARACTERS, guestCharacter, type Dir } from '../characters';
 // Presence and Voice (and the Supabase client behind them) load after the picker; see start().
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { installAudioUnlock } from '../net/audio';
@@ -133,7 +133,9 @@ export class HouseScene extends Phaser.Scene {
 
     // Sprite position is the character's feet; the physics body is a small box around them.
     const spawn = map.findObject('zones', (o) => o.name === 'spawn')!;
-    const saved = savedCharacter();
+    const isGuest = !!currentUser()?.guest;
+    const remembered = savedCharacter();
+    const saved = isGuest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered; // guests: 2 choices
     const name = savedName();
     this.character = saved ?? 0;
     this.name = name ?? '';
@@ -262,7 +264,10 @@ export class HouseScene extends Phaser.Scene {
   private async choose() {
     this.canMove = false;
     this.body.setVelocity(0, 0);
-    const choice = await pickCharacter(this.textures, savedCharacter(), savedName());
+    const guest = !!currentUser()?.guest;
+    const remembered = savedCharacter();
+    const current = guest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered;
+    const choice = await pickCharacter(this.textures, current, savedName(), undefined, guest ? GUEST_CHARACTERS : undefined);
     if (!choice) {
       this.canMove = true; // closed without changes
       return;
@@ -563,6 +568,7 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private addRemote(p: PlayerInfo) {
+    if (p.guest) p = { ...p, character: guestCharacter(p.character) };
     const avatar = new Avatar(this, 0, 0, p.character, p.name);
     avatar.setVisible(false); // shown once we know where they are
     avatar.setGuest(!!p.guest);
@@ -606,6 +612,7 @@ export class HouseScene extends Phaser.Scene {
   private updateRemote(p: PlayerInfo) {
     const r = this.remotes.get(p.id);
     if (!r) return;
+    if (p.guest) p = { ...p, character: guestCharacter(p.character) };
     if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
     if (r.info.name !== p.name) r.avatar.setName(p.name);
     r.avatar.setGuest(!!p.guest);

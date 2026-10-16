@@ -7,6 +7,10 @@ export const CHARACTER_COUNT = 20; // 16 finalbossblues chibis (0-15) + 4 LimeZu
 
 const LIMEZU = ['adam', 'alex', 'amelia', 'bob'];
 
+// Guests choose from two characters only: LimeZu Adam (male) and Amelia (female). Members have all 20.
+export const GUEST_CHARACTERS = [16, 18];
+export const guestCharacter = (index: number) => (GUEST_CHARACTERS.includes(index) ? index : GUEST_CHARACTERS[0]);
+
 // Frame source for one character: which texture + frame for each walk step and the idle pose.
 type CharFrames = {
   walk: Record<Dir, { key: string; frame: number }[]>;

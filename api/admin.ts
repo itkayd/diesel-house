@@ -1,10 +1,10 @@
 // Vercel function: POST /api/admin, used by admin.html (Diesel's door list) only.
-// Makes single-use invite codes, lists members, resets forgotten passwords, removes members.
+// Makes single-use invite codes (or adds codes Diesel already has), lists members, resets forgotten passwords, removes members.
 // Protected by ADMIN_PASSCODE; uses the server-side secret key (never sent to a browser).
-import { isMemberLogin, PASSWORD_MIN } from '../src/shared/members';
+import { isCodeShape, isMemberLogin, PASSWORD_MIN, showCode } from '../src/shared/members';
 import { adminDb, hashCode, json, newCode, same, slowDown, type Env } from './_server';
 
-type Body = { passcode?: string; action?: string; label?: string; id?: number; userId?: string; password?: string };
+type Body = { passcode?: string; action?: string; label?: string; id?: number; userId?: string; password?: string; codes?: { code?: string; label?: string }[] };
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
@@ -38,6 +38,26 @@ export async function handle(request: Request, env: Env): Promise<Response> {
         .map((u) => ({ id: u.id, name: names.get(u.id) ?? String(u.user_metadata?.display_name ?? '?'), joined: u.created_at, lastSeen: u.last_sign_in_at ?? null }));
       const guests = users.data.users.filter((u) => u.is_anonymous).length;
       return json({ codes: (codes.data ?? []).map((c) => ({ ...c, usedByName: c.used_by ? (names.get(c.used_by) ?? null) : null })), members, guests });
+    }
+
+    // Codes Diesel already has (e.g. one per friend): stored like made ones (only a fingerprint is kept).
+    case 'add-codes': {
+      const list = (body.codes ?? []).slice(0, 20);
+      const results: { code: string; label: string | null; ok: boolean; problem?: string }[] = [];
+      for (const { code = '', label } of list) {
+        const name = label?.trim().slice(0, 40) || null;
+        if (!isCodeShape(code)) {
+          results.push({ code: code.trim(), label: name, ok: false, problem: 'needs four letters then four numbers, like ABCD-1234' });
+          continue;
+        }
+        const r = await db.from('invite_codes').insert({ code_hash: hashCode(code), label: name });
+        results.push(
+          r.error
+            ? { code: showCode(code), label: name, ok: false, problem: r.error.code === '23505' ? 'already added (or used before)' : r.error.message }
+            : { code: showCode(code), label: name, ok: true },
+        );
+      }
+      return json({ results });
     }
 
     case 'make-code': {

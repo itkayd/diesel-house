@@ -37,9 +37,10 @@ export function pickCharacter(
   current: number | null,
   currentName: string | null,
   canClose = current !== null && currentName !== null,
+  choices: number[] = Array.from({ length: CHARACTER_COUNT }, (_, i) => i), // guests get GUEST_CHARACTERS
 ): Promise<{ character: number; name: string } | null> {
   return new Promise((resolve) => {
-    let selected = current;
+    let selected = current !== null && choices.includes(current) ? current : null;
     let raf = 0;
     const { panel, scrim } = openModal('picker', { dismissable: canClose, onDismiss: () => finish(null, false), label: 'picker-title' });
 
@@ -76,18 +77,19 @@ export function pickCharacter(
     grid.setAttribute('aria-labelledby', 'picker-characters');
     const buttons: HTMLButtonElement[] = [];
     const canvases: HTMLCanvasElement[] = [];
-    for (let i = 0; i < CHARACTER_COUNT; i++) {
+    for (const i of choices) {
       const b = el('button', 'dh-pick');
       b.type = 'button';
       b.setAttribute('role', 'radio');
       b.setAttribute('aria-label', `Character ${i + 1}`);
+      const at = buttons.length;
       b.setAttribute('aria-checked', 'false');
       b.dataset.character = String(i);
       const c = portrait(textures, i);
-      canvases.push(c);
+      canvases[i] = c;
       b.appendChild(c);
       b.addEventListener('click', () => select(i));
-      buttons.push(b);
+      buttons[at] = b;
       grid.appendChild(b);
     }
 
@@ -117,8 +119,8 @@ export function pickCharacter(
         drawFrame(canvases[selected], textures, key, frame);
       }
       selected = i;
-      buttons.forEach((b, j) => b.setAttribute('aria-checked', String(j === i)));
-      buttons[i].scrollIntoView?.({ block: 'nearest' });
+      buttons.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.character === String(i))));
+      buttons[choices.indexOf(i)].scrollIntoView?.({ block: 'nearest' });
     }
     if (selected !== null) select(selected);
 

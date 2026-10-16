@@ -33,13 +33,13 @@ Console → **Account → API keys & tokens → Create API key** (type: Standard
 4. **Deploy**. Every push to GitHub redeploys automatically.
 
 ## 4. Let your friends in
-1. Open `https://<your-site>/admin.html`, type your `ADMIN_PASSCODE`.
-2. **Make an invite code** for each friend; send it to them however you like.
-3. They open the site → **I have an invite** → code, name, password. From then on they sign in with name + password on any device.
-4. On a phone: Share → **Add to Home Screen** (iPhone) or ⋮ → **Install app** (Android) and it opens full-screen like an app.
+1. **First remove the test members** Tester and Visitor on the door list (**Remove** next to each). The house allows 8 accounts in total, so they'd take two places.
+2. Open , type your .
+3. Under **Add codes you already have**, paste your 8 codes, one per line, with who each is for: . (Or tap **Make an invite code** to have one made for you.)
+4. Send each friend their code. They open the site → **Join the house** → code, name, password. The code then belongs to them and stops working for anyone else; from then on they sign in with name + password on any device.
+5. On a phone: Share → **Add to Home Screen** (iPhone) or ⋮ → **Install app** (Android) and it opens full-screen like an app.
 
-## 5. Tidy up the test accounts
-Two test members, **Tester** and **Visitor**, were made while building. Remove them on the door list (**Remove** next to each), which frees Room 1 too.
+Guests: each friend has their own guest code in **Settings → Your guests**. Guests can't make an account or invite anyone, choose from two characters (Adam or Amelia), show as "friend of …", and can talk and chat in rooms whose door lets them in.
 
 ## Checking a build on your computer first
 ```powershell

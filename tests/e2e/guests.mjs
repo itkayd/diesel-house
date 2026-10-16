@@ -68,13 +68,15 @@ if (!picker) {
   process.exit(1);
 }
 if (picker) {
+  G.choices = await G.page.$$eval('button[data-character]', (bs) => bs.map((b) => Number(b.dataset.character)));
   await G.page.fill('#player-name', G.name);
-  await G.page.click('button[data-character="3"]');
+  await G.page.click('button[data-character="18"]');
   await G.page.click('#picker-done');
 }
 await G.page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 }).catch(() => {});
 G.id = await G.page.evaluate(() => window.__house?.presence?.id);
 check('a guest gets in with the code', { picker, joined: !!G.id }, picker && !!G.id);
+check('guests choose from 2 characters only (Adam, Amelia)', { choices: G.choices }, JSON.stringify(G.choices) === '[16,18]');
 
 // Visitor (another member) sees "Sam test · friend of Tester" over the guest's head.
 const B = await signIn(B_);
@@ -87,14 +89,21 @@ const settingsLine = await G.page.evaluate(async () => {
   document.getElementById('settings-button').click();
   await new Promise((r) => setTimeout(r, 300));
   const t = [...document.querySelectorAll('.dh-lede')].map((e) => e.textContent).find((t) => /Visiting/.test(t));
+  window.__guestCanInvite = !!document.querySelector('#guest-code, #make-guest-code, #open-house-switch, #open-house');
   document.getElementById('settings-close')?.click();
   return t;
 });
+const canInvite = await G.page.evaluate(() => window.__guestCanInvite);
+check('guests have no invite code to share (they cannot invite anyone)', { canInvite }, canInvite === false);
 check("the guest's own settings say whose friend they are", { settingsLine }, settingsLine === `Visiting as ${A_[0]}'s friend (${G.name})`);
 
-// In chat too.
+// Guest and Visitor in room 2 (open door): they can talk.
 await tp(G, ...ROOM2);
 await tp(B, ...ROOM2);
+const talking = await B.page
+  .waitForFunction((id) => window.__house.voice.debug().some((p) => p.id === id && p.state === 'connected'), G.id, { timeout: 20000 })
+  .then(() => true, () => false);
+check('a guest and a member in the same room are connected by voice', { talking }, talking);
 await G.page.waitForSelector('#chat-button:not([hidden])', { timeout: 8000 });
 await G.page.click('#chat-button');
 await G.page.fill('#chat-input', 'hello from a guest');

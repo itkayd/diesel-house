@@ -142,6 +142,61 @@ async function load() {
   });
   root.append(section('Invite a friend', el('p', 'dh-lede', 'Each code makes one account. Friends pick their own name and password.'), make, out));
 
+  // Codes you already have: one per line, optionally with who it's for ("Sami: ABCD-1234").
+  const add = el('form');
+  add.id = 'add-codes';
+  add.style.cssText = 'display:grid;gap:10px';
+  const lines = el('textarea', 'dh-input');
+  lines.id = 'codes-to-add';
+  lines.rows = 8;
+  lines.placeholder = 'Sami: ABCD-1234\nLayla: EFGH-5678';
+  lines.setAttribute('aria-label', 'Codes to add, one per line');
+  lines.style.cssText = 'font-family:var(--font-display);resize:vertical;min-height:120px';
+  const addGo = el('button', 'dh-btn', 'Add these codes');
+  addGo.type = 'submit';
+  const added = el('div');
+  added.id = 'codes-added';
+  added.style.cssText = 'display:grid;gap:4px';
+  add.append(lines, addGo, added);
+  add.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const codes = lines.value
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const m = l.match(/([A-Za-z]{4})[\s-]?(\d{4})/);
+        if (!m) return { code: l, label: '' };
+        const label = (l.slice(0, m.index) + l.slice(m.index! + m[0].length)).replace(/^[\s:=,–-]+|[\s:=,–-]+$/g, '');
+        return { code: `${m[1]}-${m[2]}`, label };
+      });
+    if (!codes.length) return;
+    addGo.disabled = true;
+    try {
+      const { results } = await api<{ results: { code: string; label: string | null; ok: boolean; problem?: string }[] }>('add-codes', { codes });
+      added.replaceChildren(
+        ...results.map((r) => {
+          const p = el('p', r.ok ? 'dh-lede' : 'dh-error', `${r.ok ? '✓' : '✗'} ${r.label ? r.label + ': ' : ''}${r.code}${r.ok ? ' added' : ' – ' + r.problem}`);
+          p.style.margin = '0';
+          return p;
+        }),
+      );
+      lines.value = results.filter((r) => !r.ok).map((r) => (r.label ? `${r.label}: ${r.code}` : r.code)).join('\n');
+      void refreshLists();
+    } catch (err) {
+      added.replaceChildren(el('p', 'dh-error', (err as Error).message));
+    } finally {
+      addGo.disabled = false;
+    }
+  });
+  root.append(
+    section(
+      'Add codes you already have',
+      el('p', 'dh-lede', 'One per line, four letters then four numbers. Put who it is for in front if you like. Each works once, for one friend.'),
+      add,
+    ),
+  );
+
   const lists = el('div');
   lists.style.cssText = 'display:grid;gap:24px';
   root.append(lists);

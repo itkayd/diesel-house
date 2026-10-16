@@ -15,7 +15,7 @@ import { addSoundSettings, loadSounds, play } from '../ui/sounds';
 import { ChatPanel } from '../ui/chat';
 import type { Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
-import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
+import { setNetBadge, setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
 import { addGuestSettings } from '../ui/guestSettings';
 import { el } from '../ui/modal';
@@ -34,6 +34,7 @@ import { showSoundBanner } from '../ui/soundBanner';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 import { HouseLook } from './houseLook';
+import { net } from '../net/netQuality';
 import { reloadForUpdate } from '../ui/update';
 
 const SPEED = 80; // px per second
@@ -46,7 +47,7 @@ const IDLE_RESEND = 15_000;
 const EXTRAPOLATE_MAX = 750; // ms past the last message we keep walking someone forward (then wait for news)
 const SNAP_OVER = 24; // px: corrections bigger than this jump; smaller ones glide
 const GLIDE_MS = 150; // ms to glide out a small correction
-const STALE_AFTER = 40_000; // ms without any message before someone is hidden (locked phone, closed tab)
+const STALE_AFTER = 30_000; // ms without any message before someone is hidden (locked phone, closed tab)
 const JOIN_VOICE_AFTER = 300; // ms standing in a room before joining its voice (avoids flapping in doorways)
 
 type ZoneRect = { name: Zone; rect: Phaser.Geom.Rectangle };
@@ -92,7 +93,7 @@ export class HouseScene extends Phaser.Scene {
   private voiceControls: VoiceControls | null = null;
   private voiceTimer: Phaser.Time.TimerEvent | null = null;
   private starting = false;
-  private presenceState: 'connecting' | 'online' | 'offline' = 'connecting';
+  private presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
   private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
   private rooms = new Map<RoomId, Room>();
@@ -263,12 +264,23 @@ export class HouseScene extends Phaser.Scene {
   }
 
   // Why you might not hear someone in your room: shown on their name tag.
+  // In a room, everyone's tag shows their mic: green = on, red crossed = muted or no mic, amber crossed =
+  // mic not working (plus the words, since that one needs explaining). Connection bars show everywhere.
   private showMicNote(id: string) {
     const r = this.remotes.get(id);
     if (!r) return;
     const inRoom = !!r.info.zone && r.info.zone !== 'hallway';
-    const notes = { off: 'mic off', muted: 'muted', silent: 'mic not working' } as const;
-    r.avatar.setNote(inRoom && r.info.mic && r.info.mic !== 'on' ? notes[r.info.mic] : null);
+    const mic = r.info.mic;
+    r.avatar.setMic(!inRoom || !mic ? null : mic === 'on' ? 'on' : mic === 'silent' ? 'warn' : 'off');
+    r.avatar.setNote(inRoom && mic === 'silent' ? 'mic not working' : null);
+    r.avatar.setNet(r.info.net ?? null);
+  }
+
+  // Our own tag: the same mic icon (in a room) and our connection bars.
+  private showMyMic() {
+    const inRoom = !!this.zone && this.zone !== 'hallway' && !!this.voice?.room;
+    const s = this.voice?.micState;
+    this.me.setMic(!inRoom || !s ? null : s === 'on' ? 'on' : s === 'silent' ? 'warn' : 'off');
   }
 
   // Our mic is on but gives only silence (another app has it, usually): tell them, offer to try again.
@@ -342,6 +354,16 @@ export class HouseScene extends Phaser.Scene {
         onInfo: (p) => this.updateRemote(p),
         onMove: (m) => this.receiveMove(m),
         onStatus: (s) => this.showPresenceStatus(s),
+        onSyncRequest: () => this.sendMove(true),
+        onReconnected: () => {
+          this.sendMove(true); // so everyone sees us again straight away
+          // Voice may have died with the socket: rejoin the room we're in.
+          const room = this.voice?.room;
+          if (room) {
+            this.voice!.leave();
+            void this.voice!.join(room);
+          }
+        },
         onRoomChange: (room) => void this.roomChanged(room),
         onDoor: (m) => void this.doorMessage(m),
         onChat: (e) => {
@@ -358,6 +380,12 @@ export class HouseScene extends Phaser.Scene {
       { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
     );
     this.presence.connect();
+    net.start();
+    net.onChange((q) => {
+      this.presence?.update({ net: q });
+      this.me.setNet(q);
+      setNetBadge(q);
+    });
 
     const forceRelay = import.meta.env.DEV && new URLSearchParams(location.search).has('relay'); // test TURN on its own
     this.voice = new Voice(
@@ -366,6 +394,7 @@ export class HouseScene extends Phaser.Scene {
         onSpeaking: (id, on) => (id === this.presence!.id ? this.me : this.remotes.get(id)?.avatar)?.setSpeaking(on),
         onStatus: (s) => {
           this.voiceControls?.show(s);
+          this.showMyMic();
           // Tried to use the mic and it failed: say so once, so nobody talks without being heard.
           const problem = this.voice?.micProblem;
           if (s.state === 'in-room' && s.mic === 'blocked' && problem && problem !== 'declined' && !this.micWarned) {
@@ -378,6 +407,7 @@ export class HouseScene extends Phaser.Scene {
         volumeFor: (id) => savedVolume(id),
         onMicState: (s) => {
           this.presence?.update({ mic: s });
+          this.showMyMic();
           if (s === 'silent') this.warnSilentMic();
         },
       },
@@ -441,10 +471,11 @@ export class HouseScene extends Phaser.Scene {
     this.voiceTimer = this.time.delayedCall(JOIN_VOICE_AFTER, () => void this.voice!.join(room));
   }
 
-  private showPresenceStatus(s: 'connecting' | 'online' | 'offline') {
+  private showPresenceStatus(s: 'connecting' | 'reconnecting' | 'online' | 'offline') {
     this.presenceState = s;
     this.refreshRooms();
     if (s === 'connecting') showWhere(this.zone, 'Connecting…', 'warn');
+    else if (s === 'reconnecting') showWhere(this.zone, 'Reconnecting…', 'warn');
     else if (s === 'offline') showWhere(this.zone, 'Offline', 'off');
     else if (this.zone && this.zone !== 'hallway') showWhere(this.zone, `${this.countIn(this.zone)} here`, 'ok');
     else showWhere(this.zone, `${this.activeCount()} in the house`, 'ok');

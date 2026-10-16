@@ -1,4 +1,5 @@
 import type { Zone } from '../config';
+import { NET_LABEL, type NetQuality } from '../net/netQuality';
 import { icon, MOODS, type Mood } from './icons';
 
 // HUD, as in design/game/mvp.html:
@@ -53,6 +54,45 @@ export function setRoomInfo(f: (zone: Zone) => RoomInfo) {
 }
 export const zoneLabel = (zone: Zone | null) => (zone ? roomInfo(zone).name : '');
 
+// Connection bars in the where-am-I pill (Poor / Strong / Super strong), kept across pill redraws.
+let netBadge: NetQuality | null = null;
+function netBars(q: NetQuality) {
+  const colour = q === 'super' ? 'var(--ok)' : q === 'strong' ? 'var(--lamp)' : 'var(--error)';
+  const lit = q === 'super' ? 3 : q === 'strong' ? 2 : 1;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 5 7');
+  svg.setAttribute('width', '10');
+  svg.setAttribute('height', '14');
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  [3, 5, 7].forEach((h, i) => {
+    const r = document.createElementNS(ns, 'rect');
+    r.setAttribute('x', String(i * 2));
+    r.setAttribute('y', String(7 - h));
+    r.setAttribute('width', '1');
+    r.setAttribute('height', String(h));
+    r.setAttribute('fill', i < lit ? colour : 'var(--faint)');
+    svg.append(r);
+  });
+  const box = document.createElement('span');
+  box.id = 'net';
+  box.dataset.net = q;
+  box.title = `Your connection: ${NET_LABEL[q]}`;
+  box.setAttribute('aria-label', box.title);
+  box.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:8px';
+  const label = document.createElement('span');
+  label.className = 'dh-sub';
+  label.textContent = NET_LABEL[q];
+  box.append(svg, label);
+  return box;
+}
+export function setNetBadge(q: NetQuality) {
+  netBadge = q;
+  const old = document.getElementById('net');
+  if (old) old.replaceWith(netBars(q));
+  else document.getElementById('status')?.after(netBars(q));
+}
+
 // The where-am-I pill. `sub` is the head count ("4 in the house" / "2 here") or "Connecting…"/"Offline".
 export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' | 'off') {
   const { pill } = build();
@@ -80,5 +120,6 @@ export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' |
   }
   status.append(sub);
   parts.push(status);
+  if (netBadge) parts.push(netBars(netBadge));
   pill.replaceChildren(...parts);
 }

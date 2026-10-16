@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { animKey, type Dir } from '../characters';
+import type { NetQuality } from '../net/netQuality';
+import { makeTagIcons, micKey, netKey, type MicIcon } from './tagIcons';
 
 const PANEL = 0x2b2034;
 const EDGE = 0x0d0912;
@@ -24,6 +26,10 @@ export class Avatar {
   private name: string;
   private guest = false;
   private host: string | null = null;
+  private micImg: Phaser.GameObjects.Image;
+  private netImg: Phaser.GameObjects.Image;
+  mic: MicIcon | null = null; // shown on the tag (read by automated checks)
+  net: NetQuality | null = null;
   private note: string | null = null; // e.g. "mic off", when others can't hear them
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
@@ -53,18 +59,49 @@ export class Avatar {
       .setOrigin(0.5, 1)
       .setResolution(8);
     this.tagBg = scene.add.graphics();
-    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText]).setDepth(100000);
+    makeTagIcons(scene);
+    this.micImg = scene.add.image(0, 0, micKey('on')).setOrigin(0, 1).setVisible(false);
+    this.netImg = scene.add.image(0, 0, netKey('super')).setOrigin(0, 1).setVisible(false);
+    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.micImg, this.netImg]).setDepth(100000);
     this.drawTagBg();
     this.animate(false);
   }
 
+  // [name  mic  bars] — icons only when there's something to show.
   private drawTagBg() {
-    const w = Math.ceil(this.tagText.width) + 6;
-    const h = Math.ceil(this.tagText.height) + 2;
+    const text = Math.ceil(this.tagText.width);
+    const icons = [this.micImg, this.netImg].filter((i) => i.visible);
+    const iconsW = icons.reduce((sum, i) => sum + i.width + 2, 0);
+    const w = text + 6 + iconsW;
+    const h = Math.max(Math.ceil(this.tagText.height), 8) + 2;
     this.tagBg.clear();
     this.tagBg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
     this.tagBg.fillStyle(PANEL, 0.92).fillRect(-w / 2, -h, w, h);
-    this.tagText.setPosition(0, -1);
+    const left = -w / 2 + 3;
+    this.tagText.setPosition(Math.round(left + text / 2), -1);
+    let x = left + text + 2;
+    for (const i of icons) {
+      i.setPosition(Math.round(x), -2);
+      x += i.width + 2;
+    }
+  }
+
+  // Mic icon: on (green), off/muted (red, crossed), not working (amber, crossed). Null hides it.
+  setMic(m: MicIcon | null) {
+    if (m === this.mic) return;
+    this.mic = m;
+    if (m) this.micImg.setTexture(micKey(m));
+    this.micImg.setVisible(!!m);
+    this.drawTagBg();
+  }
+
+  // Connection bars: poor (1 red), strong (2 amber), super strong (3 green). Null hides them.
+  setNet(q: NetQuality | null) {
+    if (q === this.net) return;
+    this.net = q;
+    if (q) this.netImg.setTexture(netKey(q));
+    this.netImg.setVisible(!!q);
+    this.drawTagBg();
   }
 
   setCharacter(index: number) {

@@ -3,12 +3,13 @@ import type { Dir } from '../characters';
 import type { RoomId, Zone } from '../config';
 import type { Room } from './rooms';
 import { devTest } from './mode';
-import { countMessage } from './stats';
+import type { NetQuality } from './netQuality';
+import { countMessage, countReconnect } from './stats';
 import { supabase } from './supabase';
 
 // Who someone is (shared via Realtime presence; changes rarely). `id` is their account id.
 // `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
-export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent' };
+export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -26,7 +27,11 @@ type Handlers = {
   onLeave: (id: string) => void;
   onInfo: (p: PlayerInfo) => void;
   onMove: (m: MoveMsg) => void;
-  onStatus: (status: 'connecting' | 'online' | 'offline') => void;
+  onStatus: (status: 'connecting' | 'reconnecting' | 'online' | 'offline') => void;
+  // Someone asked everyone for a fresh position (they just reconnected): send ours once.
+  onSyncRequest: () => void;
+  // The house connection was rebuilt (after a phone slept, say): rejoin voice.
+  onReconnected: () => void;
   onRoomChange: (room: Room) => void;
   onDoor: (m: DoorMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
@@ -43,6 +48,8 @@ const CHANNEL = 'house';
 const TRACK_EVERY_MS = 2000;
 // If the channel drops (rate limit, network, phone asleep) and doesn't come back by itself, start again.
 const RECONNECT_MS = [2000, 5000, 10000, 20000, 30000];
+// Back from the background (or the network) after this long, or nothing heard for this long: rebuild.
+const STALE_MS = 10_000;
 
 export class Presence {
   private channel: RealtimeChannel | null = null;
@@ -54,6 +61,11 @@ export class Presence {
   private trackTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private failures = 0;
+  private hiddenAt = 0;
+  private lastHeard = Date.now(); // anything received on the house channel
+  private rebuilding = false;
+  private lastRebuild = 0;
+  private watching = false;
 
   constructor(
     readonly id: string,
@@ -70,11 +82,18 @@ export class Presence {
       this.h.onStatus('offline');
       return;
     }
-    this.h.onStatus('connecting');
+    this.h.onStatus(this.rebuilding ? 'reconnecting' : 'connecting');
+    this.watchResume();
     // Private: only signed-in people on the guest list may join (see supabase/migrations/*_realtime_auth.sql).
     const ch = supabase.channel(CHANNEL, { config: { private: !devTest, broadcast: { self: false }, presence: { key: this.id } } });
+    ch.on('broadcast', { event: 'sync' }, () => {
+      countMessage('received', 'sync');
+      this.lastHeard = Date.now();
+      if (!this.replaced) this.h.onSyncRequest();
+    });
     ch.on('broadcast', { event: 'move' }, ({ payload }) => {
       countMessage('received', 'move');
+      this.lastHeard = Date.now();
       if (this.replaced) return;
       const m = payload as MoveMsg;
       // Dev-only: ?lag=200 delays incoming movement (with jitter) to check smoothing on slow links.
@@ -86,7 +105,10 @@ export class Presence {
       const m = payload as DoorMsg;
       if (m.to === this.id && !this.replaced) this.h.onDoor(m);
     });
-    ch.on('presence', { event: 'sync' }, () => this.sync());
+    ch.on('presence', { event: 'sync' }, () => {
+      this.lastHeard = Date.now();
+      this.sync();
+    });
     ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, ({ new: row }) => this.h.onRoomChange(row as Room));
     for (const table of ['messages', 'reactions'] as const)
       ch.on('postgres_changes', { event: '*', schema: 'public', table }, (p) => {
@@ -97,9 +119,15 @@ export class Presence {
       if (this.channel !== ch) return; // an old channel we replaced
       if (status === 'SUBSCRIBED') {
         this.failures = 0;
+        this.lastHeard = Date.now();
         this.h.onStatus('online');
         this.lastTrack = 0;
         this.announce(); // also re-announces us after a dropped connection rejoins
+        if (this.rebuilding) {
+          this.rebuilding = false;
+          this.requestSync(); // everyone sends their position once, so we see them straight away
+          this.h.onReconnected();
+        }
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         if (err) console.warn('House channel:', status, err.message);
         this.h.onStatus('offline');
@@ -135,8 +163,58 @@ export class Presence {
       if (this.channel !== ch || ch.state === 'joined') return;
       this.channel = null;
       void supabase?.removeChannel(ch);
+      this.rebuilding = true;
+      countReconnect();
       this.connect();
     }, delay);
+  }
+
+  // Phones pause background tabs and drop their sockets. When we come back (tab visible again, page
+  // restored, network back), check the connection; if it's dead or we were away long enough for it to
+  // go stale, rebuild it. Never ask anyone to reload.
+  private watchResume() {
+    if (this.watching) return;
+    this.watching = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.hiddenAt = Date.now();
+      else this.resume(false);
+    });
+    addEventListener('pageshow', (e) => (e as PageTransitionEvent).persisted && this.resume(true));
+    addEventListener('online', () => this.resume(true));
+  }
+
+  resume(force: boolean) {
+    const away = this.hiddenAt ? Date.now() - this.hiddenAt : 0;
+    this.hiddenAt = 0;
+    const ch = this.channel;
+    const dead = !ch || ch.state !== 'joined' || !supabase?.realtime.isConnected();
+    // Stale: away a while and nothing has arrived since (a sleeping phone's socket is usually dead).
+    const stale = away > STALE_MS && Date.now() - this.lastHeard > STALE_MS;
+    if (force || dead || stale) this.rebuild();
+    else if (away > 2000) this.requestSync();
+  }
+
+  // Throw the house channel away and join again (resubscribe, re-announce, ask for positions, rejoin voice).
+  rebuild() {
+    // Not twice at once (visibilitychange and pageshow can both fire on waking).
+    if (Date.now() - this.lastRebuild < 3000) return;
+    this.lastRebuild = Date.now();
+    this.rebuilding = true;
+    countReconnect();
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    const old = this.channel;
+    this.channel = null;
+    if (old) void supabase?.removeChannel(old);
+    supabase?.realtime.connect(); // reopens the socket if the phone's sleep closed it
+    this.connect();
+  }
+
+  // Ask everyone for their current position (each replies once with a move message).
+  requestSync() {
+    if (this.channel?.state !== 'joined') return;
+    countMessage('sent', 'sync');
+    void this.channel.send({ type: 'broadcast', event: 'sync', payload: { from: this.id } });
   }
 
   // Diff presence state against what we knew, and report joins/leaves/changes.
@@ -155,12 +233,12 @@ export class Presence {
         continue;
       }
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
-      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic };
+      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);
       if (!old) this.h.onJoin(p);
-      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic) this.h.onInfo(p);
+      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic || old.net !== p.net) this.h.onInfo(p);
     }
     for (const id of [...this.known.keys()]) {
       if (!seen.has(id)) {

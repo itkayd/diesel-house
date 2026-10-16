@@ -12,7 +12,14 @@ export function countMessage(dir: Dir, kind: string) {
   totals[`${dir}:${kind}`] = (totals[`${dir}:${kind}`] ?? 0) + 1;
 }
 
+let reconnects = 0;
+export const countReconnect = () => void reconnects++;
+
 export const msgStats = {
+  // Times the house connection was rebuilt (phone woke up, network came back, channel dropped).
+  get reconnects() {
+    return reconnects;
+  },
   // Messages in the last minute.
   get lastMinute() {
     const since = Date.now() - 60_000;

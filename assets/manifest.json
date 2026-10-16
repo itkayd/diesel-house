@@ -154,5 +154,152 @@
       "characterIndex": 19,
       "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
     }
-  ]
+  ],
+  "sfx": {
+    "knock": {
+      "files": [
+        "public/assets/sfx/knock.ogg",
+        "public/assets/sfx/knock.mp3"
+      ],
+      "seconds": 0.36,
+      "source": "Kenney · RPG Audio (CC0): Audio/bookPlace1.ogg (twice, knock knock)"
+    },
+    "doorbell": {
+      "files": [
+        "public/assets/sfx/doorbell.ogg",
+        "public/assets/sfx/doorbell.mp3"
+      ],
+      "seconds": 0.37,
+      "source": "Kenney · Digital Audio (CC0): Audio/twoTone1.ogg"
+    },
+    "door_open": {
+      "files": [
+        "public/assets/sfx/door_open.ogg",
+        "public/assets/sfx/door_open.mp3"
+      ],
+      "seconds": 0.91,
+      "source": "Kenney · RPG Audio (CC0): Audio/doorOpen_1.ogg"
+    },
+    "join": {
+      "files": [
+        "public/assets/sfx/join.ogg",
+        "public/assets/sfx/join.mp3"
+      ],
+      "seconds": 0.21,
+      "source": "Kenney · Interface Sounds (CC0): Audio/maximize_003.ogg"
+    },
+    "leave": {
+      "files": [
+        "public/assets/sfx/leave.ogg",
+        "public/assets/sfx/leave.mp3"
+      ],
+      "seconds": 0.21,
+      "source": "Kenney · Interface Sounds (CC0): Audio/minimize_003.ogg"
+    },
+    "footstep": {
+      "files": [
+        "public/assets/sfx/footstep.ogg",
+        "public/assets/sfx/footstep.mp3"
+      ],
+      "seconds": 0.22,
+      "source": "Kenney · RPG Audio (CC0): Audio/footstep00.ogg"
+    },
+    "footstep2": {
+      "files": [
+        "public/assets/sfx/footstep2.ogg",
+        "public/assets/sfx/footstep2.mp3"
+      ],
+      "seconds": 0.26,
+      "source": "Kenney · RPG Audio (CC0): Audio/footstep01.ogg"
+    },
+    "click": {
+      "files": [
+        "public/assets/sfx/click.ogg",
+        "public/assets/sfx/click.mp3"
+      ],
+      "seconds": 0.06,
+      "source": "Kenney · Interface Sounds (CC0): Audio/click_002.ogg"
+    },
+    "confirm": {
+      "files": [
+        "public/assets/sfx/confirm.ogg",
+        "public/assets/sfx/confirm.mp3"
+      ],
+      "seconds": 0.53,
+      "source": "Kenney · Interface Sounds (CC0): Audio/confirmation_002.ogg"
+    },
+    "error": {
+      "files": [
+        "public/assets/sfx/error.ogg",
+        "public/assets/sfx/error.mp3"
+      ],
+      "seconds": 0.33,
+      "source": "Juhani Junkala · The Essential Retro Video Game Sound Effects Collection (CC0): General Sounds/Negative Sounds/sfx_sounds_error1.wav"
+    },
+    "levelup": {
+      "files": [
+        "public/assets/sfx/levelup.ogg",
+        "public/assets/sfx/levelup.mp3"
+      ],
+      "seconds": 0.52,
+      "source": "Juhani Junkala · The Essential Retro Video Game Sound Effects Collection (CC0): General Sounds/Fanfares/sfx_sounds_fanfare1.wav"
+    },
+    "win": {
+      "files": [
+        "public/assets/sfx/win.ogg",
+        "public/assets/sfx/win.mp3"
+      ],
+      "seconds": 1.7,
+      "source": "Kenney · Music Jingles (CC0): Audio/8-Bit jingles/jingles_NES00.ogg"
+    },
+    "lose": {
+      "files": [
+        "public/assets/sfx/lose.ogg",
+        "public/assets/sfx/lose.mp3"
+      ],
+      "seconds": 1.01,
+      "source": "Kenney · Music Jingles (CC0): Audio/8-Bit jingles/jingles_NES13.ogg"
+    },
+    "challenge": {
+      "files": [
+        "public/assets/sfx/challenge.ogg",
+        "public/assets/sfx/challenge.mp3"
+      ],
+      "seconds": 0.81,
+      "source": "SoundPack01 (CC0): Rise03.aif"
+    },
+    "coin": {
+      "files": [
+        "public/assets/sfx/coin.ogg",
+        "public/assets/sfx/coin.mp3"
+      ],
+      "seconds": 0.81,
+      "source": "SoundPack01 (CC0): Coin01.aif"
+    },
+    "powerup": {
+      "files": [
+        "public/assets/sfx/powerup.ogg",
+        "public/assets/sfx/powerup.mp3"
+      ],
+      "seconds": 0.86,
+      "source": "Kenney · Digital Audio (CC0): Audio/powerUp3.ogg"
+    },
+    "emote": {
+      "files": [
+        "public/assets/sfx/emote.ogg",
+        "public/assets/sfx/emote.mp3"
+      ],
+      "seconds": 0.32,
+      "source": "Kenney · Digital Audio (CC0): Audio/pepSound1.ogg"
+    }
+  },
+  "ui": {
+    "medals": {
+      "file": "public/assets/ui/medals.png",
+      "frame": "48x48",
+      "count": 12,
+      "order": "src/ui/profile.ts BADGES",
+      "source": "OpenGameArt · oga_medals.png (CC0), cropped for design/game/v2.html"
+    }
+  }
 }

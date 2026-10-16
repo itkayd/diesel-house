@@ -1,12 +1,16 @@
 import { audioContext } from '../net/audio';
 import { mixer, type Category } from './mixer';
 
-// Sound effects and jingles from public/assets/sfx/ (name.ogg and/or name.mp3). Each is decoded once and
+// Sound effects and jingles from public/assets/sfx/ (name.ogg and/or name.mp3, made by
+// scripts/build-sfx.mjs from the Kenney, Juhani Junkala and SoundPack01 packs; see ASSETS.md). Each is decoded once and
 // played through its category on the mixer (src/ui/mixer.ts), so the Sound settings apply everywhere.
 // Missing files are skipped silently. Settings: Sound effects on/off, Door and knock sounds, Join/leave
 // chimes.
 
-export type Sfx = 'knock' | 'doorbell' | 'door_open' | 'join' | 'leave' | 'click' | 'confirm' | 'error' | 'levelup' | 'win' | 'lose';
+export type Sfx =
+  | 'knock' | 'doorbell' | 'door_open' | 'join' | 'leave' | 'footstep' | 'footstep2'
+  | 'click' | 'confirm' | 'error' | 'coin' | 'powerup' | 'emote'
+  | 'levelup' | 'challenge' | 'win' | 'lose';
 type Kind = { category: Category; group: 'doors' | 'chimes' | 'ui' | 'music' };
 const SOUNDS: Record<Sfx, Kind> = {
   knock: { category: 'game', group: 'doors' },
@@ -14,10 +18,16 @@ const SOUNDS: Record<Sfx, Kind> = {
   door_open: { category: 'game', group: 'doors' },
   join: { category: 'game', group: 'chimes' },
   leave: { category: 'game', group: 'chimes' },
+  footstep: { category: 'game', group: 'ui' },
+  footstep2: { category: 'game', group: 'ui' },
   click: { category: 'game', group: 'ui' },
   confirm: { category: 'game', group: 'ui' },
   error: { category: 'game', group: 'ui' },
+  coin: { category: 'game', group: 'ui' },
+  powerup: { category: 'game', group: 'ui' },
+  emote: { category: 'game', group: 'ui' },
   levelup: { category: 'music', group: 'music' },
+  challenge: { category: 'music', group: 'music' },
   win: { category: 'music', group: 'music' },
   lose: { category: 'music', group: 'music' },
 };

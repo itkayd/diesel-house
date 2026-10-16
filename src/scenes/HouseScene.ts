@@ -86,7 +86,9 @@ export class HouseScene extends Phaser.Scene {
   private hostsAsked = 0;
   private zoneCandidate: Zone | null = null;
   private zoneSince = 0;
-  private micWarned = false; // "Others can't hear you" shown this visit
+  private micWarned = false;
+  private lastStep = 0;
+  private stepFoot = false; // "Others can't hear you" shown this visit
   // Movement that arrived before presence told us who sent it (presence is slower); used once they join.
   private earlyMoves = new Map<string, MoveMsg>();
   private sent: Sent | null = null;
@@ -893,6 +895,12 @@ export class HouseScene extends Phaser.Scene {
           : 'up';
     this.me.animate(moving, dir);
     this.me.sync();
+    // Very quiet footsteps while you walk (Sound effects switch and Game sounds slider apply).
+    if (moving && this.time.now - this.lastStep > 320) {
+      this.lastStep = this.time.now;
+      this.stepFoot = !this.stepFoot;
+      play(this.stepFoot ? 'footstep' : 'footstep2', 0.18);
+    }
 
     // Standing on a doorway line flips between hallway and room; only count a change that lasts
     // ZONE_SETTLE_MS (and ignore gaps between zones), so voice, chat and presence don't flicker.

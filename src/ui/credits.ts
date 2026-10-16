@@ -6,6 +6,10 @@ const CREDITS: [string, string, string, string][] = [
   ['Modern Interiors', 'LimeZu', 'Floors, walls, furniture and four characters. Free version, non-commercial use.', 'https://limezu.itch.io/moderninteriors'],
   ['Modern Chibis', 'finalbossblues', '16 characters from the Asset Alliance sprite collection.', 'https://finalbossblues.itch.io/16-char-sprite-collection-modern-chibis-asset-alliance'],
   ['Roguelike Indoors', 'Kenney', 'Extra props. CC0.', 'https://kenney.nl/assets/roguelike-indoors'],
+  ['Sound packs', 'Kenney', 'RPG Audio, Interface Sounds, Digital Audio and Music Jingles. CC0.', 'https://kenney.nl/assets/category:Audio'],
+  ['Retro Video Game Sound Effects', 'Juhani Junkala', 'The Essential Retro Video Game Sound Effects Collection (512 sounds). CC0.', 'https://opengameart.org/content/512-sound-effects-8-bit-style'],
+  ['SoundPack01', 'OpenGameArt', 'Level-up, power-up and coin sounds. CC0.', 'https://opengameart.org'],
+  ['Pixel medals', 'OpenGameArt', 'Badges. CC0.', 'https://opengameart.org'],
   ['Lucide', 'Lucide contributors', 'Icons. ISC licence.', 'https://lucide.dev'],
   ['OpenMoji', 'HfG Schwäbisch Gmünd', 'Reaction emojis. CC BY-SA 4.0.', 'https://openmoji.org'],
   ['Fonts', 'Pixelify Sans, Atkinson Hyperlegible', 'SIL Open Font Licence.', 'https://fonts.google.com'],
@@ -38,5 +42,5 @@ export function openCredits() {
     li.append(a, el('span', '', ` by ${who}`), el('div', 'dh-lede', note));
     list.append(li);
   }
-  panel.append(head, list, el('small', 'dh-lede', 'Sounds made for Diesel House with ElevenLabs. Made for friends; not for sale.'));
+  panel.append(head, list, el('small', 'dh-lede', 'Made for friends; not for sale.'));
 }

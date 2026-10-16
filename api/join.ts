@@ -54,7 +54,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   const results = await Promise.all([
     db.from('invite_codes').update({ used_by: id }).eq('id', codeId),
     db.from('allowed_emails').upsert({ email }, { onConflict: 'email', ignoreDuplicates: true }),
-    db.from('profiles').upsert({ id, display_name: name, character_index: 0 }),
+    db.from('profiles').upsert({ id, display_name: name, character_index: 0, picked: false }), // picker on first visit
   ]);
   const failed = results.find((r) => r.error);
   if (failed) {

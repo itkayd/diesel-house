@@ -8,17 +8,18 @@ let user: User | null = null;
 export const setUser = (u: User | null) => (user = u);
 export const currentUser = () => user;
 
-export type Profile = { id: string; display_name: string; character_index: number };
+// `picked` is false until a new member has chosen their character (joining makes the profile with their name).
+export type Profile = { id: string; display_name: string; character_index: number; picked: boolean };
 
 export async function loadProfile(id: string): Promise<Profile | null> {
   if (!supabase) return null;
-  const { data } = await supabase.from('profiles').select('id, display_name, character_index').eq('id', id).maybeSingle();
+  const { data } = await supabase.from('profiles').select('id, display_name, character_index, picked').eq('id', id).maybeSingle();
   return data;
 }
 
 export async function saveProfile(id: string, name: string, character: number) {
   if (!supabase) return;
-  const { error } = await supabase.from('profiles').upsert({ id, display_name: name, character_index: character });
+  const { error } = await supabase.from('profiles').upsert({ id, display_name: name, character_index: character, picked: true });
   if (error) console.warn('Could not save your profile', error.message);
 }
 

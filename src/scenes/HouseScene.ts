@@ -227,6 +227,11 @@ export class HouseScene extends Phaser.Scene {
     const user = currentUser();
     if (user && !user.guest) {
       const profile = await loadProfile(user.id);
+      if (profile && !profile.picked) {
+        // Just joined: their name is known, the character isn't chosen yet.
+        saveName(profile.display_name);
+        return void this.choose();
+      }
       if (profile) {
         this.applyIdentity(profile.character_index, profile.display_name);
         return void this.start();

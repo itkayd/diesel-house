@@ -86,7 +86,9 @@ export class WalkieButton {
   }
 
   setVisible(on: boolean) {
+    if (this.el.hidden === !on) return;
     this.el.hidden = !on;
+    if (!on) this.strip.hidden = true;
   }
 
   // Who's on air (name), and how our button looks.

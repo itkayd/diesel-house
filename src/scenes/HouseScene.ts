@@ -1075,6 +1075,9 @@ export class HouseScene extends Phaser.Scene {
 
     this.moveRemotes();
     // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
+    // The walkie button follows where you are every frame, so it can never be left hidden in the hallway
+    // (a missed zone update or a setup hiccup used to leave it off until you walked into a room and back).
+    this.walkie?.setVisible(this.zone === 'hallway' && !!this.voice && !this.presence?.isReplaced);
     if (this.hallway && this.zone === 'hallway' && this.time.now - this.hallShown > 100) {
       this.hallShown = this.time.now;
       this.showHallway();

@@ -40,7 +40,7 @@ import { Hallway, WHISPER } from './hallway';
 import { WalkieButton } from '../ui/walkie';
 import { addHallwaySettings } from '../ui/hallwaySettings';
 import { net, type NetQuality } from '../net/netQuality';
-import { reloadForUpdate } from '../ui/update';
+import { reloadForUpdate, watchForNewVersion } from '../ui/update';
 
 const SPEED = 80; // px per second
 const ZONE_SETTLE_MS = 150; // a zone change counts once you have been in the new zone this long
@@ -470,6 +470,12 @@ export class HouseScene extends Phaser.Scene {
     );
     this.presence.connect();
     net.start();
+    // New version live? Reload at once if we're not talking to anyone; otherwise offer it.
+    watchForNewVersion(
+      () => (this.voice?.debug().length ?? 0) > 0,
+      (reload) =>
+        toast({ icon: 'refresh-cw', id: 'new-version', who: 'New version of the house', what: 'Reload when you are ready.', ttl: 0, actions: [{ label: 'Reload', id: 'new-version-reload', onClick: reload }] }),
+    );
     net.onChange((q) => {
       this.myNet = q;
       this.sendMove(true); // shared on the next move message, not presence (see presence.ts)

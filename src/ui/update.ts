@@ -23,3 +23,38 @@ export function installUpdateReload() {
     reloadForUpdate();
   });
 }
+
+// A new version went live while this page was open (or the phone resumed an old copy): the site's
+// index.html now points at a different main-<hash>.js. Checked when the page comes back to the front and
+// every few minutes. Out of a call it reloads straight away; in a call it offers "Reload" instead of
+// cutting anyone off. While the page is in use (the timer), it only offers. (Dev builds have no hashed
+// files, so this does nothing there.)
+const CHECK_EVERY = 5 * 60_000;
+let offered = false;
+
+async function latestMain(): Promise<string | null> {
+  try {
+    const html = await (await fetch('/', { cache: 'no-store' })).text();
+    return html.match(/\/assets\/main-[\w-]+\.js/)?.[0] ?? null;
+  } catch {
+    return null; // offline: try again later
+  }
+}
+
+// `current`: for automated checks only (the dev server has no hashed files).
+export function watchForNewVersion(inCall: () => boolean, offer: (reload: () => void) => void, current?: string) {
+  const mine = current ?? document.querySelector<HTMLScriptElement>('script[src*="/assets/main-"]')?.getAttribute('src')?.match(/\/assets\/main-[\w-]+\.js/)?.[0];
+  if (!mine) return; // dev server
+  // `returning`: the page just came back to the front (or loaded), so a reload won't interrupt anything.
+  const check = async (returning: boolean) => {
+    const latest = await latestMain();
+    if (!latest || latest === mine) return;
+    if (returning && !inCall()) return void reloadForUpdate();
+    if (offered) return;
+    offered = true;
+    offer(() => location.reload());
+  };
+  document.addEventListener('visibilitychange', () => !document.hidden && void check(true));
+  setInterval(() => !document.hidden && void check(false), CHECK_EVERY);
+  void check(true);
+}

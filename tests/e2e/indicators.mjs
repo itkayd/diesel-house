@@ -62,7 +62,13 @@ await waitSeen(B, A.id, 'mic', null);
 check('in the hallway the mic icon is hidden (no voice there)', { mic: await seen(B, A.id, 'mic') }, (await seen(B, A.id, 'mic')) === null);
 
 // 3. A bad line (high delay and lost audio) shows as Poor for everyone.
-await A.page.evaluate(async () => (await import('/src/net/netQuality.ts')).net.setCallStats(900, 0.2));
+// (Keep the bad figures: the real call between two browsers on one computer is perfect and would
+// overwrite them every 5 s.)
+await A.page.evaluate(async () => {
+  const { net } = await import('/src/net/netQuality.ts');
+  net.setCallStats(900, 0.2);
+  net.setCallStats = () => {};
+});
 await waitSeen(B, A.id, 'net', 'poor');
 const poor = { b: await seen(B, A.id, 'net'), hud: await A.page.evaluate(() => document.querySelector('#net')?.textContent) };
 check('a bad connection shows as Poor (1 red bar) on everyone\'s screen', poor, poor.b === 'poor' && poor.hud === 'Poor');

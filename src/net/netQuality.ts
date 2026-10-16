@@ -37,6 +37,29 @@ class NetMonitor {
     addEventListener('online', () => this.update());
     addEventListener('offline', () => this.update());
     (navigator as Navigator & { connection?: Connection }).connection?.addEventListener?.('change', () => this.update());
+    void this.firstReading();
+  }
+
+  // The first heartbeat can be 25 s away, so time two tiny requests to the server now (the second one,
+  // as the first includes setting up the connection) for a rating within a couple of seconds.
+  private async firstReading() {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!url || !key) return;
+    let rtt = 0;
+    for (let i = 0; i < 2; i++) {
+      const t = performance.now();
+      try {
+        await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, cache: 'no-store' });
+      } catch {
+        return;
+      }
+      rtt = performance.now() - t;
+    }
+    if (!this.beats.length) {
+      this.beats = [rtt];
+      this.update();
+    }
   }
 
   // From voice calls: average round trip (ms) and packet loss across the people we're connected to.

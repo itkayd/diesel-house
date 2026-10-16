@@ -35,7 +35,12 @@ export function showMicHelp(problem: MicProblem): Promise<boolean> {
       ? ["This is an app's built-in browser, which can't use the mic.", `Open ${location.host} in ${iphone ? 'Safari' : 'Chrome'} instead.`]
       : iphone
         ? ['Tap aA (or the page icon) next to the web address.', 'Website Settings → Microphone → Allow.', 'Then tap Try again.']
-        : ['Tap the icon to the left of the web address.', 'Permissions (or Site settings) → Microphone → Allow.', 'Then tap Try again.'],
+        : [
+            'Tap the icon to the left of the web address.',
+            'Permissions (or Site settings) → Microphone → Allow.',
+            'Already allowed? Phone Settings → Apps → Chrome → Permissions → Microphone → Allow.',
+            'Then tap Try again.',
+          ],
     busy: ['Another app is using your microphone: a phone or WhatsApp call, a voice note, or another browser tab.', 'Close it, then tap Try again.'],
     none: ['No microphone was found on this device.', 'Plug one in or connect your headphones, then tap Try again.'],
     unsupported: inApp

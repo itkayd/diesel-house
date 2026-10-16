@@ -36,6 +36,12 @@ type Handlers = {
 };
 
 const CHANNEL = 'house';
+// Supabase cuts off a client that updates its presence too often (ClientPresenceRateLimitReached), e.g.
+// someone standing in a doorway flipping between hallway and room. Presence is sent at most this often,
+// always with the latest info; positions and zones travel in move messages anyway.
+const TRACK_EVERY_MS = 2000;
+// If the channel drops (rate limit, network, phone asleep) and doesn't come back by itself, start again.
+const RECONNECT_MS = [2000, 5000, 10000, 20000, 30000];
 
 export class Presence {
   private channel: RealtimeChannel | null = null;
@@ -43,6 +49,10 @@ export class Presence {
   private known = new Map<string, PlayerInfo>();
   private readonly tab = crypto.randomUUID();
   private replaced = false;
+  private lastTrack = 0;
+  private trackTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private failures = 0;
 
   constructor(
     readonly id: string,
@@ -83,15 +93,49 @@ export class Presence {
           this.h.onChat({ table, type: p.eventType, row: (p.eventType === 'INSERT' ? p.new : p.old) as Record<string, unknown> });
       });
     ch.subscribe((status, err) => {
+      if (this.channel !== ch) return; // an old channel we replaced
       if (status === 'SUBSCRIBED') {
+        this.failures = 0;
         this.h.onStatus('online');
-        if (!this.replaced) void ch.track(this.info); // also re-announces us after a dropped connection rejoins
+        this.lastTrack = 0;
+        this.announce(); // also re-announces us after a dropped connection rejoins
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         if (err) console.warn('House channel:', status, err.message);
         this.h.onStatus('offline');
+        this.scheduleReconnect(ch);
       }
     });
     this.channel = ch;
+  }
+
+  // Tells everyone our latest info, but not more than once every TRACK_EVERY_MS.
+  private announce() {
+    const ch = this.channel;
+    if (!ch || ch.state !== 'joined' || this.replaced) return;
+    const wait = this.lastTrack + TRACK_EVERY_MS - Date.now();
+    if (wait > 0) {
+      this.trackTimer ??= setTimeout(() => {
+        this.trackTimer = null;
+        this.announce();
+      }, wait);
+      return;
+    }
+    this.lastTrack = Date.now();
+    void ch.track(this.info);
+  }
+
+  // Supabase retries some failures itself; if we're still not back after a while, make a fresh channel.
+  private scheduleReconnect(ch: RealtimeChannel) {
+    if (this.reconnectTimer) return;
+    const delay = RECONNECT_MS[Math.min(this.failures, RECONNECT_MS.length - 1)];
+    this.failures++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.channel !== ch || ch.state === 'joined') return;
+      this.channel = null;
+      void supabase?.removeChannel(ch);
+      this.connect();
+    }, delay);
   }
 
   // Diff presence state against what we knew, and report joins/leaves/changes.
@@ -133,12 +177,12 @@ export class Presence {
   reclaim() {
     this.replaced = false;
     this.info.since = Date.now();
-    if (this.channel?.state === 'joined') void this.channel.track(this.info);
+    this.announce();
   }
 
   update(change: Partial<Omit<PlayerInfo, 'id'>>) {
     this.info = { ...this.info, ...change };
-    if (this.channel?.state === 'joined' && !this.replaced) void this.channel.track(this.info);
+    this.announce();
   }
 
   sendMove(m: Omit<MoveMsg, 'id' | 't'>) {

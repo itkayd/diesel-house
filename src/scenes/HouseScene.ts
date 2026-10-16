@@ -26,6 +26,7 @@ import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
 import { addProfileButton, pickCharacter } from '../ui/picker';
+import { openProfile } from '../ui/profile';
 import { askForMic, resetMicDecline, showMicHelp } from '../ui/micPrompt';
 import { modalOpen } from '../ui/modal';
 import { addSettingsSection, switchRow } from '../ui/settings';
@@ -189,7 +190,8 @@ export class HouseScene extends Phaser.Scene {
     addEventListener('orientationchange', refit);
     screen.orientation?.addEventListener?.('change', refit);
 
-    addProfileButton(() => void this.choose());
+    addProfileButton(() => this.openMyProfile());
+    this.me.onTagTap(() => this.openMyProfile());
     if (!savedShowOwnTag()) this.me.setTagVisible(false);
     addSettingsSection(
       30,
@@ -332,6 +334,29 @@ export class HouseScene extends Phaser.Scene {
     if (user && !user.guest) await saveProfile(user.id, name, character);
     if (this.presence) this.presence.update({ character, name });
     void this.start();
+  }
+
+  // Your profile (HUD button, or tap your own name tag).
+  private openMyProfile() {
+    const user = currentUser();
+    if (!user) return void this.choose();
+    const owned = [...this.rooms.values()].find((r) => r.owner_id === user.id);
+    openProfile({
+      name: this.name,
+      character: this.character,
+      ownedRoom: owned ? zoneLabel(owned.id) : null,
+      host: this.hosts.get(user.id) ?? null,
+      changeCharacter: () => void this.choose(),
+      rename: async (name) => {
+        this.applyIdentity(this.character, name);
+        if (!user.guest) {
+          await saveProfile(user.id, name, this.character);
+          this.ownerNames.set(user.id, name);
+          this.showRooms();
+        }
+        this.presence?.update({ name });
+      },
+    });
   }
 
   // The mic isn't reaching anyone: if the browser or phone refused it, explain how to fix that first;
@@ -721,6 +746,11 @@ export class HouseScene extends Phaser.Scene {
     if (p.guest) p = { ...p, character: guestCharacter(p.character) };
     if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
     if (r.info.name !== p.name) r.avatar.setName(p.name);
+    // A room owner renamed themselves: their door sign follows.
+    if (r.info.name !== p.name && this.ownerNames.has(p.id)) {
+      this.ownerNames.set(p.id, p.name);
+      this.showRooms();
+    }
     r.avatar.setGuest(!!p.guest);
     this.showHost(p);
     r.info = { ...p, zone: r.info.zone };

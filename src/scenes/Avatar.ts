@@ -68,6 +68,16 @@ export class Avatar {
   }
 
   // [name  mic  bars] — icons only when there's something to show.
+  // Tapping this tag (your own: opens your profile).
+  private tagTap: (() => void) | null = null;
+  onTagTap(f: () => void) {
+    this.tagTap = f;
+    this.tag.setInteractive(new Phaser.Geom.Rectangle(0, 0, 1, 1), Phaser.Geom.Rectangle.Contains);
+    this.tag.input!.cursor = 'pointer';
+    this.tag.on('pointerdown', () => this.tagTap?.());
+    this.drawTagBg();
+  }
+
   private drawTagBg() {
     const text = Math.ceil(this.tagText.width);
     const icons = [this.micImg, this.netImg].filter((i) => i.visible);
@@ -77,6 +87,7 @@ export class Avatar {
     this.tagBg.clear();
     this.tagBg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
     this.tagBg.fillStyle(PANEL, 0.92).fillRect(-w / 2, -h, w, h);
+    if (this.tag?.input) (this.tag.input.hitArea as Phaser.Geom.Rectangle).setTo(-w / 2 - 1, -h - 1, w + 2, h + 2);
     const left = -w / 2 + 3;
     this.tagText.setPosition(Math.round(left + text / 2), -1);
     let x = left + text + 2;

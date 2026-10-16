@@ -147,7 +147,7 @@ export function addProfileButton(onClick: () => void) {
   const b = el('button', 'dh-iconbtn');
   b.type = 'button';
   b.id = 'profile-button';
-  b.setAttribute('aria-label', 'Your character');
+  b.setAttribute('aria-label', 'Your profile');
   b.append(icon('user-round'));
   b.addEventListener('click', onClick);
   hudButtons().prepend(b);

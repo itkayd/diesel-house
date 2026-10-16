@@ -45,7 +45,13 @@ async function signIn() {
     session = null;
   }
   hideLogin();
-  setUser({ id: session.user.id, email: session.user.email ?? '', guest: !!session.user.is_anonymous });
+  setUser({
+    id: session.user.id,
+    email: session.user.email ?? '',
+    guest: !!session.user.is_anonymous,
+    joinedAt: session.user.created_at,
+    signedInAt: session.user.last_sign_in_at,
+  });
   await authoriseRealtime();
 }
 

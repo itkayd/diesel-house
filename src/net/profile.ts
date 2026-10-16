@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 // Who's signed in (a member, or a guest without an account), plus members' profiles (display name +
 // character) in public.profiles. Guests' name and character live only in this browser (src/prefs.ts).
 
-export type User = { id: string; email: string; guest: boolean };
+// joinedAt / signedInAt: ISO times from the account (for the profile).
+export type User = { id: string; email: string; guest: boolean; joinedAt?: string; signedInAt?: string };
 let user: User | null = null;
 export const setUser = (u: User | null) => (user = u);
 export const currentUser = () => user;

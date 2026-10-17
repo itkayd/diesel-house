@@ -137,7 +137,7 @@ Weekly (80–200 XP): Visit every room · Win 5 games · 2 hours in voice this w
   - clamps per-kind daily caps (e.g. voice_minutes ≤ 300/day, emote_sent ≤ 50/day) so nobody can farm XP from the console,
   - updates `challenge_progress(user_id, challenge_id, period_key, progress, completed_at)`,
   - appends to `xp_ledger(user_id, amount, reason, created_at)`, and keeps `profiles.xp`, `profiles.level`, `profiles.streak_days`, `profiles.last_visit_date`.
-- Level curve: level n needs `50 * n * (n + 1)` total XP (L1 100, L2 300, L5 1500 …).
+- Level curve: **see `LEVELS.md`** (no max level; +100 XP per level up to level 21, then a flat 2,000 XP per level forever).
 - Day boundaries per user's **local** date (friends are in the UK, Middle East and US): the client sends its IANA time zone once; the server stores it on the profile and computes `period_key` with it. Week = ISO week in UTC for the shared leaderboard.
 - New tables/RPCs go in one migration file; RLS: users read their own progress; members read everyone's `profiles.xp/level/streak` and the weekly leaderboard view; nobody writes directly (RPC only). Guests: no XP (show "Guests don't earn XP").
 - Run the Supabase security advisor afterwards (Claude in claude.ai will).

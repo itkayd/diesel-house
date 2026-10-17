@@ -1,6 +1,6 @@
 # CLAUDE.md — Diesel House build brief
 
-**Read `FIXES.md` first (do it before anything else)**, then `NEXT.md`, then **`UPDATE.md`** (v2: hallway whisper + walkie-talkie, mini-games, challenges — Phases 9–14). Newer files win where they differ.
+**Read `FIXES.md` first (do it before anything else)**, then `NEXT.md`, then **`UPDATE.md`** and **`LEVELS.md`** (v2: hallway whisper + walkie-talkie, mini-games, challenges — Phases 9–14). Newer files win where they differ.
 
 **Visual target for v2 (Phases 9–14 and FIXES 4–6): `design/game/v2.html`** — open it in a browser, log in with `admin` / `admin`. It shows the agreed UX: XP chip under the zone pill, map/challenges/settings buttons, walkie button (hold or T) in the hallway, purple whisper circle, emote picker, tap-a-friend menu, games table (west end of the hallway) and noticeboard, Dice / RPS / Quick Draw, challenges sheet, level-up overlay, profile with guest code + badges, Sound / Mic / Room settings tabs, mic help states, "Reconnecting…" pill, first-run tips, and "Who's where" map with tap-to-walk. Source: `design/game/v2.template.html`; cropped sprites in `design/game/v2-img/` (medals atlas = 12 × 48 px in `BADGES` order, dice strip = 7 × 32 px: faces 1–6 then ?, Kenney emotes sheet = 16 px cells, coordinates in the `EMO` table). Sounds in the mock are synthesized; use the real packs per FIXES #7. The NPCs and `admin/admin` login are mock-only — do not ship them.
 

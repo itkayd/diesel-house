@@ -121,8 +121,23 @@ export class Critters {
     sh.hop?.remove();
     sh.shadow.destroy();
     if (!poof) return void sh.img.destroy();
-    // A little jump up and fade.
+    // A little jump up and fade, with pixel sparkles flying out.
     this.scene.tweens.add({ targets: sh.img, y: sh.img.y - 14, alpha: 0, duration: 420, ease: 'Stepped', onComplete: () => sh.img.destroy() });
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cols = [0xffd36b, 0xf4b860, 0x6fdc8c, 0x9ec9ff, 0xff9fb2];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const bit = this.scene.add.rectangle(sh.spawn.x, sh.spawn.y - 6, 2, 2, cols[i % cols.length]).setDepth(sh.spawn.y + 50);
+      this.scene.tweens.add({
+        targets: bit,
+        x: sh.spawn.x + Math.cos(a) * 16,
+        y: sh.spawn.y - 6 + Math.sin(a) * 12 - 4,
+        alpha: 0,
+        duration: 500,
+        ease: 'Cubic.easeOut',
+        onComplete: () => bit.destroy(),
+      });
+    }
   }
 
   // Shown sprites (read by automated checks).

@@ -1,5 +1,6 @@
 import { el } from '../ui/modal';
 import { play } from '../ui/sounds';
+import { burst, buzz, floatText, kick, timerBar } from './juice';
 import { portrait } from '../ui/portrait';
 import { randomSeed, rng, sha256 } from './fair';
 import { nameOf, pointsRows, topScorers, winTitle } from './kit';
@@ -247,7 +248,9 @@ export class HotTakesView implements TableView {
             const pct = total ? Math.round((who.length / total) * 100) : 0;
             const bar = el('span', 'bar');
             const fill = el('i');
-            fill.style.width = `${pct}%`;
+            // Grow from empty so the reveal reads as a count-up.
+            fill.style.width = fresh ? '0%' : `${pct}%`;
+            if (fresh) requestAnimationFrame(() => requestAnimationFrame(() => (fill.style.width = `${pct}%`)));
             bar.append(fill);
             const faces = el('span', 'who');
             for (const id of who) {
@@ -264,6 +267,8 @@ export class HotTakesView implements TableView {
             if (this.mine || st.phase !== 'vote') return;
             this.mine = c;
             play('click', 0.5);
+            buzz(10);
+            kick(b, 'v2-pop');
             this.sides.querySelectorAll('button').forEach((x) => {
               (x as HTMLButtonElement).disabled = true;
               x.classList.toggle('picked', x === b);
@@ -271,6 +276,13 @@ export class HotTakesView implements TableView {
             this.act({ t: 'vote', rid: st.rid, c });
           });
           this.sides.append(b);
+        }
+        if (st.phase === 'vote' && playing) this.sides.append(timerBar(VOTE_MS, 'wyr-timer'));
+        if (st.phase === 'reveal' && fresh) {
+          const side = majority(st.votes ?? {});
+          const mine = st.votes?.[this.me];
+          const myBtn = mine ? this.sides.querySelector(`[data-choice="${mine}"]`) : null;
+          if (myBtn && side && mine === side) setTimeout(() => floatText(myBtn, '+1', 'good'), 450);
         }
       }
     }
@@ -288,6 +300,7 @@ export class HotTakesView implements TableView {
       res.id = 'wyr-result';
       this.sides.append(res);
       if (fresh && playing) play(winners.includes(this.me) ? 'win' : 'lose', 0.7);
+      if (fresh && winners.includes(this.me)) requestAnimationFrame(() => burst(res, 24));
     }
     this.list.replaceChildren(
       ...pointsRows(s.players, st.points, this.me, this.names, { chip: (id) => (st.phase === 'vote' && st.voted.includes(id) ? 'voted' : '') }),

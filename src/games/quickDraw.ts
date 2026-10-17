@@ -1,6 +1,7 @@
 import { el } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
+import { burst, buzz, kick } from './juice';
 import { checkSeed, randomSeed, rng, sha256 } from './fair';
 import type { Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
 
@@ -202,12 +203,17 @@ export class QuickDrawView implements TableView {
       this.phase = 'idle';
       this.clear();
       this.setBox('foul', 'Too soon!', 'Out for this round.');
+      kick(this.box, 'v2-shake');
+      buzz([50, 40, 50]);
       play('error', 0.6);
       this.act({ t: 'early', rid: this.rid });
     } else if (this.phase === 'go') {
       this.phase = 'idle';
       const ms = Math.round(performance.now() - this.goAt);
-      this.setBox('', `${ms} ms`, 'Waiting for the others…');
+      const rating = ms < 250 ? 'Lightning!' : ms < 350 ? 'Quick hands' : ms < 500 ? 'Not bad' : 'Steady…';
+      this.setBox('', `${ms} ms`, `${rating} Waiting for the others…`);
+      kick(this.box.querySelector('b')!, 'v2-pop');
+      buzz(10);
       this.act({ t: 'tap', rid: this.rid, ms });
     }
   }
@@ -243,6 +249,10 @@ export class QuickDrawView implements TableView {
     const title = !winners.length ? 'Nobody scored' : iWon ? (winners.length > 1 ? 'Shared win!' : 'You win!') : `${winners.map((p) => this.names(p.id).name || p.name).join(' & ')} wins`;
     this.setBox(iWon ? 'win' : '', title, 'Game over · checking it was fair…');
     if (this.playing) play(iWon ? 'win' : 'lose', 0.7);
+    if (iWon) {
+      requestAnimationFrame(() => burst(this.box, 26));
+      buzz([20, 40, 20]);
+    }
     // Fair check: the revealed seed matches the hash shown at the start, and gives the same waits.
     const takeoverAt = st.takeoverAt ?? 1;
     const ok = !!st.seed && (await checkSeed(st.seed, st.commit)) && st.delays.every((d, i) => i + 1 < takeoverAt || d === delayFor(st.seed!, i + 1));

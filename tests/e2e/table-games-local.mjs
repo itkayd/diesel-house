@@ -214,6 +214,43 @@ const until = (page, f, arg, timeout = 15000) => page.waitForFunction(f, arg, { 
   await page.context().close();
 }
 
+// ---- Dice panel ------------------------------------------------------------------------------
+{
+  const page = await harness({ width: 390, height: 800 });
+  const names = await page.evaluate(async () => {
+    const { rollName } = await import('/src/games/dice.ts');
+    return [[1, 1], [6, 6], [3, 3], [2, 5], [4, 4, 4], [2, 3, 4], [5], [1, 6, 2]].map((v) => rollName(v));
+  });
+  check('dice: snake eyes, boxcars, doubles, triples and runs are named', names,
+    JSON.stringify(names) === JSON.stringify(['Snake eyes!', 'Boxcars!', 'Doubles!', null, 'Triples!', 'A run!', null, null]));
+  await page.evaluate(async () => {
+    localStorage.removeItem('diesel-house.dice');
+    const { diceView } = await import('/src/games/dice.ts');
+    window.rolls = [];
+    const col = document.createElement('div');
+    col.className = 'player dh-panel';
+    col.append(diceView((r) => window.rolls.push(r)));
+    document.getElementById('players').append(col);
+  });
+  await page.click('#dice-count [data-n="3"]');
+  await page.click('#dice-faces');
+  await until(page, () => window.rolls.length === 1);
+  await page.waitForTimeout(700);
+  await page.click('#dice-roll');
+  await until(page, () => window.rolls.length === 2);
+  const got = await page.evaluate(() => ({
+    n: window.rolls.map((r) => r.values.length),
+    faces: document.querySelectorAll('#dice-faces .v2-die').length,
+    result: document.getElementById('dice-result').textContent,
+    total: window.rolls[1].total,
+    history: [...document.querySelectorAll('#dice-history .v2-xpchip')].map((c) => c.textContent),
+    saved: localStorage.getItem('diesel-house.dice'),
+  }));
+  check('dice: pick 3 dice (remembered), tap the tray or Roll, total shown, last rolls listed newest first', got,
+    got.n.join() === '3,3' && got.faces === 3 && got.result.startsWith(String(got.total)) && got.history.length === 2 && got.history[0] === String(got.total) && got.saved === '3');
+  await page.context().close();
+}
+
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

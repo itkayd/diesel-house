@@ -467,20 +467,40 @@ html, body, #game, #overlay, #overlay * {
 .v2-dicebox { display: grid; gap: 12px; justify-items: center; }
 .v2-dice { display: flex; gap: 8px; }
 .v2-die { display: block; image-rendering: pixelated; background-repeat: no-repeat; }
-.v2-die.roll { animation: v2-shake .12s steps(2) infinite; }
-@keyframes v2-shake { 50% { transform: translate(2px, -3px) rotate(8deg); } }
+.v2-die.roll { animation: v2-tumble .3s steps(4) infinite; }
+@keyframes v2-tumble { 0% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-16px) rotate(90deg); } 50% { transform: translateY(-22px) rotate(180deg); } 75% { transform: translateY(-10px) rotate(270deg); } 100% { transform: translateY(0) rotate(360deg); } }
+.v2-die.land { animation: v2-land .3s steps(4); }
+@keyframes v2-land { 30% { transform: scale(1.2, .8); } 60% { transform: scale(.92, 1.08) translateY(-4px); } }
+/* The dice tray: felt with a lip, tap it to roll. */
+.v2-tray { display: flex; gap: 14px; justify-content: center; align-items: center; min-height: 96px; width: 100%; padding: 14px; border: 0; cursor: pointer; background: #1f4a36; box-shadow: inset 0 0 0 3px #143325, inset 0 6px 0 rgba(0,0,0,.25), 0 0 0 3px var(--panel-edge); }
+.v2-tray:disabled { cursor: default; }
+.v2-tray:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.v2-tray .v2-die { filter: drop-shadow(3px 4px 0 rgba(0,0,0,.4)); }
+.v2-seg { display: flex; box-shadow: 0 0 0 2px var(--line); }
+.v2-seg button { flex: 1; border: 0; padding: 8px 14px; white-space: nowrap; font-family: var(--font-display); font-size: 14px; color: var(--muted); background: var(--panel-edge); cursor: pointer; }
+.v2-seg button[aria-checked="true"] { color: var(--panel-edge); background: var(--lamp); }
+.v2-dicehist { display: flex; gap: 6px; min-height: 22px; flex-wrap: wrap; justify-content: center; }
+.v2-dicehist .v2-xpchip { background: var(--panel-edge); color: var(--muted); box-shadow: 0 0 0 2px var(--line); }
+.v2-dicehist .v2-xpchip:first-child { background: var(--gold); color: var(--panel-edge); box-shadow: none; }
+#dice-result { font-size: 30px; min-height: 38px; }
+.v2-dicehist .v2-xpchip.hot { background: var(--ok); color: var(--panel-edge); box-shadow: none; }
 .v2-rps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .v2-rps button { min-height: 72px; font-size: 32px; border: 0; cursor: pointer; background: var(--panel-hi); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 rgba(0,0,0,.35); display: grid; place-items: center; gap: 0; color: var(--cream); }
 .v2-rps button small { font-family: var(--font-display); font-size: 12px; }
 .v2-rps button:disabled { opacity: .45; cursor: default; }
 .v2-hand { font-size: 40px; line-height: 1; min-height: 44px; }
-.v2-hand.hidden { filter: brightness(0); opacity: .6; }
+.v2-hand.hidden { filter: brightness(0); opacity: .6; animation: v2-pump .6s steps(2) infinite; }
+@keyframes v2-pump { 50% { transform: translateY(-6px) rotate(-8deg); } }
+.v2-hand.won { filter: drop-shadow(0 0 6px rgba(111,220,140,.9)); transform: scale(1.15); }
+.v2-hand.lost { opacity: .45; transform: rotate(-12deg) scale(.9); }
+.v2-rps button:not(:disabled):active { transform: translateY(3px) scale(.96); }
+.v2-rps button:not(:disabled):hover { background: #3a2c48; }
 .v2-score { font-family: var(--font-display); font-size: 22px; color: var(--gold); }
 .v2-result { font-family: var(--font-display); font-size: 22px; text-align: center; min-height: 28px; }
 .v2-result.win { color: var(--ok); } .v2-result.lose { color: var(--error); }
 .v2-qd { display: grid; gap: 12px; }
 .v2-draw { display: grid; place-items: center; min-height: 190px; cursor: pointer; text-align: center; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); padding: 14px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
-.v2-draw b { font-family: var(--font-display); font-size: 34px; letter-spacing: .06em; }
+.v2-draw b { display: inline-block; font-family: var(--font-display); font-size: 34px; letter-spacing: .06em; }
 .v2-draw.ready { background: #2a1d14; animation: v2-flicker 1.1s steps(1) infinite; }
 @keyframes v2-flicker { 0%, 100% { background: #2a1d14; } 46% { background: #3a2a1a; } 50% { background: #22170f; } 54% { background: #3a2a1a; } }
 .v2-draw.go { background: var(--lamp); color: var(--panel-edge); box-shadow: inset 0 0 0 4px var(--panel-edge); animation: none; }
@@ -500,11 +520,25 @@ html, body, #game, #overlay, #overlay * {
 .v2-again { justify-self: center; }
 .v2-result.x { color: var(--muted); }
 /* Higher or lower: the deck and the face-up card (cards.png drawn at 3x). */
-.v2-cards { display: flex; gap: 18px; justify-content: center; align-items: center; padding: 14px 0 6px; }
+.v2-cards { display: flex; gap: 22px; justify-content: center; align-items: center; padding: 14px 0 22px; }
 .v2-card { display: block; image-rendering: pixelated; background-repeat: no-repeat; filter: drop-shadow(3px 3px 0 var(--panel-edge)); }
 .v2-card.deck { transform: rotate(-4deg); opacity: .9; }
-.v2-card.flip { animation: v2-flip .36s steps(4); }
-@keyframes v2-flip { 0% { transform: scaleX(.1) translateY(-6px); } 50% { transform: scaleX(.5) translateY(-6px); } 100% { transform: none; } }
+/* The deck: two face-down cards stacked a little askew. */
+.v2-deck { position: relative; display: grid; }
+.v2-deck .v2-card { grid-area: 1 / 1; }
+.v2-deck .v2-card:first-child { transform: rotate(-7deg) translate(-3px, 2px); filter: brightness(.8) drop-shadow(3px 3px 0 var(--panel-edge)); }
+.v2-deck .v2-card:last-child { transform: rotate(-2deg); }
+/* A new card slides off the deck and flips over. */
+.v2-card.flip { animation: v2-flip .42s steps(6); }
+@keyframes v2-flip { 0% { transform: translateX(-104px) scaleX(.1) rotate(-3deg); } 45% { transform: translateX(-30px) scaleX(.15) translateY(-10px); } 75% { transform: scaleX(.7) translateY(-6px); } 100% { transform: none; } }
+.v2-card.right { filter: drop-shadow(0 0 0 var(--ok)) drop-shadow(3px 3px 0 var(--panel-edge)) drop-shadow(0 0 6px rgba(111,220,140,.7)); }
+.v2-card.bust { filter: drop-shadow(3px 3px 0 var(--panel-edge)) drop-shadow(0 0 6px rgba(255,107,107,.75)) sepia(.3) hue-rotate(-30deg); }
+.v2-cards { position: relative; }
+.v2-pips { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+.v2-pips i { width: 10px; height: 10px; background: var(--panel-edge); box-shadow: 0 0 0 2px var(--line); }
+.v2-pips i.on { background: var(--gold); box-shadow: 0 0 0 2px #c9982f; }
+.v2-pips i.safe { background: var(--muted); }
+.v2-hl-btns .dh-btn .odds { font-family: var(--font-display); font-size: 12px; opacity: .7; margin-left: 2px; }
 .v2-hl-acts { display: grid; gap: 10px; justify-items: stretch; text-align: center; }
 .v2-hl-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .v2-hl-btns .dh-btn { min-height: 52px; }
@@ -518,10 +552,14 @@ html, body, #game, #overlay, #overlay * {
 .v2-side:disabled { cursor: default; }
 .v2-side .ab { font-family: var(--font-display); font-size: 13px; color: var(--panel-edge); background: var(--lamp); padding: 0 6px; }
 .v2-side .t { font-weight: 700; font-size: 15px; line-height: 1.3; }
-.v2-side.picked { box-shadow: inset 0 0 0 3px var(--lamp); }
+.v2-side.picked { box-shadow: inset 0 0 0 3px var(--lamp); background: #2a2034; }
+.v2-side.picked::after { content: 'Your pick'; position: absolute; top: 8px; right: 8px; font-family: var(--font-display); font-size: 11px; color: var(--panel-edge); background: var(--lamp); padding: 0 5px; }
+.v2-side:not(:disabled):active { transform: translateY(2px); }
+.v2-side.top::before { content: 'Majority'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 11px; color: var(--panel-edge); background: var(--ok); padding: 0 6px; box-shadow: 0 0 0 2px var(--panel-edge); }
+.v2-wyr .v2-timer { grid-column: 1 / -1; }
 .v2-side.top .ab { background: var(--ok); }
 .v2-side .bar { width: 100%; height: 10px; background: var(--panel); box-shadow: 0 0 0 2px var(--line); }
-.v2-side .bar i { display: block; height: 100%; background: var(--lamp); transition: width .5s steps(6); }
+.v2-side .bar i { display: block; height: 100%; background: var(--lamp); transition: width .9s steps(10); }
 .v2-side.top .bar i { background: var(--ok); }
 .v2-side .n { font-family: var(--font-display); font-size: 13px; color: var(--muted); }
 .v2-side .who { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -540,6 +578,10 @@ html, body, #game, #overlay, #overlay * {
 .v2-piece.drop { animation: v2-drop calc(.05s * var(--fall, 3) + .08s) steps(4); }
 @keyframes v2-drop { from { transform: translateY(calc(-110% * var(--fall, 3))); } }
 .v2-piece.win { animation: v2-blink .5s steps(1) infinite; }
+/* Where your piece would land: a faint ghost in that column (hover / keyboard focus). */
+.v2-four.mine .col:not(:disabled):hover .cell.land::after, .v2-four.mine .col:focus-visible .cell.land::after { content: ''; width: 100%; height: 100%; opacity: .45; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+.v2-four .cell.land.p0::after { background: var(--lamp); } .v2-four .cell.land.p1::after { background: #ff9fb2; }
+.v2-four.mine { box-shadow: 0 0 0 3px var(--panel-edge), 0 0 0 5px var(--lamp), inset 0 -4px 0 rgba(0,0,0,.35); }
 @keyframes v2-blink { 50% { filter: brightness(1.6); } }
 .v2-vs .side.turn { box-shadow: inset 0 0 0 2px var(--lamp); }
 .v2-vs .side.won { box-shadow: inset 0 0 0 2px var(--ok); }
@@ -610,3 +652,20 @@ html, body, #game, #overlay, #overlay * {
 .v2-mini .dot.critter { background: none; box-shadow: none; width: 12px; height: 12px; animation: v2-blink 1s steps(1) infinite; }
 .v2-mini .dot.critter canvas { width: 12px; height: 12px; }
 #whos-where-critter:empty { display: none; }
+
+/* ---- Game feel (src/games/juice.ts): floating points, confetti bursts, timer bars ---- */
+.v2-fx-float { position: fixed; z-index: 1000; transform: translate(-50%, -50%); font-family: var(--font-display); font-size: 22px; color: var(--gold); text-shadow: 2px 2px 0 var(--panel-edge); pointer-events: none; white-space: nowrap; animation: v2-fx-up 1s steps(8) forwards; }
+.v2-fx-float.good { color: var(--ok); } .v2-fx-float.bad { color: var(--error); }
+@keyframes v2-fx-up { 15% { transform: translate(-50%, -50%) scale(1.25); } to { transform: translate(-50%, -50%) translateY(-44px); opacity: 0; } }
+.v2-fx-burst { position: fixed; z-index: 1000; width: 0; height: 0; pointer-events: none; }
+.v2-fx-burst i { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; animation: v2-fx-fly .9s cubic-bezier(.15,.7,.35,1) forwards; }
+@keyframes v2-fx-fly { 70% { opacity: 1; } to { transform: translate(var(--dx), calc(var(--dy) + 30px)) rotate(200deg); opacity: 0; } }
+.v2-timer { height: 6px; background: var(--panel-edge); box-shadow: 0 0 0 2px var(--line); overflow: hidden; }
+.v2-timer i { display: block; height: 100%; background: var(--lamp); transform-origin: left; animation: v2-drain linear forwards; }
+.v2-timer.low i { background: var(--error); }
+@keyframes v2-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.v2-shake { animation: v2-shake-x .4s steps(6); }
+@keyframes v2-shake-x { 20% { transform: translateX(-6px) rotate(-2deg); } 40% { transform: translateX(5px) rotate(2deg); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+.v2-pop { animation: v2-pop-in .35s steps(5); }
+@keyframes v2-pop-in { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) { .v2-shake, .v2-pop, .v2-timer i, .v2-die.roll, .v2-die.land, .v2-hand.hidden { animation: none; } .v2-fx-float { animation-duration: .7s; } }

@@ -51,6 +51,7 @@ import { net, type NetQuality } from '../net/netQuality';
 import { reloadForUpdate, watchForNewVersion } from '../ui/update';
 import { addWhosWhereButton } from '../ui/whosWhere';
 import { Tracker } from '../challenges/tracker';
+import { buzz } from '../games/juice';
 import { canRecord, weeklyBoard, type Progress, type Recorded } from '../net/progress';
 import { gamesWon } from '../net/games';
 import { challengeToast, confettiAt, critterToast, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
@@ -1549,6 +1550,7 @@ export class HouseScene extends Phaser.Scene {
     // Dev test mode / no Supabase: catch it here only, no XP.
     if (!canCatch() || !this.presence) {
       this.critters?.markCaught(s.slot, s.idx, this.presence?.id ?? 'me');
+      this.floatWorld(s.x, s.y - 14, 'Caught!');
       play('coin', 0.8);
       critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, 'Test mode: no XP.');
       return;
@@ -1556,6 +1558,8 @@ export class HouseScene extends Phaser.Scene {
     const r = await catchCritter(s.slot, s.idx);
     if (r.ok) {
       this.critters?.markCaught(s.slot, s.idx, this.presence.id);
+      this.floatWorld(s.x, s.y - 14, `+${r.xp} XP`);
+      buzz([15, 30, 15]);
       play('coin', 0.9);
       critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, `+${r.xp} XP`);
       this.gotProgress(r.progress);
@@ -1569,6 +1573,15 @@ export class HouseScene extends Phaser.Scene {
       critterToast(s.id, 'Couldn’t catch it just now', 'Step off and walk into it again.');
       this.time.delayedCall(2000, () => this.critters?.retry(s.slot, s.idx)); // couldn't reach the database: try again
     }
+  }
+
+  // Pixel text rising out of the world (a catch).
+  private floatWorld(x: number, y: number, text: string) {
+    const t = this.add
+      .text(x, y, text, { fontFamily: '"Pixelify Sans", monospace', fontSize: '8px', color: '#ffd36b', stroke: '#0d0912', strokeThickness: 3, resolution: 4 })
+      .setOrigin(0.5, 1)
+      .setDepth(100000);
+    this.tweens.add({ targets: t, y: y - 18, alpha: { from: 1, to: 0 }, duration: 1100, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
   }
 
   // Someone caught a critter (live, from the database).

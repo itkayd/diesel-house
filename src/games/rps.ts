@@ -3,6 +3,7 @@ import { icon } from '../ui/icons';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
 import { randomSeed, sha256 } from './fair';
+import { burst, buzz, floatText, kick } from './juice';
 
 // Rock-paper-scissors duel (UPDATE.md Phase 12), from the tap-a-friend menu, anywhere in the house.
 // Best of 3. Both pick secretly within 10 s: each first sends a hash of (pick + salt), and only once both
@@ -110,6 +111,7 @@ export class Duel {
     this.revealed = false;
     this.els.round.textContent = `Round ${this.round}`;
     this.els.mineHand.textContent = '❔';
+    this.els.mineHand.className = 'v2-hand';
     this.els.theirHand.textContent = '✊';
     this.els.theirHand.className = 'v2-hand hidden';
     this.setButtons(true);
@@ -135,8 +137,10 @@ export class Duel {
     this.mine = await sha256(`${h}:${this.salt}`);
     this.setButtons(false);
     this.els.mineHand.textContent = HANDS[h];
+    kick(this.els.mineHand, 'v2-pop');
     this.els.timer.textContent = '';
     play('click', 0.6);
+    buzz(10);
     this.deps.send({ k: 'commit', id: this.id, from: this.me.id, to: this.them.id, round: this.round, h: this.mine });
     this.setStatus(auto ? 'Time’s up: picked for you. Waiting…' : this.theirs ? 'Both locked in…' : `Locked in. Waiting for ${this.them.name}…`);
     await this.maybeReveal();
@@ -157,14 +161,23 @@ export class Duel {
     this.els.theirHand.textContent = HANDS[b];
     play('card_flip', 0.7);
     const res = this.els.result;
+    kick(this.els.theirHand, 'v2-pop');
     if (BEATS[a] === b) {
       this.score[0]++;
       res.className = 'v2-result win';
       res.textContent = `${HANDS[a]} beats ${HANDS[b]}`;
+      this.els.mineHand.className = 'v2-hand won';
+      this.els.theirHand.className = 'v2-hand lost';
+      floatText(this.els.scoreMe, '+1', 'good');
+      buzz(15);
     } else if (BEATS[b] === a) {
       this.score[1]++;
       res.className = 'v2-result lose';
       res.textContent = `${HANDS[b]} beats ${HANDS[a]}`;
+      this.els.mineHand.className = 'v2-hand lost';
+      this.els.theirHand.className = 'v2-hand won';
+      floatText(this.els.scoreThem, '+1', 'bad');
+      buzz([40, 30, 40]);
     } else {
       res.className = 'v2-result';
       res.textContent = 'Same pick: go again';
@@ -196,6 +209,10 @@ export class Duel {
     res.textContent = draw ? 'It’s a draw' : won ? 'You win the duel!' : `${this.them.name} wins the duel`;
     this.setStatus('');
     play(won ? 'win' : 'lose', 0.7);
+    if (won) {
+      burst(res, 26);
+      buzz([20, 40, 20]);
+    }
     if (this.host && !draw) {
       const [winner, loser] = won ? [this.me.id, this.them.id] : [this.them.id, this.me.id];
       this.deps.send({ k: 'end', id: this.id, from: this.me.id, winner, loser, score: this.score });

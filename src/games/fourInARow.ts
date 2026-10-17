@@ -1,6 +1,7 @@
 import { el } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
+import { burst, buzz } from './juice';
 import { cryptoInt } from './fair';
 import { nameOf } from './kit';
 import type { Names, Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
@@ -126,6 +127,7 @@ export class FourView implements TableView {
   private status = el('div', 'v2-result');
   private rid = 0;
   private sent = 0;
+  private dropped = -1; // the cell our own piece already fell into (don't animate it twice)
 
   constructor(
     private me: string,
@@ -175,9 +177,11 @@ export class FourView implements TableView {
         const i = r * COLS + c;
         const v = st.board[i];
         const cell = el('i', 'cell');
+        if (mine && i === landing(st.board, c)) cell.classList.add('land', `p${seat}`); // ghost piece on hover
         if (v !== '.') {
-          cell.append(el('i', `v2-piece p${v}` + (i === st.last && fresh ? ' drop' : '') + (st.line?.includes(i) ? ' win' : '')));
-          if (i === st.last && fresh) cell.style.setProperty('--fall', String(r + 1));
+          const falls = i === st.last && fresh && i !== this.dropped;
+          cell.append(el('i', `v2-piece p${v}` + (falls ? ' drop' : '') + (st.line?.includes(i) ? ' win' : '')));
+          if (falls) cell.style.setProperty('--fall', String(r + 1));
         }
         col.append(cell);
       }
@@ -185,11 +189,27 @@ export class FourView implements TableView {
         if (!mine || this.sent === st.rid) return;
         this.sent = st.rid;
         this.grid.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = true));
+        this.grid.classList.remove('mine');
+        // Show our piece falling straight away; the host's answer redraws the board a moment later.
+        const at = landing(st.board, c);
+        const r = Math.floor(at / COLS);
+        const cell = at >= 0 ? (col.children[r] as HTMLElement | undefined) : undefined;
+        if (cell) {
+          this.dropped = at;
+          cell.classList.remove('land');
+          cell.style.setProperty('--fall', String(r + 1));
+          cell.append(el('i', `v2-piece p${seat} drop`));
+        }
+        play('card_place', 0.6);
+        buzz(10);
         this.act({ t: 'drop', col: c, rid: st.rid });
       });
       this.grid.append(col);
     }
-    if (fresh && st.last !== undefined) play('card_place', 0.7);
+    // (our own drop already clicked into place when we tapped)
+    const lastBy = st.last !== undefined ? st.board[st.last] : null;
+    if (fresh && st.last !== undefined && String(seat) !== lastBy) play('card_place', 0.7);
+    if (fresh && mine && st.last !== undefined) buzz(10); // your move
 
     this.status.className = 'v2-result';
     if (st.phase === 'play') {
@@ -201,6 +221,10 @@ export class FourView implements TableView {
       const loser = s.players.find((p) => p.id !== st.winner);
       this.status.textContent = st.reason === 'left' ? `${loser ? name(loser.id) : 'Someone'} left · ${who}` : who;
       if (fresh && seat >= 0) play(won ? 'win' : 'lose', 0.7);
+      if (fresh && won) {
+        requestAnimationFrame(() => burst(this.status, 26));
+        buzz([20, 40, 20]);
+      }
     }
   }
 

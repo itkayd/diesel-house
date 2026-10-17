@@ -1,6 +1,7 @@
 import { el } from '../ui/modal';
 import { icon } from '../ui/icons';
 import { play } from '../ui/sounds';
+import { burst, buzz, floatText, kick, timerBar } from './juice';
 import { checkSeed, randomSeed, rng, sha256 } from './fair';
 import { nameOf, pointsRows, topScorers, winTitle } from './kit';
 import type { Names, Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
@@ -243,16 +244,34 @@ export class HigherLowerView implements TableView {
       st.phase === 'done' ? 'Game over.' : `Round ${round} of ${HL_ROUNDS}${playing ? '' : ' · watching'}. Aces high. Bank your points before you bust.`;
 
     // The face-up card, and the deck (face down) it came from.
-    const up = cardEl(st.card);
+    const up = cardEl(st.card, 4);
     up.id = 'hl-card';
     if (fresh && st.last?.to !== undefined) up.classList.add('flip');
-    const deck = cardEl(null);
-    deck.classList.add('deck');
-    this.cards.replaceChildren(deck, up);
+    if (st.last?.result === 'right') up.classList.add('right');
+    if (st.last?.result === 'wrong') up.classList.add('bust');
+    const deck = el('div', 'v2-deck');
+    deck.append(cardEl(null, 4), cardEl(null, 4));
+    // Guesses this turn, one pip each (gold once it's paid off).
+    const pips = el('div', 'v2-pips');
+    pips.id = 'hl-pips';
+    for (let i = 0; i < HL_MAX_GUESSES; i++) pips.append(el('i', i < st.guesses ? (i < st.streak ? 'on' : 'safe') : ''));
+    this.cards.replaceChildren(deck, up, pips);
     if (fresh && st.last) {
       if (st.last.to !== undefined) play('card_flip', 0.7);
       if (st.last.result === 'wrong' && st.last.who === this.me) play('error', 0.5);
       if (st.last.result === 'right') play(st.last.who === this.me ? 'coin' : 'card_place', 0.5);
+      // After the card has flipped over: points float off it, or it shakes on a bust.
+      const l = st.last;
+      const byMe = l.who === this.me;
+      setTimeout(() => {
+        if (l.result === 'right') floatText(up, `+${l.won}`, 'good');
+        if (l.result === 'wrong') {
+          kick(up, 'v2-shake');
+          floatText(up, 'Bust!', 'bad');
+        }
+        if (l.result === 'bank' && l.won) floatText(this.status, `+${l.won} banked`, 'gold');
+      }, 360);
+      if (byMe) buzz(l.result === 'wrong' ? [50, 40, 50] : l.result === 'right' ? 15 : 0);
     }
 
     // What just happened, and whose turn it is.
@@ -277,14 +296,17 @@ export class HigherLowerView implements TableView {
       turn.id = 'hl-turn';
       const pot = st.pot ? ` · ${st.pot} pt${st.pot === 1 ? '' : 's'} at stake` : '';
       turn.textContent += ` Guess ${st.guesses + 1} of ${HL_MAX_GUESSES}${pot}.`;
-      this.acts.append(turn);
+      this.acts.append(turn, timerBar(TURN_MS, 'hl-timer'));
       if (mine) {
         const row = el('div', 'v2-hl-btns');
+        // Rough odds by rank (2 to ace): how many of the other 12 ranks are above / below this one.
+        const v = cardValue(st.card);
+        const odds = { hi: Math.round(((14 - v) / 12) * 100), lo: Math.round(((v - 2) / 12) * 100) };
         for (const [g, label, ic] of [['hi', 'Higher', 'arrow-up'], ['lo', 'Lower', 'arrow-down']] as const) {
           const b = el('button', 'dh-btn');
           b.type = 'button';
           b.id = `hl-${g}`;
-          b.append(icon(ic), document.createTextNode(label));
+          b.append(icon(ic), document.createTextNode(label), el('small', 'odds', `${odds[g]}%`));
           b.addEventListener('click', () => this.send({ t: 'guess', g, rid: st.rid }));
           row.append(b);
         }
@@ -306,6 +328,7 @@ export class HigherLowerView implements TableView {
   }
 
   private send(a: HLAct) {
+    buzz(8);
     this.acts.querySelectorAll('button').forEach((b) => (b.disabled = true));
     this.act(a);
   }
@@ -315,8 +338,13 @@ export class HigherLowerView implements TableView {
     const title = winTitle(winners, this.me, this.names, s.players);
     const sub = el('p', 'v2-note', 'Checking the deck was fair…');
     sub.id = 'hl-fair';
-    this.acts.replaceChildren(el('div', 'v2-result' + (winners.includes(this.me) ? ' win' : ''), title), sub);
+    const res = el('div', 'v2-result' + (winners.includes(this.me) ? ' win' : ''), title);
+    this.acts.replaceChildren(res, sub);
     if (fresh && s.players.some((p) => p.id === this.me)) play(winners.includes(this.me) ? 'win' : 'lose', 0.7);
+    if (fresh && winners.includes(this.me)) {
+      requestAnimationFrame(() => burst(res, 24));
+      buzz([20, 40, 20]);
+    }
     // Fair check: the seed matches the hash shown at the start, and deals the very same cards.
     const ok = !!st.seed && (await checkSeed(st.seed, st.commit)) && st.dealt.every((c, i) => c === cardAt(st.seed!, i));
     sub.textContent = ok

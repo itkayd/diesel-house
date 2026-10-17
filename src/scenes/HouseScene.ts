@@ -433,6 +433,7 @@ export class HouseScene extends Phaser.Scene {
     const user = currentUser();
     if (!user) return void this.choose();
     const owned = [...this.rooms.values()].find((r) => r.owner_id === user.id);
+    if (!user.guest && !document.getElementById('profile')) void this.tracker.flush(); // fresh XP (other tabs, phones)
     openProfile({
       name: this.name,
       character: this.character,
@@ -451,6 +452,7 @@ export class HouseScene extends Phaser.Scene {
       progress: this.progress,
       gamesWon: () => gamesWon(user.id),
     });
+    if (this.progress) document.getElementById('profile')?.setAttribute('data-xp', String(this.progress.xp));
   }
 
   // The mic isn't reaching anyone: if the browser or phone refused it, explain how to fix that first;
@@ -1388,6 +1390,15 @@ export class HouseScene extends Phaser.Scene {
     }
     if (levelled) setTimeout(() => levelUpOverlay(r.level_before, r.level), wait + 300);
     if (r.completed.length || levelled) this.cheer();
+    // Keep an open profile up to date (where it was scrolled to), unless you're typing your name.
+    const prof = document.getElementById('profile');
+    if (prof && (first || prof.dataset.xp !== String(r.xp)) && !prof.contains(document.activeElement)) {
+      const top = prof.querySelector('.dh-panel')?.scrollTop ?? 0;
+      this.openMyProfile();
+      const again = document.getElementById('profile');
+      if (again) again.querySelector('.dh-panel')!.scrollTop = top;
+    }
+    document.getElementById('profile')?.setAttribute('data-xp', String(r.xp));
     // Keep an open Challenges sheet up to date (same tab).
     const sheet = document.getElementById('challenges');
     if (sheet) {
@@ -1434,7 +1445,7 @@ export class HouseScene extends Phaser.Scene {
     b.type = 'button';
     b.className = 'dh-btn';
     b.id = 'board-prompt';
-    b.append(icon('clipboard-list'), document.createTextNode(isTouchDevice() ? 'Read the noticeboard' : 'Noticeboard'));
+    b.append(icon('clipboard-list'), document.createTextNode('Noticeboard'));
     if (!isTouchDevice()) {
       const k = document.createElement('kbd');
       k.textContent = 'E';

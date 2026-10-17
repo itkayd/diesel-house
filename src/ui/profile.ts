@@ -285,9 +285,7 @@ function badges(body: HTMLElement, p: Progress | null) {
     const btn = el('button', 'v2-badge' + (has ? '' : ' locked'));
     btn.type = 'button';
     btn.dataset.badge = m.id;
-    // The next rank to earn: "Lv 30 · 4,000 XP to go" under its silhouette.
-    const next = !has && m.rank !== undefined && RANK_MEDALS.find((r) => !earned(p, r))?.id === m.id;
-    btn.append(medalEl(m), el('span', '', next ? `${m.name} · Lv ${m.rank} · ${Math.max(0, xpFor(m.rank!) - (p?.xp ?? 0)).toLocaleString()} XP to go` : m.name));
+    btn.append(medalEl(m), el('span', '', m.name));
     btn.addEventListener('click', () => {
       body.querySelectorAll('.v2-badge').forEach((x) => x.setAttribute('aria-pressed', String(x === btn)));
       const at = p?.medals.find((x) => x.id === m.id)?.at;
@@ -303,9 +301,17 @@ function badges(body: HTMLElement, p: Progress | null) {
   RANK_MEDALS.forEach((m) => button(m, ranks));
   const stars = legendStars(level);
   if (stars) ranks.lastElementChild?.querySelector('span:last-child')?.append(` ${stars}`);
+  // The next rank to earn, on its own line (it didn't fit inside the little tile on a phone).
+  const next = RANK_MEDALS.find((r) => !earned(p, r) && r.rank !== undefined);
+  const nextEl = el('p', 'v2-note');
+  nextEl.id = 'profile-next-rank';
+  if (next) {
+    nextEl.append('Next: ', bold(next.name), ` at Lv ${next.rank} · ${Math.max(0, xpFor(next.rank!) - (p?.xp ?? 0)).toLocaleString()} XP to go`);
+    ranks.querySelector(`[data-badge="${next.id}"]`)?.classList.add('next');
+  }
   const grid = el('div', 'v2-badges');
   ACHIEVEMENTS.forEach((m) => button(m, grid));
-  body.append(el('div', 'dh-label', 'Rank'), ranks, el('div', 'dh-label', 'Badges'), grid, info);
+  body.append(el('div', 'dh-label', 'Rank'), ranks, ...(next && p ? [nextEl] : []), el('div', 'dh-label', 'Badges'), grid, info);
   if (!p) body.append(el('p', 'v2-note', 'Couldn’t load your medals just now.'));
 }
 

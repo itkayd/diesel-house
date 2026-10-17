@@ -17,11 +17,13 @@ import { toast } from './toasts';
 // the level-up overlay with confetti, and the noticeboard's weekly leaderboard. Numbers come from
 // record_events() (src/net/progress.ts); nothing here decides XP.
 
-// A medal from public/assets/ui/medals.png (48 px cells).
+// A medal from public/assets/ui/medals.png (48 px cells). The ?v= changes whenever the sheet does: Vercel lets
+// phones keep /assets/* for a day, and an old, shorter sheet showed the wrong medals.
+const MEDALS_URL = `assets/ui/medals.png?v=${MEDAL_CELLS}`;
 export function medalEl(m: Medal, size = 48) {
   const s = size / 48;
   const i = el('span', 'v2-medal');
-  i.style.cssText = `width:${size}px;height:${size}px;background-image:url(assets/ui/medals.png);background-size:${MEDAL_CELLS * 48 * s}px ${48 * s}px;background-position:-${m.cell * 48 * s}px 0`;
+  i.style.cssText = `width:${size}px;height:${size}px;background-image:url(${MEDALS_URL});background-size:${MEDAL_CELLS * 48 * s}px ${48 * s}px;background-position:-${m.cell * 48 * s}px 0`;
   i.setAttribute('role', 'img');
   i.setAttribute('aria-label', m.name);
   return i;

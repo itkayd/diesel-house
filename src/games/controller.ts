@@ -144,7 +144,7 @@ export class Games {
     const b = el('button', 'dh-btn');
     b.type = 'button';
     b.id = 'game-prompt';
-    b.append(icon('dice-5'), document.createTextNode(isTouchDevice() ? 'Tap to play' : 'Play games'));
+    b.append(icon('dice-5'), document.createTextNode('Play games'));
     if (!isTouchDevice()) b.append(el('kbd', '', 'E'));
     b.addEventListener('click', () => this.open(spot));
     box.append(b);

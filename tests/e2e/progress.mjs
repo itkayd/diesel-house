@@ -114,6 +114,13 @@ await page.tap('#profile-close');
 // 7. Noticeboard: standing in front of it offers it; the board lists the week with ranks.
 await page.evaluate(() => window.__house.body.reset(175, 240));
 const prompt = await page.waitForSelector('#board-prompt', { timeout: 3000 }).then(() => true, () => false);
+await page.waitForTimeout(300);
+const clear = await page.evaluate(() => {
+  const p = document.getElementById('board-prompt').getBoundingClientRect();
+  const under = [...document.querySelectorAll('.dh-hud-br button, .dh-hud-bl *')].map((e) => e.getBoundingClientRect()).filter((b) => b.width);
+  return { lines: Math.round(p.height / 48), hits: under.filter((b) => !(b.right <= p.left || b.left >= p.right || b.bottom <= p.top || b.top >= p.bottom)).length };
+});
+check('phone: the noticeboard button is one line and clear of the joystick and bottom buttons', clear, clear.lines === 1 && clear.hits === 0);
 await page.evaluate(async () => {
   const { openNoticeboard } = await import('/src/ui/progressUi.ts');
   openNoticeboard([

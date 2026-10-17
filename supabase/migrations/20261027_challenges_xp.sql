@@ -201,6 +201,105 @@ insert into public.event_caps (kind, cap) values
 revoke insert, update, delete on public.event_caps from anon, authenticated;
 
 -- ---- record_events: the only way XP, streaks, challenges and medals change -----------------------------
+-- (Split into small helpers that only record_events() can use, so each piece is easy to read and apply.)
+
+-- One challenge moves on by `amount` (or to `set_to`, for the streak / first in the house; or by one new
+-- `about` for the "different things" ones). Returns {id, title, xp} the moment it's completed, else null.
+create or replace function public.bump_challenge(uid uuid, c public.challenge_defs, pkey text, amount int, about text, set_to int default null)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+#variable_conflict use_variable
+declare
+  pr public.challenge_progress;
+  prog int;
+begin
+  insert into public.challenge_progress (user_id, challenge_id, period_key) values (uid, c.id, pkey) on conflict do nothing;
+  select * into pr from public.challenge_progress where user_id = uid and challenge_id = c.id and period_key = pkey for update;
+  if pr.completed_at is not null then
+    return null;
+  end if;
+  if set_to is not null then
+    if set_to <= pr.progress then
+      return null;
+    end if;
+    prog := set_to;
+  elsif c.uniq then
+    if about is null or about = any (pr.seen) then
+      return null;
+    end if;
+    pr.seen := pr.seen || about;
+    prog := cardinality(pr.seen);
+  else
+    prog := pr.progress + amount;
+  end if;
+  update public.challenge_progress
+    set progress = least(prog, c.goal), seen = pr.seen, completed_at = case when prog >= c.goal then now() end
+    where user_id = uid and challenge_id = c.id and period_key = pkey;
+  if prog < c.goal then
+    return null;
+  end if;
+  insert into public.xp_ledger (user_id, amount, reason) values (uid, c.xp, 'challenge:' || c.id);
+  return jsonb_build_object('id', c.id, 'title', c.title, 'xp', c.xp);
+end;
+$$;
+
+-- Achievement medals (LEVELS.md §7.3) earned and not yet given: id and their one-off XP.
+create or replace function public.medals_due(uid uuid, local_now timestamp, streak int)
+returns table (id text, xp int)
+language sql
+stable
+set search_path = ''
+as $$
+  with t as (select kind, n, seen from public.user_tallies where user_id = uid and scope = 'all')
+  select v.id, v.xp from (values
+    ('decor', 25, exists (select 1 from public.rooms r where r.owner_id = uid and r.name <> 'Empty room')),
+    ('first_knock', 25, exists (select 1 from t where kind = 'knock' and n >= 1)),
+    ('social', 50, exists (select 1 from t where kind = 'emote_sent' and cardinality(seen) >= 3)),
+    ('over_out', 50, exists (select 1 from t where kind = 'walkie_used' and n >= 3)),
+    ('night_owl', 50, extract(hour from local_now) < 5),
+    ('high_roller', 75, exists (select 1 from t where kind = 'double_six' and n >= 1)),
+    ('fast_hand', 75, exists (select 1 from t where kind = 'qd_round_won' and n >= 1)),
+    ('duelist', 100, exists (select 1 from t where kind = 'rps_won' and n >= 3)),
+    ('host', 150, exists (select 1 from t where kind = 'party' and n >= 1)),
+    ('steady', 200, streak >= 7)
+  ) as v(id, xp, earned)
+  where v.earned and not exists (select 1 from public.user_medals um where um.user_id = uid and um.medal_id = v.id);
+$$;
+
+-- Where someone stands, for the screen: XP, level, streak, medals, their 6 challenges, this week's XP.
+create or replace function public.progress_json(uid uuid, day_key text, week_key text)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'xp', p.xp,
+    'level', p.level,
+    'streak', p.streak_days,
+    'best_streak', p.best_streak,
+    'day', day_key,
+    'week', week_key,
+    'medals', coalesce((select jsonb_agg(jsonb_build_object('id', um.medal_id, 'at', um.earned_at) order by um.earned_at) from public.user_medals um where um.user_id = uid), '[]'),
+    'challenges', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', a.id, 'period', a.period, 'title', a.title, 'goal', a.goal, 'xp', a.xp,
+        'progress', coalesce(cp.progress, 0), 'done', cp.completed_at is not null
+      ) order by a.period, a.id)
+      from public.active_challenges(uid, day_key, week_key) a
+      left join public.challenge_progress cp
+        on cp.user_id = uid and cp.challenge_id = a.id and cp.period_key = case a.period when 'day' then day_key else week_key end
+    ), '[]'),
+    'week_xp', coalesce((select sum(l.amount) from public.xp_ledger l where l.user_id = uid and l.created_at >= date_trunc('week', now() at time zone 'UTC') at time zone 'UTC'), 0)
+  )
+  from public.profiles p where p.id = uid;
+$$;
+revoke all on function public.bump_challenge(uuid, public.challenge_defs, text, int, text, int) from public, anon, authenticated;
+revoke all on function public.medals_due(uuid, timestamp, int) from public, anon, authenticated;
+revoke all on function public.progress_json(uuid, text, text) from public, anon, authenticated;
+
 -- events: [{ "k": kind, "n": amount (default 1), "u": what it was about (a room, a friend, a game) }, …]
 -- tz: the browser's IANA time zone (e.g. 'Asia/Dubai'), remembered on the profile.
 -- An empty list still counts as a visit (streak, first in the house) and returns everything for the screen.
@@ -214,7 +313,6 @@ as $$
 declare
   uid uuid := auth.uid();
   p public.profiles;
-  zone text;
   local_now timestamp;
   today date;
   day_key text;
@@ -227,18 +325,15 @@ declare
   amount int;
   about text;
   cap int;
+  internal boolean;
   used bigint;
-  c record;
-  pr public.challenge_progress;
-  pkey text;
-  prog int;
+  c public.challenge_defs;
+  got jsonb;
   gained bigint := 0;
-  level_before int;
   level_after int;
   done jsonb := '[]';
   medals jsonb := '[]';
   m record;
-  internal boolean;
   trusted boolean := coalesce(current_setting('dh.internal', true), '') = 'on'; -- set by the server's own functions
 begin
   if uid is null or not (select public.is_member()) then
@@ -247,7 +342,6 @@ begin
   if jsonb_typeof(coalesce(events, '[]')) <> 'array' or jsonb_array_length(coalesce(events, '[]')) > 300 then
     raise exception 'bad events';
   end if;
-
   if tz is not null and exists (select 1 from pg_catalog.pg_timezone_names where name = tz) then
     update public.profiles set time_zone = tz where id = uid;
   end if;
@@ -255,9 +349,7 @@ begin
   if not found then
     raise exception 'no profile';
   end if;
-  level_before := p.level;
-  zone := coalesce(p.time_zone, 'UTC');
-  local_now := now() at time zone zone;
+  local_now := now() at time zone coalesce(p.time_zone, 'UTC');
   today := local_now::date;
   day_key := 'd:' || to_char(today, 'YYYY-MM-DD');
   week_key := 'w:' || to_char(today, 'IYYY-"W"IW');
@@ -266,9 +358,7 @@ begin
   streak := p.streak_days;
   if p.last_visit_date is distinct from today then
     streak := case when p.last_visit_date = today - 1 then p.streak_days + 1 else 1 end;
-    update public.profiles
-      set streak_days = streak, best_streak = greatest(best_streak, streak), last_visit_date = today
-      where id = uid;
+    update public.profiles set streak_days = streak, best_streak = greatest(best_streak, streak), last_visit_date = today where id = uid;
   end if;
 
   -- First in the house today (UTC). The day's first visitor also tidies up old rows.
@@ -276,7 +366,7 @@ begin
   if found then
     delete from public.xp_ledger where created_at < now() - interval '90 days';
     delete from public.user_tallies where scope like 'd:%' and scope < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
-    delete from public.challenge_progress where period_key < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD') and period_key like 'd:%';
+    delete from public.challenge_progress where period_key like 'd:%' and period_key < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
     delete from public.house_days where day < utc_day - 90;
   end if;
   first_in := exists (select 1 from public.house_days where day = utc_day and first_user = uid);
@@ -288,7 +378,6 @@ begin
     continue when cap is null or (internal and not trusted);
     amount := greatest(1, least(60, coalesce((e ->> 'n')::int, 1)));
     about := nullif(left(e ->> 'u', 64), '');
-
     insert into public.user_tallies (user_id, scope, kind) values (uid, day_key, k) on conflict do nothing;
     select n into used from public.user_tallies where user_id = uid and scope = day_key and kind = k for update;
     amount := least(amount, cap - used)::int;
@@ -300,65 +389,28 @@ begin
         set n = public.user_tallies.n + amount,
             seen = case when about is null or about = any (public.user_tallies.seen) or cardinality(public.user_tallies.seen) >= 50
                         then public.user_tallies.seen else public.user_tallies.seen || about end;
-
     for c in select * from public.active_challenges(uid, day_key, week_key) a where a.kind = k loop
-      pkey := case c.period when 'day' then day_key else week_key end;
-      insert into public.challenge_progress (user_id, challenge_id, period_key) values (uid, c.id, pkey) on conflict do nothing;
-      select * into pr from public.challenge_progress where user_id = uid and challenge_id = c.id and period_key = pkey for update;
-      continue when pr.completed_at is not null;
-      if c.uniq then
-        continue when about is null or about = any (pr.seen);
-        pr.seen := pr.seen || about;
-        prog := cardinality(pr.seen);
-      else
-        prog := pr.progress + amount;
-      end if;
-      update public.challenge_progress
-        set progress = least(prog, c.goal), seen = pr.seen, completed_at = case when prog >= c.goal then now() end
-        where user_id = uid and challenge_id = c.id and period_key = pkey;
-      if prog >= c.goal then
-        insert into public.xp_ledger (user_id, amount, reason) values (uid, c.xp, 'challenge:' || c.id);
+      got := public.bump_challenge(uid, c, case c.period when 'day' then day_key else week_key end, amount, about);
+      if got is not null then
         gained := gained + c.xp;
-        done := done || jsonb_build_object('id', c.id, 'title', c.title, 'xp', c.xp);
+        done := done || got;
       end if;
     end loop;
   end loop;
 
   -- Challenges worked out here: first in the house, and the streak.
   for c in select * from public.active_challenges(uid, day_key, week_key) a where a.kind in ('first_in', 'streak') loop
-    prog := case c.kind when 'first_in' then (case when first_in then 1 else 0 end) else streak end;
-    continue when prog <= 0;
-    pkey := case c.period when 'day' then day_key else week_key end;
-    insert into public.challenge_progress (user_id, challenge_id, period_key) values (uid, c.id, pkey) on conflict do nothing;
-    select * into pr from public.challenge_progress where user_id = uid and challenge_id = c.id and period_key = pkey for update;
-    continue when pr.completed_at is not null or prog <= pr.progress;
-    update public.challenge_progress
-      set progress = least(prog, c.goal), completed_at = case when prog >= c.goal then now() end
-      where user_id = uid and challenge_id = c.id and period_key = pkey;
-    if prog >= c.goal then
-      insert into public.xp_ledger (user_id, amount, reason) values (uid, c.xp, 'challenge:' || c.id);
+    continue when (case c.kind when 'first_in' then (case when first_in then 1 else 0 end) else streak end) <= 0;
+    got := public.bump_challenge(uid, c, case c.period when 'day' then day_key else week_key end, 0, null,
+      case c.kind when 'first_in' then 1 else streak end);
+    if got is not null then
       gained := gained + c.xp;
-      done := done || jsonb_build_object('id', c.id, 'title', c.title, 'xp', c.xp);
+      done := done || got;
     end if;
   end loop;
 
-  -- Achievement medals (LEVELS.md §7.3): first time only, each with a one-off XP bonus.
-  for m in
-    with t as (select kind, n, seen from public.user_tallies where user_id = uid and scope = 'all')
-    select v.id, v.xp from (values
-      ('decor', 25, exists (select 1 from public.rooms r where r.owner_id = uid and r.name <> 'Empty room')),
-      ('first_knock', 25, exists (select 1 from t where kind = 'knock' and n >= 1)),
-      ('social', 50, exists (select 1 from t where kind = 'emote_sent' and cardinality(seen) >= 3)),
-      ('over_out', 50, exists (select 1 from t where kind = 'walkie_used' and n >= 3)),
-      ('night_owl', 50, extract(hour from local_now) < 5),
-      ('high_roller', 75, exists (select 1 from t where kind = 'double_six' and n >= 1)),
-      ('fast_hand', 75, exists (select 1 from t where kind = 'qd_round_won' and n >= 1)),
-      ('duelist', 100, exists (select 1 from t where kind = 'rps_won' and n >= 3)),
-      ('host', 150, exists (select 1 from t where kind = 'party' and n >= 1)),
-      ('steady', 200, streak >= 7)
-    ) as v(id, xp, earned)
-    where v.earned and not exists (select 1 from public.user_medals um where um.user_id = uid and um.medal_id = v.id)
-  loop
+  -- Achievement medals: first time only, each with a one-off XP bonus.
+  for m in select * from public.medals_due(uid, local_now, streak) loop
     insert into public.user_medals (user_id, medal_id) values (uid, m.id) on conflict do nothing;
     if found then
       insert into public.xp_ledger (user_id, amount, reason) values (uid, m.xp, 'medal:' || m.id);
@@ -368,8 +420,7 @@ begin
   end loop;
 
   -- XP and level (no cap), then rank medals for every rank reached (no XP: they come from XP).
-  update public.profiles set xp = xp + gained, level = public.level_for_xp(xp + gained) where id = uid
-    returning level into level_after;
+  update public.profiles set xp = xp + gained, level = public.level_for_xp(xp + gained) where id = uid returning level into level_after;
   for m in
     select v.id from (values ('rank_visitor', 1), ('rank_housemate', 10), ('rank_regular', 20), ('rank_keyholder', 30), ('rank_landlord', 40), ('rank_legend', 50)) as v(id, lv)
     where level_after >= v.lv
@@ -380,30 +431,8 @@ begin
     end if;
   end loop;
 
-  select * into p from public.profiles where id = uid;
-  return jsonb_build_object(
-    'xp', p.xp,
-    'level', p.level,
-    'level_before', level_before,
-    'gained', gained,
-    'streak', p.streak_days,
-    'best_streak', p.best_streak,
-    'day', day_key,
-    'week', week_key,
-    'completed', done,
-    'new_medals', medals,
-    'medals', coalesce((select jsonb_agg(jsonb_build_object('id', um.medal_id, 'at', um.earned_at) order by um.earned_at) from public.user_medals um where um.user_id = uid), '[]'),
-    'challenges', coalesce((
-      select jsonb_agg(jsonb_build_object(
-        'id', a.id, 'period', a.period, 'title', a.title, 'goal', a.goal, 'xp', a.xp,
-        'progress', coalesce(cp.progress, 0), 'done', cp.completed_at is not null
-      ) order by a.period, a.id)
-      from public.active_challenges(uid, day_key, week_key) a
-      left join public.challenge_progress cp
-        on cp.user_id = uid and cp.challenge_id = a.id and cp.period_key = case a.period when 'day' then day_key else week_key end
-    ), '[]'),
-    'week_xp', coalesce((select sum(l.amount) from public.xp_ledger l where l.user_id = uid and l.created_at >= date_trunc('week', now() at time zone 'UTC') at time zone 'UTC'), 0)
-  );
+  return public.progress_json(uid, day_key, week_key)
+    || jsonb_build_object('level_before', p.level, 'gained', gained, 'completed', done, 'new_medals', medals);
 end;
 $$;
 revoke all on function public.record_events(jsonb, text) from public, anon;

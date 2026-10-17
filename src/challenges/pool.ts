@@ -23,6 +23,8 @@ export const CHALLENGE_ICONS: Record<string, IconName> = {
   w_streak: 'flame',
   w_guest: 'ticket',
   w_qd: 'zap',
+  d_catch: 'paw-print',
+  w_catch: 'paw-print',
 };
 
 // Achievement medals (LEVELS.md §7.3) and rank medals (§7.1). `cell`: the 48 px cell in

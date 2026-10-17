@@ -167,5 +167,9 @@ Even at 10 table games a night, every night: ~40k billed messages a month, under
 - Realtime adds only: a presence update when your level or streak changes (a few a day), and one "!" emote broadcast per challenge done or level up (≈ 6–10 a day per person). Under 0.1% of the budget.
 - `xp_ledger`, daily tallies and old daily challenge rows older than 90 days are deleted by the first visitor of each (UTC) day, inside `record_events()`; totals stay on `profiles`.
 
+### Measured: critters (17 Oct 2026)
+- Which critter and where is worked out from the clock on every device: **no messages** to show one.
+- A catch is one database call, and everyone in the house gets one Realtime change message for it (at most ~22 critters an hour, so ~22 × people online). Even 8 friends for 4 hours a night: ~700 a night, ~21k a month.
+
 ## 7. Order
 Phase 9 assets → 10 hallway voice → 11 emotes → 12 quick games → 13 table games → 14 challenges/XP. Stop after each phase for Diesel to test.

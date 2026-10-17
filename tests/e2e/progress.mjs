@@ -119,7 +119,7 @@ await page.evaluate(async () => {
   openNoticeboard([
     { user_id: 'a', display_name: 'Sami', character_index: 2, level: 31, xp_week: 1250, wins_week: 4, streak: 3, best_streak: 9 },
     { user_id: '00000000-0000-0000-0000-0000000000aa', display_name: 'Leveller', character_index: 5, level: 100, xp_week: 300, wins_week: 0, streak: 4, best_streak: 4 },
-  ], '00000000-0000-0000-0000-0000000000aa', false, () => {});
+  ], [], '00000000-0000-0000-0000-0000000000aa', false, () => {});
 });
 const board = await page.evaluate(() => [...document.querySelectorAll('#board-list .v2-board-row')].map((r) => r.textContent));
 check('noticeboard: "Noticeboard" offered at the board; this week’s XP with level and wins, you marked', { prompt, board },

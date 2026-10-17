@@ -184,6 +184,22 @@ alter table public.house_days enable row level security;
 -- Nobody writes any of these directly (no insert/update/delete policies); take away the grants too.
 revoke insert, update, delete on public.challenge_defs, public.challenge_progress, public.user_tallies, public.user_medals, public.xp_ledger, public.house_days from anon, authenticated;
 
+-- ---- Daily caps per kind of event. `internal`: only the server itself may record it (e.g. 'caught',
+-- recorded by catch_critter() in 20261028_critters.sql), never a browser. ------------------------------
+create table public.event_caps (
+  kind text primary key,
+  cap int not null check (cap > 0),
+  internal boolean not null default false
+);
+alter table public.event_caps enable row level security;
+-- No policies: read by record_events() only.
+insert into public.event_caps (kind, cap) values
+  ('room_enter', 200), ('chat_sent', 200), ('voice_min', 300), ('voice_min_group', 300), ('rps_won', 30),
+  ('walkie_used', 60), ('emote_sent', 50), ('reaction_sent', 100), ('knock', 30), ('knock_admitted', 20),
+  ('game_played', 60), ('game_won', 60), ('whisper_used', 60), ('host_game_4', 20), ('qd_fast', 10),
+  ('qd_round_won', 30), ('double_six', 10), ('party', 10), ('guest_met', 20);
+revoke insert, update, delete on public.event_caps from anon, authenticated;
+
 -- ---- record_events: the only way XP, streaks, challenges and medals change -----------------------------
 -- events: [{ "k": kind, "n": amount (default 1), "u": what it was about (a room, a friend, a game) }, …]
 -- tz: the browser's IANA time zone (e.g. 'Asia/Dubai'), remembered on the profile.
@@ -222,12 +238,8 @@ declare
   done jsonb := '[]';
   medals jsonb := '[]';
   m record;
-  caps constant jsonb := '{
-    "room_enter": 200, "chat_sent": 200, "voice_min": 300, "voice_min_group": 300, "rps_won": 30,
-    "walkie_used": 60, "emote_sent": 50, "reaction_sent": 100, "knock": 30, "knock_admitted": 20,
-    "game_played": 60, "game_won": 60, "whisper_used": 60, "host_game_4": 20, "qd_fast": 10,
-    "qd_round_won": 30, "double_six": 10, "party": 10, "guest_met": 20
-  }';
+  internal boolean;
+  trusted boolean := coalesce(current_setting('dh.internal', true), '') = 'on'; -- set by the server's own functions
 begin
   if uid is null or not (select public.is_member()) then
     raise exception 'members only';
@@ -272,8 +284,8 @@ begin
   -- The events, clamped to each kind's daily cap.
   for e in select value from jsonb_array_elements(coalesce(events, '[]')) loop
     k := e ->> 'k';
-    cap := (caps ->> k)::int;
-    continue when cap is null;
+    select ec.cap, ec.internal into cap, internal from public.event_caps ec where ec.kind = k;
+    continue when cap is null or (internal and not trusted);
     amount := greatest(1, least(60, coalesce((e ->> 'n')::int, 1)));
     about := nullif(left(e ->> 'u', 64), '');
 

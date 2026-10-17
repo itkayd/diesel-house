@@ -597,3 +597,10 @@ html, body, #game, #overlay, #overlay * {
 .v2-board-row .s { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2-board-row b .v2-medal { vertical-align: -3px; }
 @media (prefers-reduced-motion: reduce) { .v2-lvl .card, .v2-float { animation: none; } }
+
+/* Critters: on the noticeboard, in toasts and on the map. */
+.v2-critter { image-rendering: pixelated; flex: none; }
+.v2-pets { display: inline-flex; gap: 2px; vertical-align: -4px; }
+.v2-mini .dot.critter { background: none; box-shadow: none; width: 12px; height: 12px; animation: v2-blink 1s steps(1) infinite; }
+.v2-mini .dot.critter canvas { width: 12px; height: 12px; }
+#whos-where-critter:empty { display: none; }

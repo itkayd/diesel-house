@@ -1,6 +1,9 @@
 import { CHALLENGE_ICONS, MEDAL_CELLS, medalById, RANK_MEDALS, type Medal } from '../challenges/pool';
 import { formatXp, legendStars, progress, rankOf, type Rank } from '../challenges/levels';
 import type { BoardRow, Challenge, Progress } from '../net/progress';
+import type { CatchRow } from '../net/critters';
+import { critterIcon } from '../critters/art';
+import { critterById } from '../critters/critters';
 import { icon } from './icons';
 import { el, openModal } from './modal';
 import { hudButtons, overlay } from './overlay';
@@ -206,6 +209,13 @@ export function medalToast(id: string, xp: number) {
   return remove;
 }
 
+// Critters: turned up, caught, got away. The toast's icon is the critter itself.
+export function critterToast(id: string, who: string, what: string) {
+  const remove = toast({ icon: 'paw-print', who, what, small: true, ttl: 3200 });
+  document.querySelector('#toasts .dh-toast:last-child')?.firstElementChild?.replaceWith(critterIcon(id, 28));
+  return remove;
+}
+
 // Shown once even after several level-ups at once ("Level 22 → 24").
 export function levelUpOverlay(from: number, to: number) {
   play('levelup', 0.9);
@@ -253,7 +263,7 @@ export function confettiAt(x: number, y: number) {
 
 // ---- Noticeboard: this week's top housemates ----
 
-export function openNoticeboard(rows: BoardRow[] | null, me: string, guest: boolean, seeChallenges: () => void) {
+export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | null, me: string, guest: boolean, seeChallenges: () => void, tab: 'week' | 'catches' = 'week') {
   const { panel, close } = openModal('noticeboard', { dismissable: true, label: 'noticeboard-title' });
   const head = el('div', 'v2-head');
   const h = el('h2', '', 'Noticeboard');
@@ -265,27 +275,58 @@ export function openNoticeboard(rows: BoardRow[] | null, me: string, guest: bool
   x.append(icon('x'));
   x.addEventListener('click', close);
   head.append(icon('clipboard-list'), h, x);
-  panel.append(head, el('div', 'dh-label', 'This week’s top housemates'));
+  panel.append(head);
   if (guest) {
     panel.append(el('p', 'dh-lede', 'The leaderboard is for members. Guests don’t earn XP.'));
     return;
   }
+  const tabs = el('div', 'v2-tabs');
+  tabs.setAttribute('role', 'tablist');
+  const label = el('div', 'dh-label');
   const list = el('div', 'v2-list');
   list.id = 'board-list';
-  if (!rows) list.append(el('p', 'v2-note', 'Couldn’t load the board just now.'));
-  else if (!rows.length) list.append(el('p', 'v2-note', 'Nobody has earned XP this week yet.'));
-  rows?.forEach((r, i) => {
-    const row = el('div', 'v2-board-row' + (r.user_id === me ? ' me' : ''));
-    row.dataset.player = r.user_id;
-    const who = el('b');
-    who.append(medalEl(rankMedal(rankOf(r.level)), 16), document.createTextNode(` ${r.display_name}${r.user_id === me ? ' (you)' : ''}`));
-    const sub = `Lv ${r.level.toLocaleString()} · ${r.wins_week} win${r.wins_week === 1 ? '' : 's'} · ${r.best_streak}-day best streak`;
-    const mid = el('span');
-    mid.style.cssText = 'display:grid;gap:2px;min-width:0';
-    mid.append(who, el('span', 's', sub));
-    row.append(el('span', 'rk' + (i < 3 && r.xp_week > 0 ? ' top' : ''), String(i + 1)), portrait(r.character_index, 32), mid, el('span', 'v2-xpchip', formatXp(r.xp_week)));
-    list.append(row);
-  });
+  const note = el('p', 'v2-note');
+  const show = (t: 'week' | 'catches') => {
+    tabs.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+    list.replaceChildren();
+    if (t === 'week') {
+      label.textContent = 'This week’s top housemates';
+      note.textContent = 'Resets every Monday at 00:00 UTC.';
+      if (!rows) list.append(el('p', 'v2-note', 'Loading the board…'));
+      else if (!rows.length) list.append(el('p', 'v2-note', 'Nobody has earned XP this week yet.'));
+      rows?.forEach((r, i) => {
+        const sub = `Lv ${r.level.toLocaleString()} · ${r.wins_week} win${r.wins_week === 1 ? '' : 's'} · ${r.best_streak}-day best streak`;
+        list.append(boardRow(i, r.user_id, r.display_name, r.character_index, r.level, sub, formatXp(r.xp_week), r.xp_week > 0, me));
+      });
+    } else {
+      label.textContent = 'Today’s catches';
+      note.textContent = 'Critters turn up around the house every few minutes: walk into one to catch it. Resets at 00:00 UTC.';
+      if (!catches) list.append(el('p', 'v2-note', 'Loading today’s catches…'));
+      else if (!catches.length) list.append(el('p', 'v2-note', 'Nothing caught yet today. Keep an eye out!'));
+      catches?.forEach((r, i) => {
+        const row = boardRow(i, r.user_id, r.display_name, r.character_index, r.level, `${r.caught} caught`, `+${formatXp(r.xp)}`, true, me);
+        // What they caught: a little row of critters (the latest 8).
+        const pets = el('span', 'v2-pets');
+        r.critters.slice(-8).forEach((c) => {
+          const ic = critterIcon(c, 16);
+          ic.title = critterById(c)?.name ?? c;
+          pets.append(ic);
+        });
+        row.querySelector('.s')?.append(' ', pets);
+        list.append(row);
+      });
+    }
+  };
+  for (const [t, ic, text] of [['week', 'trophy', 'This week'], ['catches', 'paw-print', 'Today’s catches']] as const) {
+    const b = el('button');
+    b.type = 'button';
+    b.dataset.tab = t;
+    b.id = `board-tab-${t}`;
+    b.setAttribute('role', 'tab');
+    b.append(icon(ic), text);
+    b.addEventListener('click', () => show(t));
+    tabs.append(b);
+  }
   const go = el('button', 'dh-btn');
   go.type = 'button';
   go.id = 'board-challenges';
@@ -294,6 +335,18 @@ export function openNoticeboard(rows: BoardRow[] | null, me: string, guest: bool
     close();
     seeChallenges();
   });
-  panel.append(list, el('p', 'v2-note', 'Resets every Monday at 00:00 UTC.'), go);
+  panel.append(tabs, label, list, note, go);
+  show(tab);
 }
 
+function boardRow(i: number, id: string, name: string, character: number, level: number, sub: string, chip: string, top: boolean, me: string) {
+  const row = el('div', 'v2-board-row' + (id === me ? ' me' : ''));
+  row.dataset.player = id;
+  const who = el('b');
+  who.append(medalEl(rankMedal(rankOf(level)), 16), document.createTextNode(` ${name}${id === me ? ' (you)' : ''}`));
+  const mid = el('span');
+  mid.style.cssText = 'display:grid;gap:2px;min-width:0';
+  mid.append(who, el('span', 's', sub));
+  row.append(el('span', 'rk' + (i < 3 && top ? ' top' : ''), String(i + 1)), portrait(character, 32), mid, el('span', 'v2-xpchip', chip));
+  return row;
+}

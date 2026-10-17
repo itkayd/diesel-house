@@ -97,6 +97,39 @@ export class WalkGrid {
     return pts;
   }
 
+  // Free cells you can walk to from `from` (doors open), as a test for points.
+  reachableFrom(from: Pt) {
+    const seen = new Uint8Array(this.cols * this.rows);
+    const s = this.nearestFree(from, 2);
+    if (s) {
+      const queue = [s.r * this.cols + s.c];
+      seen[queue[0]] = 1;
+      for (let qi = 0; qi < queue.length; qi++) {
+        const cur = queue[qi];
+        const c = cur % this.cols;
+        const r = Math.floor(cur / this.cols);
+        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nc = c + dc;
+          const nr = r + dr;
+          if (!this.ok(nc, nr) || seen[nr * this.cols + nc]) continue;
+          seen[nr * this.cols + nc] = 1;
+          queue.push(nr * this.cols + nc);
+        }
+      }
+    }
+    return (p: Pt) => {
+      const { c, r } = this.cellOf(p);
+      return c >= 0 && r >= 0 && c < this.cols && r < this.rows && seen[r * this.cols + c] === 1;
+    };
+  }
+
+  // Centres of free cells, every `every` cells across and down, row by row (the same on every device).
+  freePoints(every = 2): Pt[] {
+    const out: Pt[] = [];
+    for (let r = 0; r < this.rows; r += every) for (let c = 0; c < this.cols; c += every) if (this.ok(c, r)) out.push(this.centre(r * this.cols + c));
+    return out;
+  }
+
   private centre(i: number): Pt {
     return { x: (i % this.cols) * CELL + CELL / 2, y: Math.floor(i / this.cols) * CELL + CELL / 2 };
   }

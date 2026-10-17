@@ -53,8 +53,11 @@ import { addWhosWhereButton } from '../ui/whosWhere';
 import { Tracker } from '../challenges/tracker';
 import { canRecord, weeklyBoard, type Progress, type Recorded } from '../net/progress';
 import { gamesWon } from '../net/games';
-import { challengeToast, confettiAt, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
+import { challengeToast, confettiAt, critterToast, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
 import { WalkGrid, type Pt, type Rect } from './pathfind';
+import { Critters, type Spawn } from './critters';
+import { critterById, slotAt } from '../critters/critters';
+import { canCatch, caughtSlots, catchBoard, catchCritter } from '../net/critters';
 
 const SPEED = 80; // px per second
 const ZONE_SETTLE_MS = 150; // a zone change counts once you have been in the new zone this long
@@ -142,6 +145,7 @@ export class HouseScene extends Phaser.Scene {
   private metGuests = new Set<string>();
   private partied = false;
   private boardPrompt: HTMLDivElement | null = null;
+  private critters: Critters | null = null;
   private autoKnock: RoomId | null = null;
   private autoCheck = { t: 0, x: 0, y: 0 };
   private wallLayer!: Phaser.Tilemaps.TilemapLayer;
@@ -215,6 +219,7 @@ export class HouseScene extends Phaser.Scene {
     }
     doorBlocks.refresh();
     this.doorBlocks = doorBlocks;
+    this.setupCritters();
     this.physics.add.collider(
       this.player,
       doorBlocks,
@@ -498,6 +503,7 @@ export class HouseScene extends Phaser.Scene {
           }
         },
         onRoomChange: (room) => void this.roomChanged(room),
+        onCatch: (c) => this.someoneCaught(c),
         onDoor: (m) => void this.doorMessage(m),
         onEmote: (m) => this.receiveEmote(m),
         onDice: (m) => this.receiveDice(m),
@@ -1290,6 +1296,7 @@ export class HouseScene extends Phaser.Scene {
     const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
     this.games?.showPrompt(modalOpen() ? null : spot);
     this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
+    if (this.canMove && !this.presence?.isReplaced) this.critters?.update(this.player);
     if (this.games?.openSpot && !spot) this.games.close();
     // The walkie button follows where you are every frame, so it can never be left hidden in the hallway
     // (a missed zone update or a setup hiccup used to leave it off until you walked into a room and back).
@@ -1362,12 +1369,13 @@ export class HouseScene extends Phaser.Scene {
 
   private gotProgress(r: Recorded) {
     const first = !this.progress;
+    const prevLevel = this.progress?.level;
     this.progress = r;
     this.progressHud?.update(r, first ? 0 : r.gained);
     this.me.setProgress(r.level, r.streak);
     this.presence?.update(this.rankInfo());
     // One after another: challenges, then medals (a new rank shows in the level-up instead), then level up.
-    const levelled = r.level > r.level_before;
+    const levelled = r.level > Math.min(r.level_before, prevLevel ?? r.level_before);
     let wait = 0;
     for (const c of r.completed) {
       setTimeout(() => challengeToast(c), wait);
@@ -1409,10 +1417,10 @@ export class HouseScene extends Phaser.Scene {
   private async openBoard() {
     const user = currentUser();
     const guest = !!user?.guest;
-    openNoticeboard(null, user?.id ?? '', guest, () => this.openMyChallenges());
+    openNoticeboard(null, null, user?.id ?? '', guest, () => this.openMyChallenges());
     if (guest || !canRecord()) return;
-    const rows = await weeklyBoard();
-    if (document.getElementById('noticeboard')) openNoticeboard(rows, user?.id ?? '', guest, () => this.openMyChallenges());
+    const [rows, catches] = await Promise.all([weeklyBoard(), catchBoard()]);
+    if (document.getElementById('noticeboard')) openNoticeboard(rows, catches, user?.id ?? '', guest, () => this.openMyChallenges());
   }
 
   private showBoardPrompt(on: boolean) {
@@ -1473,6 +1481,87 @@ export class HouseScene extends Phaser.Scene {
     }
   }
 
+  // ---- Critters: catch them for XP (supabase/migrations/20261028_critters.sql) ----
+
+  // Where critters can turn up: free floor in the hallway and the rooms, away from the game spots, the
+  // noticeboard and the front door. Worked out from the map alone, so it's the same on every device.
+  private setupCritters() {
+    const b = this.body;
+    const feet = { x: b.offset.x + b.width / 2 - this.player.displayOriginX, y: b.offset.y + b.height / 2 - this.player.displayOriginY };
+    const blocked: Rect[] = [];
+    this.wallLayer.forEachTile((t) => {
+      if (t.index !== -1) blocked.push({ x: t.pixelX, y: t.pixelY, w: t.width, h: t.height });
+    });
+    for (const o of this.look.solids.getChildren() as Phaser.GameObjects.Rectangle[]) blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height });
+    const grid = new WalkGrid(this.wallLayer.width, this.wallLayer.height, blocked, { hw: b.width / 2 + 4, hh: b.height / 2 + 4 });
+    const avoid = [...this.spots.spots, ...(this.spots.board ? [this.spots.board] : []), { x: 48, y: 288 }];
+    const canReach = grid.reachableFrom({ x: 48 + feet.x, y: 288 + feet.y }); // from the front door
+    const places = grid
+      .freePoints(2)
+      .filter(canReach)
+      .map((p) => ({ x: p.x - feet.x, y: p.y - feet.y }))
+      .filter((p) => this.zones.some((z) => z.rect.contains(p.x, p.y - 3)) && avoid.every((a) => Math.hypot(a.x - p.x, a.y - p.y) > 28));
+    this.critters = new Critters(this, places, {
+      appeared: (s) => this.critterAppeared(s),
+      near: (s) => void this.catchCritter(s),
+    });
+    // Arriving mid-slot: someone may have caught it already.
+    void caughtSlots(slotAt(Date.now()) - 1).then((rows) => rows.forEach((r) => this.critters?.markCaught(r.slot, r.user_id)));
+  }
+
+  private zoneOf(x: number, y: number) {
+    return this.zones.find((z) => z.rect.contains(x, y - 3))?.name ?? null;
+  }
+
+  // A critter turned up where we are: a little hint.
+  private critterAppeared(s: Spawn) {
+    const zone = this.zoneOf(s.x, s.y);
+    if (!zone || zone !== this.zone || modalOpen() || document.hidden) return;
+    const c = critterById(s.id)!;
+    critterToast(s.id, `A ${c.name.toLowerCase()} turned up ${zone === 'hallway' ? 'in the hallway' : 'in here'}!`, `Walk into it to catch it · +${c.xp} XP`);
+  }
+
+  private async catchCritter(s: Spawn) {
+    const user = currentUser();
+    const c = critterById(s.id)!;
+    if (user?.guest) {
+      critterToast(s.id, `The ${c.name.toLowerCase()} ran off`, 'Only members can catch critters.');
+      return;
+    }
+    // Dev test mode / no Supabase: catch it here only, no XP.
+    if (!canCatch() || !this.presence) {
+      this.critters?.markCaught(s.slot, this.presence?.id ?? 'me');
+      play('coin', 0.8);
+      critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, 'Test mode: no XP.');
+      return;
+    }
+    const r = await catchCritter(s.slot);
+    if (r.ok) {
+      this.critters?.markCaught(s.slot, this.presence.id);
+      play('coin', 0.9);
+      critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, `+${r.xp} XP`);
+      this.gotProgress(r.progress);
+    } else if (r.why === 'taken') {
+      this.critters?.markCaught(s.slot, r.by ?? '');
+      const who = r.by ? (this.remotes.get(r.by)?.info.name ?? 'Someone') : 'Someone';
+      critterToast(s.id, `${who} got the ${c.name.toLowerCase()} first`, 'Be quicker next time!');
+    } else if (r.why === 'enough') {
+      critterToast(s.id, 'That’s 25 catches today', 'The critters need a rest. More tomorrow!');
+    } else if (r.why === 'error') {
+      this.time.delayedCall(3000, () => this.critters?.retry(s.slot)); // couldn't reach the database: try again
+    }
+  }
+
+  // Someone caught a critter (live, from the database).
+  private someoneCaught(c: { slot: number; user_id: string; critter: string; xp: number }) {
+    const had = this.critters?.current;
+    this.critters?.markCaught(c.slot, c.user_id);
+    if (c.user_id === this.presence?.id || !had || had.slot !== c.slot) return;
+    const r = this.remotes.get(c.user_id);
+    if (!r?.active || r.info.zone !== this.zone) return;
+    critterToast(c.critter, `${r.info.name} caught the ${critterById(c.critter)?.name.toLowerCase() ?? 'critter'}`, `+${c.xp} XP`);
+  }
+
   // ---- Who's where: the map, and walking there by itself ----
 
   private whosWhere() {
@@ -1493,6 +1582,10 @@ export class HouseScene extends Phaser.Scene {
           talking: !!here(r) && here(r) !== 'hallway' && this.countIn(here(r)!) > 1,
         })),
       label: (z: Zone) => zoneLabel(z),
+      critter: (() => {
+        const s = this.critters?.current;
+        return s ? { id: s.id, name: critterById(s.id)!.name, x: s.x, y: s.y, zone: this.zoneOf(s.x, s.y), secondsLeft: this.critters!.secondsLeft } : null;
+      })(),
       goRoom: (room: RoomId) => this.walkToRoom(room),
       goTo: (id: string) => {
         const r = this.remotes.get(id);

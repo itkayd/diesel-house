@@ -3,6 +3,7 @@ import { icon } from './icons';
 import { el, openModal } from './modal';
 import { hudButtons } from './overlay';
 import { portrait } from './portrait';
+import { critterIcon } from '../critters/art';
 
 // "Who's where" (design/game/v2.html showPeople): a map button in the HUD opens a little map of the house
 // with everyone on it, and a list of friends with where they are. Tap a room on the map, or Go next to a
@@ -15,6 +16,7 @@ export type WhoWhere = {
   me: { x: number; y: number; zone: Zone | null };
   people: { id: string; name: string; character: number; x: number; y: number; zone: Zone | null; talking: boolean }[];
   label: (zone: Zone) => string;
+  critter: { id: string; name: string; x: number; y: number; zone: Zone | null; secondsLeft: number } | null; // one to catch right now
   goRoom: (room: RoomId) => void;
   goTo: (id: string) => void;
 };
@@ -77,6 +79,7 @@ export function openWhosWhere(get: () => WhoWhere) {
   const note = el('p', 'v2-note', 'Tap a room on the map, or Go next to a friend, and you’ll walk there. Move any way to stop.');
 
   let lastList = '';
+  let critNote = el('p');
   const draw = () => {
     const w = get();
     // Dots: friends' faces, and you (blinking).
@@ -90,6 +93,21 @@ export function openWhosWhere(get: () => WhoWhere) {
         return d;
       }),
     );
+    const crit = el('p', 'v2-note');
+    crit.id = 'whos-where-critter';
+    if (w.critter) {
+      const c = el('span', 'dot critter');
+      c.style.left = pct(w.critter.x, w.size.w);
+      c.style.top = pct(w.critter.y - 6, w.size.h);
+      c.append(critterIcon(w.critter.id, 12));
+      c.title = w.critter.name;
+      dots.append(c);
+      const where = !w.critter.zone || w.critter.zone === 'hallway' ? 'the hallway' : w.label(w.critter.zone);
+      const m = Math.floor(w.critter.secondsLeft / 60);
+      crit.textContent = `A ${w.critter.name.toLowerCase()} is in ${where} for another ${m ? `${m}:${String(w.critter.secondsLeft % 60).padStart(2, '0')}` : `${w.critter.secondsLeft} s`}. Catch it!`;
+    }
+    critNote.replaceWith(crit);
+    critNote = crit;
     const me = el('span', 'dot me');
     me.style.left = pct(w.me.x, w.size.w);
     me.style.top = pct(w.me.y - 6, w.size.h);
@@ -121,5 +139,5 @@ export function openWhosWhere(get: () => WhoWhere) {
   };
   draw();
   const timer = setInterval(() => (document.getElementById('whos-where') ? draw() : clearInterval(timer)), 500);
-  ui.panel.append(head, mini, note, list);
+  ui.panel.append(head, mini, critNote, note, list);
 }

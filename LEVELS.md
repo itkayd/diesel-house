@@ -100,17 +100,19 @@ Medals are the badges already in the profile (`src/ui/profile.ts`, sprites in `p
 The mock's `lvl5` ("Level 5") and `legend` ("House legend — reach level 10") achievement badges overlap with ranks. **Remove both**; the rank medals replace them. Their two medal sprites (cells 8 and 9) can be reused for new achievements later. That leaves **10 achievement medals**.
 
 ### 7.3 XP for achievement medals (one-off, first time only)
+
+(Updated 18 Oct for REDESIGN.md: rooms have no owners, so "Home maker", "First knock" and "Party host" became the three new medals below. They reuse the same medal sprites.)
 | Medal | XP |
 |---|---|
-| Home maker (name your room) | 25 |
-| First knock | 25 |
+| House tour (visit all 7 rooms) | 25 |
+| Dance machine (2 min on the Disco floor) | 25 |
 | Social butterfly | 50 |
 | Over and out (walkie 3×) | 50 |
 | Night owl | 50 |
 | High roller (double six) | 75 |
 | Fastest hand (win Quick Draw) | 75 |
 | Duelist (win 3 RPS duels) | 100 |
-| Party host (4 people in your room) | 150 |
+| Party starter (be in a room when it reaches 4 people) | 150 |
 | Slow & steady (7-day streak) | 200 |
 | **Total** | **800** |
 
@@ -123,4 +125,4 @@ Rank medals give **no** XP (they come *from* XP, so no loops).
 - Guests: medals and XP don't apply (same as the rest of Phase 14).
 - Toast on earning: medal sprite + name + "+75 XP", medal sound, then the level-up overlay if the bonus caused a level-up (medal toast first, level-up second).
 
-**Done when:** the Phase 14 "Done when" in `UPDATE.md` passes, the unit tests above pass on both TS and SQL, a test account with 10,000,000 XP shows level 5,010 correctly on the name tag, HUD and profile, no code path rejects a level over 100, a test account crossing level 30 gets the Keyholder medal exactly once, the Legend medal shows ★★ at level 100, and earning "Party host" adds exactly 150 XP once (not again on refresh).
+**Done when:** the Phase 14 "Done when" in `UPDATE.md` passes, the unit tests above pass on both TS and SQL, a test account with 10,000,000 XP shows level 5,010 correctly on the name tag, HUD and profile, no code path rejects a level over 100, a test account crossing level 30 gets the Keyholder medal exactly once, the Legend medal shows ★★ at level 100, and earning "Party starter" adds exactly 150 XP once (not again on refresh).

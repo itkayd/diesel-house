@@ -127,8 +127,8 @@ Quick win that the games need anyway.
 - **Streak**: visited the house on consecutive days → flame + number on your name tag.
 
 ### Starter challenge pool (pick 3 daily / 3 weekly at random per person, seeded by date + user so it's stable for the day)
-Daily (10–40 XP): Say hi in 3 different rooms · Spend 15 min in voice with at least 2 friends · Win a Rock-Paper-Scissors duel · Use the walkie-talkie 3 times · Send 5 emotes · React to 5 chat messages · Be the first friend in the house today · Knock on a door and get let in · Play any mini-game · Whisper to someone in the hallway.
-Weekly (80–200 XP): Visit every room · Win 5 games · 2 hours in voice this week · Host a game with 4+ players · Play all 6 mini-games · Keep a 4-day streak · Welcome a guest your friend invited · Win Quick Draw with a reaction under 250 ms.
+Daily (10–40 XP): Say hi in 3 different rooms · Spend 15 min in voice with at least 2 friends · Win a Rock-Paper-Scissors duel · Use the walkie-talkie 3 times · Send 5 emotes · React to 5 chat messages · Be the first friend in the house today · Dance in the Disco for 2 minutes *(was: knock on a door — changed by REDESIGN.md)* · Play any mini-game · Whisper to someone in the hallway.
+Weekly (80–200 XP): Visit all 7 rooms · Win 5 games · 2 hours in voice this week · Host a game with 4+ players · Play all 6 mini-games · Keep a 4-day streak · Welcome a guest your friend invited · Win Quick Draw with a reaction under 250 ms.
 
 ### Implementation
 - Definitions live in code: `src/challenges/pool.ts` (id, period daily|weekly, title, goal, xp, event kind, filter).

@@ -9,7 +9,7 @@ Read after `CLAUDE.md`, `FIXES.md`, `NEXT.md`, `UPDATE.md`, `LEVELS.md`. **This 
 ## 0. What Diesel asked for
 1. Seriously upgrade the UX. Fix lots of bugs and make the foundations solid, so things are easy to change and edit later.
 2. Make it feel like **one house**, not a grid of boxes.
-3. New shared rooms: a **Disco**, a **Library** and a **Lounge**.
+3. **No more 8 personal rooms.** Every room is a **shared themed space** with no owners (decided 18 Oct): Disco, Library, Lounge, Gaming room, Café, Garden and Rooftop. Diesel: "mix it and match it".
 4. Drop the 4-over-4 layout. Use a **hexagon or another shape, with the hallway as the centre**.
 5. **Many character skins** and **many animals**.
 6. Pull in 10+ diverse free pixel packs, because the overall look may change.
@@ -30,37 +30,49 @@ Read after `CLAUDE.md`, `FIXES.md`, `NEXT.md`, `UPDATE.md`, `LEVELS.md`. **This 
 
 ---
 
-## 2. The new house (layout Option A — octagon Great Hall)
+## 2. The new house (layout Option A — octagon Great Hall, 7 shared rooms)
 
 Sketch: **`design/redesign/floorplan_octagon.png`**
 
-- **Great Hall** at the centre, an **octagon** (8 faces). Every room opens off it, so it reads as one house. The games corner, noticeboard, walkie, whispering, and the rug/whisper zone in the middle all move here.
-- **North face → Library** (shared). **East face → Disco** (shared, bigger wing). **West face → Lounge** (shared, bigger wing). **South face → Front porch** (spawn, front door).
-- **The 4 diagonal faces each open onto 2 friend rooms → 8 friend rooms** (owners keep their rooms; map `room_01..08` onto the new slots in order).
-- Pixel tiles are square, so **diagonal walls are stepped** (1 tile across, 1 tile down) with a dedicated corner tile. They must look intentional, not jagged. Diagonal friend rooms in the sketch are drawn thin; make them at least 9 × 9 tiles inside.
+**Decision (18 Oct): no private rooms and no owners.** The house is the Great Hall plus 7 themed rooms anyone can use. The 8 personal rooms (`room_01..08`) are retired.
+
+| Hall face | Room | Voice | Look & features |
+|---|---|---|---|
+| Centre | **Great Hall** | Hallway rules (whisper + walkie) | Hub of the house: games corner, noticeboard, rug/whisper zone. |
+| S | **Front porch** | Hallway rules | Spawn point and front door. |
+| N | **Garden** (back door) | Open room voice | Outdoor: grass, trees, pond, bench, fire pit, night sky + stars. Most animals live here (fox, doe, owl, squirrel, frog). |
+| NW | **Rooftop** (stairs up from the hall) | Open room voice | Part of the garden idea: deck chairs, fairy lights, city skyline at night, telescope. |
+| NE | **Library** | **Quiet voice**: whisper-style falloff, no full-room mesh | Bookshelves, reading nooks, lamps, shared study timer on a desk. Owl lives here. |
+| E (big wing) | **Disco** | Open voice + **music bed** (anyone starts/stops a track from the jukebox) | Dance floor that changes colour, glitter ball, light sweeps, DJ booth, dance emote on the floor. Music never leaks into other rooms. |
+| SE | **Gaming room** | Open room voice | Arcade cabinets, consoles/TV, beanbags. **All table games move here** (Dice, RPS, Quick Draw, Higher or Lower, Hot Takes, Four in a Row). |
+| SW | **Café / Kitchen** | Open room voice | Coffee-shop look (Coffee Shop pack #4): counter, stools, bistro tables, a fridge with a daily "special". Cat lives here. |
+| W (big wing) | **Lounge** | Open room voice | Sofas, rug, fireplace, TV "watch party" card (link only), a second game table. |
+
+- Pixel tiles are square, so **diagonal walls are stepped** (1 tile across, 1 tile down) with a dedicated corner tile. They must look intentional, not jagged. Rooms on the diagonals must be at least 10 × 10 tiles inside.
+- With only 7 rooms, each can be bigger and more detailed than the old rooms. Aim for 14 × 12+ tiles, and wings (Disco, Lounge) around 18 × 14.
+- **No owners means:**
+  - **Doors** are always open. Remove the knock / lock / let-in flow, room passes, "remove guest" and owner room settings.
+  - Instead, anyone inside a room can toggle **"Do not disturb"**. The door shows a sign, and people outside get a gentle "They've asked for quiet. Go in anyway?" before entering. No hard lock.
+  - **Room names** are fixed (Disco, Library …); no renaming.
+  - **Game rules** per room (which games are allowed, custom Hot Takes prompts): any member can edit them from the room's noticeboard, which keeps a simple change log.
+  - **Ownership in the DB** (`rooms.owner_id`, `room_passes`, knock broadcasts): stop using it in R1. Leave the columns and tables in place for one release, then drop them in a later migration (tell Diesel first).
 - Option B (true hexagon in isometric view) was rejected for now: it means a full engine rewrite and far fewer assets. The isometric packs (#8, #9) are downloaded only so R2 can show what it would look like.
 
-### Shared rooms (new)
-| Room | Voice | Look & features |
-|---|---|---|
-| **Disco** | Open room voice, **music bed** (owner-less, anyone can start/stop a track from a jukebox) | Flashing dance floor (code-driven tile colours), spinning glitter ball, coloured light sweeps (additive Phaser lights), DJ booth. Dance emote loops while you stand on the floor. Never plays music into other rooms. |
-| **Library** | **Quiet voice**: whisper-style falloff like the hallway (no full-room mesh) | Bookshelves, reading nooks, lamps, a "study timer" (shared Pomodoro on a desk). Warm low light. |
-| **Lounge** | Open room voice | Sofas, rug, fireplace, a TV that shows a shared "watch party" link card (link only, no video streaming), board-game table → reuse the table games. |
-
-Shared rooms have **no owner**. Door is always open. Any member can use them; guests can too (same as the hall).
-
----
+### Knock-on changes to other plans
+- **Challenges (`UPDATE.md` §5):** replace "Knock on a door and get let in" with "Dance in the Disco for 2 minutes". Replace the weekly "Visit every room" with "Visit all 7 rooms".
+- **Medals (`LEVELS.md` §7.3):** these are already live (`src/challenges/pool.ts`, `20261027_challenges_xp.sql`). Keep the ids so nobody loses a medal they've earned, and only change the name, rule and "how" text: `decor` → **House tour** (visit all 7 rooms), `first_knock` → **Dance machine** (2 min on the Disco floor), `host` → **Party starter** (be in a room when it reaches 4 people). Anyone who already has them keeps them and their XP. Update the award checks in a new migration.
+- **Game spots (`UPDATE.md` §4):** `game:room_XX` topics become `game:<roomId>` (e.g. `game:gaming`, `game:lounge`).
 
 ## 3. Foundations (Phase R1 — do before any visuals)
-1. **Rooms become data.** Add `src/house/rooms.ts`, one list of `{ id, kind: 'private'|'shared', name, voice: 'room'|'quiet'|'music', polygon, door, floor, wall, theme }`. Everything (map build, zone lookup, voice, chat, games spots, "Who's where") reads from it.
-2. **Database.** New migration: drop the `room_0[1-8]` check. Allow ids `^[a-z0-9_]{3,32}$`, add a `kind` column, seed `disco`, `library`, `lounge`. Rewrite the Realtime policies to look up the `rooms` table instead of using a regex (`exists (select 1 from rooms where id = substr(topic, 7))` + `can_enter_room`). Shared rooms: `can_enter_room` returns true for members and admitted guests.
+1. **Rooms become data.** Add `src/house/rooms.ts`, one list of `{ id, name, voice: 'room'|'quiet'|'music', polygon, door, floor, wall, theme }`. Everything (map build, zone lookup, voice, chat, games spots, "Who's where") reads from it.
+2. **Database.** New migration: drop the `room_0[1-8]` check. Allow ids `^[a-z0-9_]{3,32}$`, seed `garden`, `rooftop`, `library`, `disco`, `gaming`, `cafe`, `lounge`, and mark `room_01..08` retired (`active = false`, kept for one release). Rewrite the Realtime policies to look up the `rooms` table instead of using a regex (`exists (select 1 from rooms where id = substr(topic, 7))` + `can_enter_room`). `can_enter_room` becomes: true for members and admitted guests on any active room (no owner or door checks). Add a `dnd` (do-not-disturb) flag + `dnd_set_by`/`dnd_at` on `rooms`; any member inside can set it, and it auto-clears when the room empties.
 3. **Polygon zones.** Zones come from polygons (Tiled polygon objects or `rooms.ts`), checked with `Phaser.Geom.Polygon.Contains`, plus a cached tile → zone lookup grid so it stays fast.
-4. **Split `HouseScene.ts`** into modules: `house/map.ts` (load, layers, collision), `house/zones.ts`, `house/players.ts` (avatars, interpolation), `house/doors.ts`, `house/lighting.ts`, `house/input.ts`, `house/hud-bridge.ts`. Target: no file over ~400 lines. **No behaviour change.** All existing e2e tests must still pass.
+4. **Split `HouseScene.ts`** into modules: `house/map.ts` (load, layers, collision), `house/zones.ts`, `house/players.ts` (avatars, interpolation), `house/doors.ts` (now just the do-not-disturb sign), `house/lighting.ts`, `house/input.ts`, `house/hud-bridge.ts`. Target: no file over ~400 lines. **No behaviour change.** All existing e2e tests must still pass.
 5. **Bundle.** Fix the `voice.ts` static import (move the shared types into `net/voiceTypes.ts`). Lazy-load games, admin, chat and profile. Target main chunk < 250 kB gzip.
 6. **Map builder.** Rewrite `scripts/build-map.mjs` to generate the house from `rooms.ts` (polygons → floors, stepped walls, door gaps, furniture recipes per room theme). Keep `npm run map`.
 7. **Error reporting.** Add a tiny client error catcher (`window.onerror` + unhandled rejections) that writes to a new `client_errors` table (rate-limited RPC, members only). Diesel can then see real bugs from friends' phones.
 
-**Done when:** the current game looks and behaves the same, every e2e test passes, the main chunk is < 250 kB gzip, and adding a test room in `rooms.ts` makes it show up with working voice, chat and doors without touching any other file.
+**Done when:** the current game looks and behaves the same apart from the removed owner features (knock/lock/passes/kick/rename are gone; the tests for them are replaced by do-not-disturb tests), every other e2e test passes, the main chunk is < 250 kB gzip, and adding a test room in `rooms.ts` makes it show up with working voice, chat and doors without touching any other file.
 
 ---
 
@@ -87,16 +99,18 @@ Shared rooms have **no owner**. Door is always open. Any member can use them; gu
 ---
 
 ## 6. Phase R3 — Build the new house
-- Generate the octagon house from `rooms.ts` with the chosen pack(s): stepped diagonal walls, distinct floor and wall per room, furniture recipes per theme.
-- **Disco**: animated floor (cycle tile tints every beat), glitter ball sprite with rotating light specks, light sweeps, jukebox UI (pick from a few CC0 loops; ask Diesel before adding any music files) and a dance emote.
-- **Library**: quiet voice mode (reuse whisper falloff from the hallway code), shelves and nooks, study timer.
-- **Lounge**: sofas, fireplace, TV "watch party" card, table-game spot.
-- Lighting pass: night tint, warm lamp pools, and brighter rooms when people are inside (keep from NEXT.md §4.2).
-- Owners keep their room data: the migration maps `room_01..08` to the new 8 friend slots.
+- Generate the octagon house from `rooms.ts` with the chosen pack(s): stepped diagonal walls, a distinct floor and wall per room, and furniture recipes per theme (section 2 table).
+- **Disco:** colour-changing floor (cycle tile tints every beat), glitter ball with rotating light specks, light sweeps, jukebox UI (a few CC0 loops; ask Diesel before adding music files), dance emote.
+- **Library:** quiet voice mode (reuse the whisper falloff from the hallway code), shelves and nooks, study timer.
+- **Gaming room:** move every game spot here (plus the Lounge's second table). Arcade cabinet = Quick Draw.
+- **Café:** counter, stools, daily "special" on the fridge (a fun line, rotates daily).
+- **Garden + Rooftop:** outdoor tiles, a day/night sky that follows each viewer's local time, stars, pond, fire pit. The rooftop is reached by stairs from the hall (a short fade between maps, or the same map up a level).
+- **Lounge:** sofas, fireplace, TV "watch party" card, game table.
+- **Do not disturb:** a sign on the door, the soft warning before entering, and it auto-clears when the room is empty.
+- Lighting pass: night tint, warm lamp pools, and rooms with people inside glow brighter from the hall (keep from NEXT.md §4.2).
+- Migration: retire `room_01..08`. Old chat history in those rooms stays readable from an "Old rooms" archive in settings for one release.
 
-**Done when:** you can walk the whole house on a phone. Each friend room is distinct. Disco, Library and Lounge each work with the right voice mode. Walls (including diagonals) block correctly. "Who's where" and the map show the new shape. Every old e2e test, updated for the new map, passes.
-
----
+**Done when:** you can walk the whole house on a phone. All 7 rooms + hall + porch look distinct and work with the right voice mode. Walls (including diagonals) block correctly. Do-not-disturb works between two accounts. "Who's where" and the map show the new shape. The e2e tests, updated for the new map, pass.
 
 ## 7. Phase R4 — Skins and animals
 ### Skins (target **60+ choices**)
@@ -107,7 +121,7 @@ Shared rooms have **no owner**. Door is always open. Any member can use them; gu
 
 ### Animals (the house feels alive)
 - Ambient animals wander in fitting places: fox, doe, owl, squirrel, frog (#10); cat, bunny, pig, sheep and more (#11, non-commercial); and Ninja Adventure animals.
-- There is already a critters system (`src/critters/`, catching works live). **Extend it** rather than writing a new one: per-room spawn tables (cat in the Lounge, owl in the Library, frog near the porch), and more critters when more people are in.
+- There is already a critters system (`src/critters/`, catching works live). **Extend it** rather than writing a new one: per-room spawn tables (fox/doe/frog in the Garden, owl in the Library, cat in the Café, pigeon on the Rooftop if a pack has one), and more critters when more people are in.
 - **Pets**: each member can adopt one animal that follows them around (cosmetic). It is unlocked by level or a medal and stored on the profile.
 
 **Done when:** the picker shows 60+ skins and works smoothly on a 360 px phone, old profiles keep their character, at least 10 animal types appear around the house, and pets follow their owner for everyone watching.
@@ -142,7 +156,7 @@ Why most are still "to download": on 18 Oct at 00:30, itch.io's download server 
 
 ## 9. Phase R5 — UI/UX pass (after the look is chosen)
 - Re-skin all panels from the chosen pack + `theme.css` tokens, so one visual language covers the HUD, sheets, toasts and game panels.
-- **Navigation:** "Who's where" becomes a tappable mini-map of the octagon house (tap a room → walk there). Add room previews ("3 in the Disco · music on").
+- **Navigation:** "Who's where" becomes a tappable mini-map of the octagon house (tap a room → walk there). Add room previews ("3 in the Disco · music on", "Library · do not disturb").
 - **First-run:** a 3-step tour: walk, talk, rooms.
 - **Feedback everywhere:** every tap gets a sound + visual response; every network wait shows a pixel spinner, never a frozen screen; every error says what to do next.
 - **Accessibility:** tap targets ≥ 44 px, contrast AA, reduced-motion setting (turns off disco flashing, which is also a **photosensitivity** concern, so default the disco floor to a slow, soft cycle with no strobing).

@@ -16,7 +16,8 @@ export type WhoWhere = {
   me: { x: number; y: number; zone: Zone | null };
   people: { id: string; name: string; character: number; x: number; y: number; zone: Zone | null; talking: boolean }[];
   label: (zone: Zone) => string;
-  critter: { id: string; name: string; x: number; y: number; zone: Zone | null; secondsLeft: number } | null; // one to catch right now
+  critters: { id: string; name: string; x: number; y: number; zone: Zone | null }[]; // to catch right now
+  critterSeconds: number; // until they wander off
   goRoom: (room: RoomId) => void;
   goTo: (id: string) => void;
 };
@@ -95,16 +96,23 @@ export function openWhosWhere(get: () => WhoWhere) {
     );
     const crit = el('p', 'v2-note');
     crit.id = 'whos-where-critter';
-    if (w.critter) {
-      const c = el('span', 'dot critter');
-      c.style.left = pct(w.critter.x, w.size.w);
-      c.style.top = pct(w.critter.y - 6, w.size.h);
-      c.append(critterIcon(w.critter.id, 12));
-      c.title = w.critter.name;
-      dots.append(c);
-      const where = !w.critter.zone || w.critter.zone === 'hallway' ? 'the hallway' : w.label(w.critter.zone);
-      const m = Math.floor(w.critter.secondsLeft / 60);
-      crit.textContent = `A ${w.critter.name.toLowerCase()} is in ${where} for another ${m ? `${m}:${String(w.critter.secondsLeft % 60).padStart(2, '0')}` : `${w.critter.secondsLeft} s`}. Catch it!`;
+    for (const c of w.critters) {
+      const d = el('span', 'dot critter');
+      d.style.left = pct(c.x, w.size.w);
+      d.style.top = pct(c.y - 6, w.size.h);
+      d.append(critterIcon(c.id, 12));
+      d.title = c.name;
+      dots.append(d);
+    }
+    if (w.critters.length) {
+      const m = Math.floor(w.critterSeconds / 60);
+      const left = m ? `${m}:${String(w.critterSeconds % 60).padStart(2, '0')}` : `${w.critterSeconds} s`;
+      const where = (z: Zone | null) => (!z || z === 'hallway' ? 'the hallway' : w.label(z));
+      const c0 = w.critters[0];
+      crit.textContent =
+        w.critters.length === 1
+          ? `A ${c0.name.toLowerCase()} is in ${where(c0.zone)} for another ${left}. Catch it!`
+          : `${w.critters.length} critters about for another ${left}: ${w.critters.map((c) => `${c.name.toLowerCase()} (${where(c.zone)})`).join(', ')}.`;
     }
     critNote.replaceWith(crit);
     critNote = crit;

@@ -1504,21 +1504,28 @@ export class HouseScene extends Phaser.Scene {
     this.critters = new Critters(this, places, {
       appeared: (s) => this.critterAppeared(s),
       near: (s) => void this.catchCritter(s),
+      people: () => 1 + [...this.remotes.values()].filter((r) => r.active).length,
     });
-    // Arriving mid-slot: someone may have caught it already.
-    void caughtSlots(slotAt(Date.now()) - 1).then((rows) => rows.forEach((r) => this.critters?.markCaught(r.slot, r.user_id)));
+    // Arriving mid-slot: some may have been caught already.
+    void caughtSlots(slotAt(Date.now()) - 1).then((rows) => rows.forEach((r) => this.critters?.markCaught(r.slot, r.idx, r.user_id)));
   }
 
   private zoneOf(x: number, y: number) {
     return this.zones.find((z) => z.rect.contains(x, y - 3))?.name ?? null;
   }
 
-  // A critter turned up where we are: a little hint.
-  private critterAppeared(s: Spawn) {
-    const zone = this.zoneOf(s.x, s.y);
-    if (!zone || zone !== this.zone || modalOpen() || document.hidden) return;
-    const c = critterById(s.id)!;
-    critterToast(s.id, `A ${c.name.toLowerCase()} turned up ${zone === 'hallway' ? 'in the hallway' : 'in here'}!`, `Walk into it to catch it · +${c.xp} XP`);
+  // Critters turned up: one hint, about the ones where we are (or how many are about).
+  private critterAppeared(list: Spawn[]) {
+    if (modalOpen() || document.hidden) return;
+    const here = list.filter((s) => this.zoneOf(s.x, s.y) === this.zone);
+    if (here.length === 1) {
+      const c = critterById(here[0].id)!;
+      critterToast(here[0].id, `A ${c.name.toLowerCase()} turned up ${this.zone === 'hallway' ? 'in the hallway' : 'in here'}!`, `Walk into it to catch it · +${c.xp} XP`);
+    } else if (here.length > 1) {
+      critterToast(here[0].id, `${here.length} critters turned up ${this.zone === 'hallway' ? 'in the hallway' : 'in here'}!`, 'Walk into them to catch them.');
+    } else if (list.length > 1) {
+      critterToast(list[0].id, `${list.length} critters are about`, 'Check the map to find them.');
+    }
   }
 
   private async catchCritter(s: Spawn) {
@@ -1530,33 +1537,34 @@ export class HouseScene extends Phaser.Scene {
     }
     // Dev test mode / no Supabase: catch it here only, no XP.
     if (!canCatch() || !this.presence) {
-      this.critters?.markCaught(s.slot, this.presence?.id ?? 'me');
+      this.critters?.markCaught(s.slot, s.idx, this.presence?.id ?? 'me');
       play('coin', 0.8);
       critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, 'Test mode: no XP.');
       return;
     }
-    const r = await catchCritter(s.slot);
+    const r = await catchCritter(s.slot, s.idx);
     if (r.ok) {
-      this.critters?.markCaught(s.slot, this.presence.id);
+      this.critters?.markCaught(s.slot, s.idx, this.presence.id);
       play('coin', 0.9);
       critterToast(s.id, `You caught the ${c.name.toLowerCase()}!`, `+${r.xp} XP`);
       this.gotProgress(r.progress);
     } else if (r.why === 'taken') {
-      this.critters?.markCaught(s.slot, r.by ?? '');
+      this.critters?.markCaught(s.slot, s.idx, r.by ?? '');
       const who = r.by ? (this.remotes.get(r.by)?.info.name ?? 'Someone') : 'Someone';
       critterToast(s.id, `${who} got the ${c.name.toLowerCase()} first`, 'Be quicker next time!');
     } else if (r.why === 'enough') {
       critterToast(s.id, 'That’s 25 catches today', 'The critters need a rest. More tomorrow!');
     } else if (r.why === 'error') {
-      this.time.delayedCall(3000, () => this.critters?.retry(s.slot)); // couldn't reach the database: try again
+      critterToast(s.id, 'Couldn’t catch it just now', 'Step off and walk into it again.');
+      this.time.delayedCall(2000, () => this.critters?.retry(s.slot, s.idx)); // couldn't reach the database: try again
     }
   }
 
   // Someone caught a critter (live, from the database).
-  private someoneCaught(c: { slot: number; user_id: string; critter: string; xp: number }) {
-    const had = this.critters?.current;
-    this.critters?.markCaught(c.slot, c.user_id);
-    if (c.user_id === this.presence?.id || !had || had.slot !== c.slot) return;
+  private someoneCaught(c: { slot: number; idx: number; user_id: string; critter: string; xp: number }) {
+    const had = this.critters?.current.some((s) => s.slot === c.slot && s.idx === c.idx);
+    this.critters?.markCaught(c.slot, c.idx, c.user_id);
+    if (c.user_id === this.presence?.id || !had) return;
     const r = this.remotes.get(c.user_id);
     if (!r?.active || r.info.zone !== this.zone) return;
     critterToast(c.critter, `${r.info.name} caught the ${critterById(c.critter)?.name.toLowerCase() ?? 'critter'}`, `+${c.xp} XP`);
@@ -1582,10 +1590,8 @@ export class HouseScene extends Phaser.Scene {
           talking: !!here(r) && here(r) !== 'hallway' && this.countIn(here(r)!) > 1,
         })),
       label: (z: Zone) => zoneLabel(z),
-      critter: (() => {
-        const s = this.critters?.current;
-        return s ? { id: s.id, name: critterById(s.id)!.name, x: s.x, y: s.y, zone: this.zoneOf(s.x, s.y), secondsLeft: this.critters!.secondsLeft } : null;
-      })(),
+      critters: (this.critters?.current ?? []).map((s) => ({ id: s.id, name: critterById(s.id)!.name, x: s.x, y: s.y, zone: this.zoneOf(s.x, s.y) })),
+      critterSeconds: this.critters?.secondsLeft ?? 0,
       goRoom: (room: RoomId) => this.walkToRoom(room),
       goTo: (id: string) => {
         const r = this.remotes.get(id);

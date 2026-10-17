@@ -10,8 +10,8 @@ export type CatchRow = { user_id: string; display_name: string; character_index:
 
 export const canCatch = () => !!supabase && !devTest;
 
-export async function catchCritter(slot: number): Promise<CatchResult> {
-  const { data, error } = await supabase!.rpc('catch_critter', { at_slot: slot });
+export async function catchCritter(slot: number, idx: number): Promise<CatchResult> {
+  const { data, error } = await supabase!.rpc('catch_critter_at', { at_slot: slot, idx });
   if (error) {
     console.warn('Could not catch', error.message);
     return { ok: false, why: 'error' };
@@ -22,10 +22,10 @@ export async function catchCritter(slot: number): Promise<CatchResult> {
 }
 
 // Who caught the critters of these slots (for a late arrival).
-export async function caughtSlots(fromSlot: number): Promise<{ slot: number; user_id: string }[]> {
+export async function caughtSlots(fromSlot: number): Promise<{ slot: number; idx: number; user_id: string }[]> {
   if (!supabase || devTest) return [];
-  const { data } = await supabase.from('catches').select('slot, user_id').gte('slot', fromSlot);
-  return (data ?? []).map((r) => ({ slot: Number(r.slot), user_id: r.user_id as string }));
+  const { data } = await supabase.from('critter_catches').select('slot, idx, user_id').gte('slot', fromSlot);
+  return (data ?? []).map((r) => ({ slot: Number(r.slot), idx: Number(r.idx ?? 0), user_id: r.user_id as string }));
 }
 
 export async function catchBoard(): Promise<CatchRow[] | null> {

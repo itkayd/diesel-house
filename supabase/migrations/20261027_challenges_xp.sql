@@ -296,6 +296,19 @@ as $$
   )
   from public.profiles p where p.id = uid;
 $$;
+-- The day's first visitor tidies away rows older than 90 days (totals stay on profiles). Kept separate:
+-- record_events() works without it (it skips the tidy-up until this exists).
+create or replace function public.tidy_progress(utc_day date)
+returns void
+language sql
+set search_path = ''
+as $$
+  delete from public.xp_ledger where created_at < now() - interval '90 days';
+  delete from public.user_tallies where scope like 'd:%' and scope < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
+  delete from public.challenge_progress where period_key like 'd:%' and period_key < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
+  delete from public.house_days where day < utc_day - 90;
+$$;
+revoke all on function public.tidy_progress(date) from public, anon, authenticated;
 revoke all on function public.bump_challenge(uuid, public.challenge_defs, text, int, text, int) from public, anon, authenticated;
 revoke all on function public.medals_due(uuid, timestamp, int) from public, anon, authenticated;
 revoke all on function public.progress_json(uuid, text, text) from public, anon, authenticated;
@@ -363,11 +376,8 @@ begin
 
   -- First in the house today (UTC). The day's first visitor also tidies up old rows.
   insert into public.house_days (day, first_user) values (utc_day, uid) on conflict (day) do nothing;
-  if found then
-    delete from public.xp_ledger where created_at < now() - interval '90 days';
-    delete from public.user_tallies where scope like 'd:%' and scope < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
-    delete from public.challenge_progress where period_key like 'd:%' and period_key < 'd:' || to_char(utc_day - 90, 'YYYY-MM-DD');
-    delete from public.house_days where day < utc_day - 90;
+  if found and to_regprocedure('public.tidy_progress(date)') is not null then
+    perform public.tidy_progress(utc_day);
   end if;
   first_in := exists (select 1 from public.house_days where day = utc_day and first_user = uid);
 

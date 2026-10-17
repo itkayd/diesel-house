@@ -44,7 +44,7 @@ type Handlers = {
   onReconnected: () => void;
   onRoomChange: (room: Room) => void;
   // Someone caught a critter (supabase/migrations/20261028_critters.sql).
-  onCatch?: (c: { slot: number; user_id: string; critter: string; xp: number }) => void;
+  onCatch?: (c: { slot: number; idx: number; user_id: string; critter: string; xp: number }) => void;
   onDoor: (m: DoorMsg) => void;
   onEmote: (m: EmoteMsg) => void;
   onDice: (m: DiceMsg) => void;
@@ -138,9 +138,9 @@ export class Presence {
       this.sync();
     });
     ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms' }, ({ new: row }) => this.h.onRoomChange(row as Room));
-    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'catches' }, ({ new: row }) => {
-      const r = row as { slot: number | string; user_id: string; critter: string; xp: number };
-      this.h.onCatch?.({ slot: Number(r.slot), user_id: r.user_id, critter: r.critter, xp: Number(r.xp) });
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'critter_catches' }, ({ new: row }) => {
+      const r = row as { slot: number | string; idx?: number; user_id: string; critter: string; xp: number };
+      this.h.onCatch?.({ slot: Number(r.slot), idx: Number(r.idx ?? 0), user_id: r.user_id, critter: r.critter, xp: Number(r.xp) });
     });
     for (const table of ['messages', 'reactions'] as const)
       ch.on('postgres_changes', { event: '*', schema: 'public', table }, (p) => {

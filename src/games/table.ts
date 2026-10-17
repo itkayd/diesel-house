@@ -13,6 +13,26 @@ export type SpotId = 'hall' | RoomId;
 export type Seat = { id: string; name: string; character: number; guest?: boolean; at: number }; // at: when they sat down
 export type Snapshot<S = unknown> = { v: number; host: string; game: string; players: Seat[]; state: S };
 
+// What a game's host and screen need from a table (GameTable, or a stand-in in tests).
+export type Table = Pick<GameTable, 'id' | 'spot' | 'isHost' | 'people' | 'snap' | 'start' | 'update' | 'act' | 'seat'>;
+// Each table game (Quick Draw, Higher or lower, Would you rather, Four in a row) has a host side, run
+// by whoever started it (or took it over), and a screen everyone at the table sees.
+export interface TableHost {
+  start(players: Seat[]): void | Promise<void>;
+  takeover(s: Snapshot): void | Promise<void>;
+  onAction(from: string, a: unknown): void;
+  onPeople(): void;
+  stop(): void;
+}
+export interface TableView {
+  readonly root: HTMLElement;
+  show(s: Snapshot): void;
+  destroy(): void;
+}
+export type Names = (id: string) => { name: string; character: number };
+// The host saves the result (record_game): players, winners, score, the revealed seed.
+export type Recorder = (players: string[], winners: string[], score: unknown, seed?: string) => void;
+
 type Handlers = {
   // A new snapshot (from the host, or our own as host).
   onSnapshot: (s: Snapshot) => void;

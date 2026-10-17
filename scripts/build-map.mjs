@@ -171,14 +171,20 @@ for (let i = 0; i < 8; i++) {
 for (const [key, x, y, flag] of HALL) place(key, x, y, flag);
 
 // Game spots (UPDATE.md Phase 12): stand here for "Play games". The hallway's games table, and rooms with a
-// table or desk. A point just in front of the piece.
+// table or desk: a point just in front of the piece. Rooms without one get a sofa corner on their rug
+// (Phase 13: Would you rather works in any room) with only the games that need no table.
 const spots = [];
-const GAME_TABLES = [['hall', 'table_wood', 'hall'], ['room_03', 'desk_study', 'room_03'], ['room_04', 'desk_study', 'room_04'], ['room_06', 'table_wood', 'room_06']];
+const GAME_TABLES = [['hall', 'table_wood', 'hall'], ['room_03', 'desk_study', 'room_03'], ['room_04', 'desk_study', 'room_04'], ['room_06', 'table_wood', 'room_06'],
+  ['room_01', 'rug_blue', 'room_01'], ['room_02', 'rug_red', 'room_02'], ['room_05', 'rug_olive', 'room_05'], ['room_07', 'rug_small_red', 'room_07'], ['room_08', 'rug_small_blue', 'room_08']];
 for (const [id, key, zoneName] of GAME_TABLES) {
   const z = zones.find((o) => o.name === (zoneName === 'hall' ? 'hallway' : zoneName));
   const piece = furniture.find((o) => o.name === key && o.x >= z.x && o.x < z.x + z.width && o.y + o.height > z.y && o.y < z.y + z.height);
   if (!piece) throw new Error('no ' + key + ' in ' + zoneName);
-  spots.push({ id: nextId++, name: id, type: 'spot', x: piece.x + Math.round(piece.width / 2), y: piece.y + piece.height + 11, width: 0, height: 0, point: true, rotation: 0, visible: true });
+  const rug = piece.type === 'rug';
+  const x = piece.x + Math.round(piece.width / 2);
+  const y = rug ? piece.y + Math.round(piece.height / 2) : piece.y + piece.height + 11;
+  const props = [{ name: 'kind', type: 'string', value: rug ? 'sofa' : 'table' }];
+  spots.push({ id: nextId++, name: id, type: 'spot', x, y, width: 0, height: 0, point: true, rotation: 0, visible: true, properties: props });
 }
 
 // Doors: one object per doorway (the gap through the wall), for door frames now and door states later.

@@ -2,7 +2,7 @@ import { el } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
 import { checkSeed, randomSeed, rng, sha256 } from './fair';
-import type { GameTable, Seat, Snapshot } from './table';
+import type { Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
 
 // Quick Draw (UPDATE.md Phase 12): 2-8 players at a table. "The lamp will flicker… wait for it", then
 // DRAW! after a random 2-6 s, and the first to tap wins the round. Early tap = out for that round. 5 rounds,
@@ -33,17 +33,15 @@ type Act = { t: 'tap'; rid: number; ms: number } | { t: 'early'; rid: number };
 
 const delayFor = (seed: string, round: number) => 2000 + Math.floor(rng(`${seed}:${round}`)() * 4000);
 
-export type Record_ = (players: string[], winners: string[], score: unknown, seed: string) => void;
-
 // Host side: runs the game on the table.
-export class QuickDrawHost {
+export class QuickDrawHost implements TableHost {
   private seed = '';
   private times: Record<string, number> = {};
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private table: GameTable,
-    private record: Record_,
+    private table: Table,
+    private record: Recorder,
   ) {}
 
   async start(players: Seat[]) {
@@ -70,7 +68,8 @@ export class QuickDrawHost {
     this.armRound(next);
   }
 
-  onAction(from: string, a: Act) {
+  onAction(from: string, act: unknown) {
+    const a = act as Act;
     const s = this.table.snap;
     const st = s?.state as QDState | undefined;
     if (!s || !st || st.phase !== 'round' || a.rid !== st.rid || !s.players.some((p) => p.id === from) || from in this.times) return;
@@ -131,7 +130,7 @@ export class QuickDrawHost {
 }
 
 // Everyone's screen: the draw box, this round's times and the points table.
-export class QuickDrawView {
+export class QuickDrawView implements TableView {
   readonly root = el('div', 'v2-qd');
   private box = el('div', 'v2-draw');
   private list = el('div', 'v2-list');

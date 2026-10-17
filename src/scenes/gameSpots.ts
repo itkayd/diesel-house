@@ -1,19 +1,25 @@
 import Phaser from 'phaser';
 import type { SpotId } from '../games/table';
 
+export type SpotKind = 'table' | 'sofa';
+
 // Game spots on the map (maps/house.tmj "spots", UPDATE.md Phase 12): the games table at the west end of
 // the hallway and the room tables. Each gets a little bobbing "Games" sign (design/game/v2.html .v2-sign);
 // the hallway table has two dice on it. Standing within NEAR px of a spot offers "Play games".
+// Rooms without a table have a sofa corner instead (kind 'sofa'): only the games that need no table.
 
 const NEAR = 34;
 const LAMP = 0xf4b860;
 const EDGE = 0x0d0912;
 
 export class GameSpots {
-  readonly spots: { id: SpotId; x: number; y: number }[] = [];
+  readonly spots: { id: SpotId; x: number; y: number; kind: SpotKind }[] = [];
 
   constructor(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap) {
-    for (const o of map.getObjectLayer('spots')?.objects ?? []) this.spots.push({ id: o.name as SpotId, x: o.x!, y: o.y! });
+    for (const o of map.getObjectLayer('spots')?.objects ?? []) {
+      const kind = (o.properties as { name: string; value: unknown }[] | undefined)?.find((p) => p.name === 'kind')?.value === 'sofa' ? 'sofa' : 'table';
+      this.spots.push({ id: o.name as SpotId, x: o.x!, y: o.y!, kind });
+    }
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     for (const s of this.spots) {
       const text = scene.add.text(0, 0, 'GAMES', { fontFamily: '"Pixelify Sans", monospace', fontSize: '6px', color: '#0d0912' }).setOrigin(0.5).setResolution(8);
@@ -30,6 +36,10 @@ export class GameSpots {
       for (const [dx, dy, n] of [[-13, -44, 5], [1, -39, 3]] as const)
         scene.add.image(hall.x + dx, hall.y + dy, 'cards', `die_${n}`).setOrigin(0).setScale(11 / 32).setDepth(hall.y - 10);
     }
+  }
+
+  kind(id: SpotId): SpotKind | null {
+    return this.spots.find((s) => s.id === id)?.kind ?? null;
   }
 
   // The spot you're standing at, if any.

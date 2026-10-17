@@ -489,3 +489,55 @@ html, body, #game, #overlay, #overlay * {
 .v2-board-row .rk.top { color: var(--gold); }
 .v2-board-row b { font-family: var(--font-display); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dh-chat .roll, #msgs .roll { font-family: var(--font-display); color: var(--gold); font-size: 13px; text-align: center; padding: 2px 0; }
+
+/* Table games (UPDATE.md Phase 13): Higher or lower, Would you rather / Hot takes, Four in a row. */
+.dh-textarea { resize: vertical; min-height: 84px; line-height: 1.4; }
+.v2-board-row.turn { box-shadow: inset 0 0 0 2px var(--ok); }
+.v2-board-row.gone { opacity: .5; }
+.v2-again { justify-self: center; }
+.v2-result.x { color: var(--muted); }
+/* Higher or lower: the deck and the face-up card (cards.png drawn at 3x). */
+.v2-cards { display: flex; gap: 18px; justify-content: center; align-items: center; padding: 14px 0 6px; }
+.v2-card { display: block; image-rendering: pixelated; background-repeat: no-repeat; filter: drop-shadow(3px 3px 0 var(--panel-edge)); }
+.v2-card.deck { transform: rotate(-4deg); opacity: .9; }
+.v2-card.flip { animation: v2-flip .36s steps(4); }
+@keyframes v2-flip { 0% { transform: scaleX(.1) translateY(-6px); } 50% { transform: scaleX(.5) translateY(-6px); } 100% { transform: none; } }
+.v2-hl-acts { display: grid; gap: 10px; justify-items: stretch; text-align: center; }
+.v2-hl-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2-hl-btns .dh-btn { min-height: 52px; }
+/* Would you rather: the prompt card and the two sides, which turn into bars with faces on the reveal. */
+.v2-prompt { display: grid; gap: 6px; padding: 14px; text-align: center; background: var(--cream); color: var(--panel-edge); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 rgba(0,0,0,.12); }
+.v2-prompt .k { font-family: var(--font-display); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--lamp-deep); }
+.v2-prompt b { font-family: var(--font-display); font-weight: 500; font-size: 19px; line-height: 1.25; }
+.v2-wyr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v2-side { position: relative; display: grid; gap: 6px; align-content: start; justify-items: start; text-align: left; padding: 10px; min-height: 92px; border: 0; cursor: pointer; font: inherit; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-side:not(:disabled):hover, .v2-side:focus-visible { box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.v2-side:disabled { cursor: default; }
+.v2-side .ab { font-family: var(--font-display); font-size: 13px; color: var(--panel-edge); background: var(--lamp); padding: 0 6px; }
+.v2-side .t { font-weight: 700; font-size: 15px; line-height: 1.3; }
+.v2-side.picked { box-shadow: inset 0 0 0 3px var(--lamp); }
+.v2-side.top .ab { background: var(--ok); }
+.v2-side .bar { width: 100%; height: 10px; background: var(--panel); box-shadow: 0 0 0 2px var(--line); }
+.v2-side .bar i { display: block; height: 100%; background: var(--lamp); transition: width .5s steps(6); }
+.v2-side.top .bar i { background: var(--ok); }
+.v2-side .n { font-family: var(--font-display); font-size: 13px; color: var(--muted); }
+.v2-side .who { display: flex; flex-wrap: wrap; gap: 4px; }
+.v2-wyr .v2-result { grid-column: 1 / -1; }
+/* Four in a row: 7 columns of 6, pixel pieces (octagons), lamp-gold and rose. */
+.v2-four { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 6px; background: #1d3a5c; box-shadow: 0 0 0 3px var(--panel-edge), inset 0 -4px 0 rgba(0,0,0,.35); max-width: 360px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.v2-four .col { display: grid; gap: 4px; padding: 0; border: 0; background: none; cursor: default; touch-action: manipulation; }
+.v2-four.mine .col:not(:disabled) { cursor: pointer; }
+.v2-four.mine .col:not(:disabled):hover .cell, .v2-four .col:focus-visible .cell { background: #2c5480; }
+.v2-four .col:focus-visible { outline: 2px solid var(--cream); outline-offset: 1px; }
+.v2-four .cell { display: grid; place-items: center; aspect-ratio: 1; background: #12263d; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+.v2-piece { display: block; width: 100%; height: 100%; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+.v2-piece.p0 { background: var(--lamp); box-shadow: inset -3px -3px 0 var(--lamp-deep); }
+.v2-piece.p1 { background: #ff9fb2; box-shadow: inset -3px -3px 0 #c9637a; }
+.v2-vs .v2-piece { width: 18px; height: 18px; }
+.v2-piece.drop { animation: v2-drop calc(.05s * var(--fall, 3) + .08s) steps(4); }
+@keyframes v2-drop { from { transform: translateY(calc(-110% * var(--fall, 3))); } }
+.v2-piece.win { animation: v2-blink .5s steps(1) infinite; }
+@keyframes v2-blink { 50% { filter: brightness(1.6); } }
+.v2-vs .side.turn { box-shadow: inset 0 0 0 2px var(--lamp); }
+.v2-vs .side.won { box-shadow: inset 0 0 0 2px var(--ok); }
+@media (prefers-reduced-motion: reduce) { .v2-card.flip, .v2-piece.drop, .v2-piece.win { animation: none; } }

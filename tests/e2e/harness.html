@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<base href="/">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table games harness</title>
+<style>
+  body { margin: 0; background: #1a1220; }
+  #players { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; align-items: flex-start; }
+  .player { width: 360px; display: grid; gap: 12px; padding: 14px; }
+  .player > h3 { margin: 0; font-family: var(--font-display); color: var(--lamp); }
+</style>
+</head>
+<body>
+<div id="overlay"><div id="players"></div></div>
+<script type="module" src="/tests/e2e/harness.ts"></script>
+</body>
+</html>

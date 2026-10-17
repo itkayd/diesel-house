@@ -12,7 +12,7 @@ import { letIn, myPasses, removeFromRoom } from '../net/passes';
 import { guestHosts } from '../net/guestCodes';
 import type { DiceMsg, DoorMsg, EmoteMsg } from '../net/presence';
 import { GameSpots } from './gameSpots';
-import { Games, TABLE_GAMES, type GameId } from '../games/controller';
+import { Games, gamesFor, type GameId } from '../games/controller';
 import { Duel, type DuelMsg } from '../games/rps';
 import { parseRoll, roll, rollText, type Roll } from '../games/dice';
 import { randomSeed } from '../games/fair';
@@ -587,6 +587,8 @@ export class HouseScene extends Phaser.Scene {
       nearby: () =>
         [...this.remotes.values()].filter((r) => r.active && r.info.zone === this.zone).map((r) => ({ id: r.info.id, name: r.info.name, character: r.info.character })),
       allowed: (spot) => (spot === 'hall' ? null : ((this.rooms.get(spot)?.games as GameId[] | null | undefined) ?? null)),
+      prompts: (spot) => (spot === 'hall' ? [] : (this.rooms.get(spot)?.prompts ?? [])),
+      kind: (spot) => this.spots.kind(spot),
       roll: (r) => this.rollDice(r),
       challenge: (id) => this.startDuel(id),
       record: (game, spot, players, winners, score, seed) => void recordGame(game, spot, players, winners, score, seed),
@@ -605,7 +607,7 @@ export class HouseScene extends Phaser.Scene {
         if (!err) await this.roomChanged({ ...mine, ...change });
         return err;
       },
-      (room) => (this.spots.spots.some((sp) => sp.id === room.id) ? TABLE_GAMES : []),
+      (room) => gamesFor(this.spots.kind(room.id)),
     );
     addGuestSettings(() => {
       const u = currentUser();

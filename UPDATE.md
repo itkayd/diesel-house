@@ -151,5 +151,16 @@ Weekly (80–200 XP): Visit every room · Win 5 games · 2 hours in voice this w
 - TURN: hallway whisper connects only to nearby people; walkie only while someone is transmitting. Note the measured bytes per minute.
 - Database: `xp_ledger` and `game_results` grow slowly; add a monthly cleanup of `xp_ledger` rows older than 90 days (keep totals on `profiles`).
 
+### Measured: Phase 13 table games (17 Oct 2026)
+Game messages **sent** (the `game` kind in `msgStats`), measured in `tests/e2e/table-games-local.mjs`. Realtime bills 1 per send + 1 per person at the table who receives it.
+
+| Game | Sent per round | Whole game | Billed per game (players + watchers) |
+|---|---|---|---|
+| Higher or lower (3 players, 3 rounds) | 6–14 per round of turns (max 48 with 8 players) | ~30 | ~90 |
+| Would you rather (4 players, 5 prompts) | 7 per prompt (2 × players − 1) | ~35 | ~140 |
+| Four in a row (2 players + 1 watcher) | — | 11 for a 7-move win; 30–45 typical; 64 only for a full-board draw | ~40–135 |
+
+Even at 10 table games a night, every night: ~40k billed messages a month, under 3% of the 1.5 M target. TURN: unchanged (games add no voice).
+
 ## 7. Order
 Phase 9 assets → 10 hallway voice → 11 emotes → 12 quick games → 13 table games → 14 challenges/XP. Stop after each phase for Diesel to test.

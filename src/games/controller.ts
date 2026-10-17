@@ -5,29 +5,84 @@ import { overlay } from '../ui/overlay';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
 import { diceView, type Roll } from './dice';
-import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
-import { GameTable, type Snapshot, type SpotId } from './table';
+import { FourHost, FourView } from './fourInARow';
+import { HigherLowerHost, HigherLowerView } from './higherLower';
+import { HotTakesHost, HotTakesView } from './hotTakes';
+import { QuickDrawHost, QuickDrawView } from './quickDraw';
+import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type Table, type TableHost, type TableView } from './table';
 
 // The games corner (west end of the hallway) and room tables (UPDATE.md Phase 12): walking onto a spot
 // shows "Play games · E"; the games panel opens over the world, so you stay in the room and voice keeps
-// working. Lists the games (Phase 13's three as "coming soon"), and runs Quick Draw on the spot's table.
+// working. Lists the games; Dice and the rock-paper-scissors duel are personal, the table games (Quick
+// Draw, and Phase 13's Higher or lower, Would you rather and Four in a row) run on the spot's table:
+// a lobby of everyone sitting there, then the game, with anyone not playing watching.
 
 export type GameId = 'dice' | 'rps' | 'quickdraw' | 'higherlower' | 'wyr' | 'four';
 export const ALL_GAMES: GameId[] = ['dice', 'rps', 'quickdraw', 'higherlower', 'wyr', 'four'];
-// What a room owner can switch off in "Your room" settings.
+// What a room owner can switch off in "Your room" settings (a sofa corner: only SOFA_GAMES).
 export const TABLE_GAMES: { id: GameId; label: string }[] = [
   { id: 'dice', label: 'Dice' },
   { id: 'rps', label: 'Rock paper scissors' },
   { id: 'quickdraw', label: 'Quick Draw' },
+  { id: 'higherlower', label: 'Higher or lower' },
+  { id: 'wyr', label: 'Would you rather' },
+  { id: 'four', label: 'Four in a row' },
 ];
-const GAMES: Record<GameId, { icon: IconName; title: string; sub: string; soon?: boolean }> = {
+// Games that need no table, for rooms with a sofa corner instead.
+export const SOFA_GAMES: GameId[] = ['dice', 'rps', 'wyr'];
+export const gamesFor = (kind: 'table' | 'sofa' | null) => (kind === 'sofa' ? TABLE_GAMES.filter((g) => SOFA_GAMES.includes(g.id)) : TABLE_GAMES);
+const GAMES: Record<GameId, { icon: IconName; title: string; sub: string }> = {
   dice: { icon: 'dice-5', title: 'Dice', sub: 'Roll two dice. Everyone sees it.' },
   rps: { icon: 'swords', title: 'Rock paper scissors', sub: 'Best of three. Picks are locked in first.' },
   quickdraw: { icon: 'zap', title: 'Quick Draw', sub: 'Wait for DRAW!, then tap. Too soon = out.' },
-  higherlower: { icon: 'arrow-up-down', title: 'Higher or lower', sub: 'Coming soon', soon: true },
-  wyr: { icon: 'messages-square', title: 'Would you rather', sub: 'Coming soon', soon: true },
-  four: { icon: 'grid-3x3', title: 'Four in a row', sub: 'Coming soon', soon: true },
+  higherlower: { icon: 'arrow-up-down', title: 'Higher or lower', sub: 'Guess the next card. Bank before you bust.' },
+  wyr: { icon: 'messages-square', title: 'Would you rather', sub: 'Vote in secret, then see who picked what.' },
+  four: { icon: 'grid-3x3', title: 'Four in a row', sub: 'Two players, a 7 by 6 grid. Others watch.' },
 };
+
+// The games played on a spot's table: who can play, the lobby's line, and their host and screen.
+type TableGameId = 'quickdraw' | 'higherlower' | 'wyr' | 'four';
+type Ctx = { table: Table; record: Recorder; prompts: () => string[] };
+type TableGame = {
+  short: string; // element ids: qd-start, hl-lobby, …
+  min: number;
+  max: number;
+  lobby: string;
+  host: (c: Ctx) => TableHost;
+  view: (me: string, act: (a: unknown) => void, names: Names) => TableView;
+  running: (state: unknown) => boolean;
+};
+const TABLE: Record<TableGameId, TableGame> = {
+  quickdraw: {
+    short: 'qd', min: 2, max: 8,
+    lobby: 'Everyone at this table plays. 5 rounds; fastest three each round get 3, 2 and 1 points.',
+    host: (c) => new QuickDrawHost(c.table, c.record),
+    view: (me, act, names) => new QuickDrawView(me, act, names),
+    running: (st) => (st as { phase: string }).phase === 'round',
+  },
+  higherlower: {
+    short: 'hl', min: 2, max: 8,
+    lobby: 'Everyone at this table plays, taking turns. Is the next card higher or lower? Each right guess in a row is worth more: bank before you bust. 3 rounds.',
+    host: (c) => new HigherLowerHost(c.table, c.record),
+    view: (me, act, names) => new HigherLowerView(me, act, names),
+    running: (st) => (st as { phase: string }).phase === 'turn',
+  },
+  wyr: {
+    short: 'wyr', min: 2, max: 8,
+    lobby: 'Everyone votes in secret, then the reveal shows who picked what. A point for siding with the majority. 5 prompts; best with 3 or more.',
+    host: (c) => new HotTakesHost(c.table, c.record, c.prompts),
+    view: (me, act, names) => new HotTakesView(me, act, names),
+    running: (st) => (st as { phase: string }).phase !== 'done',
+  },
+  four: {
+    short: 'four', min: 2, max: 2,
+    lobby: 'Two players: you and the next person at the table. Everyone else watches. Line up four of your pieces to win.',
+    host: (c) => new FourHost(c.table, c.record),
+    view: (me, act, names) => new FourView(me, act, names),
+    running: (st) => (st as { phase: string }).phase === 'play',
+  },
+};
+const isTableGame = (g: string): g is TableGameId => g in TABLE;
 
 type Who = { id: string; name: string; character: number; guest?: boolean };
 export type GameDeps = {
@@ -37,6 +92,10 @@ export type GameDeps = {
   nearby: () => Who[];
   // Games the room owner allows at this spot (null: all).
   allowed: (spot: SpotId) => GameId[] | null;
+  // The room owner's own Would you rather prompts ("A|B").
+  prompts: (spot: SpotId) => string[];
+  // A table, or a sofa corner (no card or board games).
+  kind: (spot: SpotId) => 'table' | 'sofa' | null;
   roll: (r: Roll) => void;
   challenge: (id: string) => void;
   record: (game: GameId, spot: SpotId, players: string[], winners: string[], score: unknown, seed?: string) => void;
@@ -44,11 +103,12 @@ export type GameDeps = {
 
 export class Games {
   private tables = new Map<SpotId, GameTable>();
-  private host: QuickDrawHost | null = null;
-  private view: QuickDrawView | null = null;
+  private host: TableHost | null = null;
+  private view: TableView | null = null;
+  private viewGame: TableGameId | null = null;
   private ui: ReturnType<typeof openModal> | null = null;
   private body: HTMLDivElement | null = null;
-  private screen: 'list' | 'dice' | 'rps' | 'quickdraw' = 'list';
+  private screen: 'list' | 'dice' | 'rps' | TableGameId = 'list';
   private spot: SpotId | null = null;
   private prompt: HTMLDivElement | null = null;
   private promptSpot: SpotId | null = null;
@@ -83,14 +143,14 @@ export class Games {
     return this.promptSpot;
   }
 
-  open(spot: SpotId, screen: 'list' | 'quickdraw' = 'list') {
+  open(spot: SpotId, screen: 'list' | TableGameId = 'list') {
     if (this.ui && this.spot === spot) return;
     this.close();
     this.spot = spot;
     this.ui = openModal('games', { dismissable: true, onDismiss: () => this.closed(), label: 'games-title' });
     const p = this.ui.panel;
     const head = el('div', 'v2-head');
-    const h = el('h2', '', spot === 'hall' ? 'Games table' : 'Table games');
+    const h = el('h2', '', spot === 'hall' ? 'Games table' : this.deps.kind(spot) === 'sofa' ? 'Sofa games' : 'Table games');
     h.id = 'games-title';
     const x = el('button', 'dh-iconbtn');
     x.type = 'button';
@@ -103,8 +163,9 @@ export class Games {
     this.body.style.cssText = 'display:grid;gap:12px';
     p.append(head, this.body);
     this.table(spot).open();
+    // A game already going at this table: straight to it.
     const s = this.table(spot).snap;
-    this.show(screen === 'quickdraw' || (s?.game === 'quickdraw' && (s.state as QDState).phase === 'round') ? 'quickdraw' : 'list');
+    this.show(s && this.running(spot) && isTableGame(s.game) ? s.game : screen);
   }
 
   close() {
@@ -116,8 +177,7 @@ export class Games {
   private closed() {
     this.ui = null;
     this.body = null;
-    this.view?.destroy();
-    this.view = null;
+    this.dropView();
     if (this.host) {
       this.host.stop();
       this.host = null;
@@ -135,11 +195,13 @@ export class Games {
       onAction: (from, a) => this.host?.onAction(from, a as never),
       onPeople: () => {
         this.host?.onPeople();
-        if (this.spot === spot && this.screen === 'quickdraw' && !this.running(spot)) this.render();
+        // Lobby: refresh who's here. A game we're not showing yet (we sat down before we knew its host was here): show it.
+        if (this.spot === spot && isTableGame(this.screen) && (!this.running(spot) || !this.view)) this.render();
       },
       onTakeover: (s) => {
-        if (s.game !== 'quickdraw' || this.spot !== spot) return;
-        this.host = new QuickDrawHost(t!, (players, winners, score, seed) => this.deps.record('quickdraw', spot, players, winners, score, seed));
+        if (!isTableGame(s.game) || this.spot !== spot) return;
+        this.host?.stop();
+        this.host = this.newHost(t!, s.game);
         void this.host.takeover(s);
       },
     });
@@ -147,9 +209,21 @@ export class Games {
     return t;
   }
 
+  private newHost(t: GameTable, game: TableGameId) {
+    const spot = t.spot;
+    return TABLE[game].host({
+      table: t,
+      record: (players, winners, score, seed) => this.deps.record(game, spot, players, winners, score, seed),
+      prompts: () => this.deps.prompts(spot),
+    });
+  }
+
+  // A game is going at this table, and its host is still sitting there.
   private running(spot: SpotId) {
-    const s = this.tables.get(spot)?.snap;
-    return !!s && s.game === 'quickdraw' && (s.state as QDState).phase === 'round';
+    const t = this.tables.get(spot);
+    const s = t?.snap;
+    if (!t || !s || !isTableGame(s.game) || !TABLE[s.game].running(s.state)) return false;
+    return s.host === t.id || t.people.some((p) => p.id === s.host);
   }
 
   private snapshot(spot: SpotId, s: Snapshot) {
@@ -160,10 +234,18 @@ export class Games {
       this.host.stop();
       this.host = null;
     }
-    if (s.game !== 'quickdraw') return;
-    if (this.screen !== 'quickdraw') this.show('quickdraw');
-    else if (this.view) this.view.show(s);
-    else this.render();
+    if (!isTableGame(s.game)) return;
+    if (this.screen !== s.game) this.show(s.game);
+    else if (this.view && this.viewGame === s.game) {
+      this.view.show(s);
+      this.again(t, s);
+    } else this.render();
+  }
+
+  private dropView() {
+    this.view?.destroy();
+    this.view = null;
+    this.viewGame = null;
   }
 
   private show(screen: Games['screen']) {
@@ -175,28 +257,26 @@ export class Games {
     const body = this.body;
     const spot = this.spot;
     if (!body || !spot) return;
-    if (this.screen !== 'quickdraw') {
-      this.view?.destroy();
-      this.view = null;
-    }
+    if (this.screen !== this.viewGame) this.dropView();
     body.replaceChildren();
     if (this.screen === 'list') return this.renderList(body, spot);
     if (this.screen === 'dice') body.append(diceView((r) => this.deps.roll(r)));
     if (this.screen === 'rps') this.renderRps(body);
-    if (this.screen === 'quickdraw') this.renderQuickDraw(body, spot);
+    if (isTableGame(this.screen)) this.renderTable(body, spot, this.screen);
     body.append(this.back());
   }
 
   private renderList(body: HTMLElement, spot: SpotId) {
     const allowed = this.deps.allowed(spot);
+    const here = gamesFor(this.deps.kind(spot)).map((g) => g.id);
     const grid = el('div', 'v2-games');
-    for (const id of ALL_GAMES) {
+    for (const id of ALL_GAMES.filter((g) => here.includes(g))) {
       const g = GAMES[id];
-      const off = !g.soon && allowed !== null && !allowed.includes(id);
-      const b = el('button', 'v2-game' + (g.soon || off ? ' soon' : ''));
+      const off = allowed !== null && !allowed.includes(id);
+      const b = el('button', 'v2-game' + (off ? ' soon' : ''));
       b.type = 'button';
       b.dataset.game = id;
-      b.disabled = !!g.soon || off;
+      b.disabled = off;
       const gi = el('span', 'gi');
       gi.append(icon(g.icon));
       b.append(gi, el('b', '', g.title), el('span', '', off ? 'Off in this room' : g.sub));
@@ -228,45 +308,70 @@ export class Games {
     body.append(list);
   }
 
-  private renderQuickDraw(body: HTMLElement, spot: SpotId) {
+  private renderTable(body: HTMLElement, spot: SpotId, game: TableGameId) {
     const t = this.table(spot);
+    const g = TABLE[game];
     const s = t.snap;
-    if (s && s.game === 'quickdraw' && ((s.state as QDState).phase === 'round' || this.view)) {
-      if (!this.view) {
-        this.view = new QuickDrawView(t.id, (a) => t.act(a), (id) => this.deps.names(id));
+    // The game (going, or just finished and still on screen).
+    if (s && s.game === game && (this.running(spot) || (this.view && this.viewGame === game))) {
+      if (!this.view || this.viewGame !== game) {
+        this.dropView();
+        this.view = g.view(t.id, (a) => t.act(a), (id) => this.deps.names(id));
+        this.viewGame = game;
       }
       body.append(this.view.root);
       this.view.show(s);
-      if ((s.state as QDState).phase === 'done') body.append(this.startButton(t, 'Play again'));
+      this.again(t, s);
       return;
     }
-    // Lobby: everyone at the table plays.
-    const people = t.people.length ? t.people : [t.seat()];
-    body.append(el('p', 'v2-note', 'Everyone at this table plays. 5 rounds; fastest three each round get 3, 2 and 1 points.'));
+    // Lobby: the first `max` people at the table play (us first), the rest watch.
+    const people = this.lineup(t, g);
+    const watching = Math.max(0, (t.people.length || 1) - people.length);
+    body.append(el('p', 'v2-note', g.lobby));
     const list = el('div', 'v2-list');
-    list.id = 'qd-lobby';
+    list.id = `${g.short}-lobby`;
     for (const p of people) {
       const row = el('div', 'v2-item');
       row.append(portrait(this.deps.names(p.id).character ?? p.character, 32), el('span', 't', p.id === t.id ? 'You' : p.name));
       list.append(row);
     }
-    body.append(list, this.startButton(t, people.length < 2 ? 'Waiting for someone to join…' : `Start with ${people.length} players`, people.length < 2));
+    body.append(list);
+    if (watching) body.append(el('p', 'v2-note', `${watching} more at the table will watch.`));
+    body.append(this.startButton(t, game, people.length < g.min ? 'Waiting for someone to join…' : `Start with ${people.length} players`, people.length < g.min));
   }
 
-  private startButton(t: GameTable, label: string, disabled = false) {
+  // Who plays: us first, then by when they sat down, up to the game's maximum.
+  private lineup(t: GameTable, g: TableGame) {
+    const people = t.people.length ? t.people : [t.seat()];
+    const me = people.find((p) => p.id === t.id) ?? t.seat();
+    return [me, ...people.filter((p) => p.id !== t.id)].slice(0, g.max);
+  }
+
+  // After a game: "Play again" under the result.
+  private again(t: GameTable, s: Snapshot) {
+    const game = s.game as TableGameId;
+    const root = this.view?.root;
+    if (!root) return;
+    root.querySelector('.v2-again')?.remove();
+    if (TABLE[game].running(s.state)) return;
+    const b = this.startButton(t, game, 'Play again', this.lineup(t, TABLE[game]).length < TABLE[game].min);
+    b.classList.add('v2-again');
+    root.append(b);
+  }
+
+  private startButton(t: GameTable, game: TableGameId, label: string, disabled = false) {
+    const g = TABLE[game];
     const b = el('button', 'dh-btn');
     b.type = 'button';
-    b.id = 'qd-start';
+    b.id = `${g.short}-start`;
     b.disabled = disabled;
-    b.append(icon('zap'), document.createTextNode(label));
+    b.append(icon(GAMES[game].icon), document.createTextNode(label));
     b.addEventListener('click', () => {
-      const players = t.people.length >= 2 ? t.people : null;
-      if (!players) return;
-      this.view?.destroy();
-      this.view = null;
+      const players = this.lineup(t, g);
+      if (players.length < g.min) return;
+      this.dropView();
       this.host?.stop();
-      const spot = t.spot;
-      this.host = new QuickDrawHost(t, (pl, winners, score, seed) => this.deps.record('quickdraw', spot, pl, winners, score, seed));
+      this.host = this.newHost(t, game);
       void this.host.start(players);
     });
     return b;

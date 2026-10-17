@@ -6,17 +6,19 @@ import { supabase } from './supabase';
 // owner may change their room (row-level security). Changes arrive live via the house channel.
 
 // games: which games the room's table offers (null: all), UPDATE.md Phase 12.
-export type Room = { id: RoomId; owner_id: string | null; name: string; door_state: DoorState; mood: Mood | null; games?: string[] | null };
+// prompts: the owner's own Would you rather prompts, "option A|option B" (null: none), Phase 13.
+export type Room = { id: RoomId; owner_id: string | null; name: string; door_state: DoorState; mood: Mood | null; games?: string[] | null; prompts?: string[] | null };
+type RoomChange = Partial<Pick<Room, 'name' | 'door_state' | 'mood' | 'games' | 'prompts'>>;
 export const DEFAULT_ROOM_NAME = 'Empty room'; // the table's default
 
 export async function loadRooms(): Promise<Room[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('rooms').select('id, owner_id, name, door_state, mood, games').order('id');
+  const { data, error } = await supabase.from('rooms').select('id, owner_id, name, door_state, mood, games, prompts').order('id');
   if (error) console.warn('Could not load rooms', error.message);
   return (data ?? []) as Room[];
 }
 
-export async function updateRoom(id: RoomId, change: Partial<Pick<Room, 'name' | 'door_state' | 'mood' | 'games'>>) {
+export async function updateRoom(id: RoomId, change: RoomChange) {
   if (!supabase) return 'offline';
   const { error } = await supabase.from('rooms').update({ ...change, updated_at: new Date().toISOString() }).eq('id', id);
   return error?.message ?? null;

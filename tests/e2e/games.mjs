@@ -1,5 +1,5 @@
 import { chromium } from 'playwright-core';
-// UPDATE.md Phase 12: the games corner and mini-games. Walking onto the hallway games table offers
+// UPDATE.md Phase 12: the games corner and mini-games (Phase 13's table games: tests/e2e/table-games.mjs). Walking onto the hallway games table offers
 // "Play games"; Dice shows on everyone's screen; Quick Draw runs a full 5-round game between a desktop and a
 // phone player (early tap = out, fair seed check, under the 60-message budget), and carries on when the
 // host leaves; rock-paper-scissors duel from the friend menu with sealed picks, crown for the winner.
@@ -46,8 +46,8 @@ await sees(B, A);
   await A.page.keyboard.press('e');
   const open = await A.page.waitForSelector('#games', { timeout: 3000 }).then(() => true, () => false);
   const list = await A.page.evaluate(() => [...document.querySelectorAll('#games [data-game]')].map((b) => [b.dataset.game, b.disabled]));
-  check('at the games table: "Play games · E", E opens the panel with 3 games and 3 coming soon', { prompt, label, open, list },
-    prompt && /Play games/.test(label ?? '') && open && list.length === 6 && list.filter(([, d]) => !d).length === 3);
+  check('at the games table: "Play games · E", E opens the panel with all 6 games', { prompt, label, open, list },
+    prompt && /Play games/.test(label ?? '') && open && list.length === 6 && list.every(([, d]) => !d));
   await at(A, 300, 270);
   await A.page.waitForTimeout(400);
   const closed = !(await A.page.locator('#games').count()) && !(await A.page.locator('#game-prompt').count());

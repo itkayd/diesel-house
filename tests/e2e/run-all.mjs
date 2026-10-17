@@ -6,7 +6,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const files = ['auth', 'characters', 'joystick', 'multiplayer', 'movement', 'voice', 'voice-extras', 'audio', 'look', 'doors', 'chat', 'guests', 'presence-limits', 'mic-help', 'profile', 'mic-state', 'zoom', 'touch-guards', 'indicators', 'resume', 'mic-button', 'sound-settings', 'sounds', 'assets', 'hallway', 'update', 'emotes', 'games', 'table-games-local', 'table-games', 'whos-where', 'voice-volume'];
+const files = ['auth', 'characters', 'joystick', 'multiplayer', 'movement', 'voice', 'voice-extras', 'audio', 'look', 'doors', 'chat', 'guests', 'presence-limits', 'mic-help', 'profile', 'mic-state', 'zoom', 'touch-guards', 'indicators', 'resume', 'mic-button', 'sound-settings', 'sounds', 'assets', 'hallway', 'update', 'emotes', 'games', 'table-games-local', 'table-games', 'whos-where', 'voice-volume', 'progress'];
 
 const env = { ...process.env };
 if (env.DH_TEST_OWNER) {

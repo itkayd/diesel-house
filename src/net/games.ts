@@ -9,3 +9,10 @@ export async function recordGame(game: string, spot: string, players: string[], 
   if (error) console.warn('Could not save the game result', error.message);
   return error ? null : (data as number);
 }
+
+// How many games someone has won (profile). Members only (game_results RLS).
+export async function gamesWon(userId: string) {
+  if (!supabase || devTest) return null;
+  const { count, error } = await supabase.from('game_results').select('id', { count: 'exact', head: true }).contains('winner_ids', [userId]);
+  return error ? null : (count ?? 0);
+}

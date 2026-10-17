@@ -43,7 +43,7 @@ const B = await signIn(B_);
 await B.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, A.id, { timeout: 15000 });
 
 // HUD button → Profile, About tab.
-await A.page.click('#profile-button');
+await A.page.click('#xp-chip');
 await A.page.waitForSelector('#profile-body .v2-facts');
 const about = await A.page.$eval('#profile-body', (b) => b.textContent);
 const fits = await A.page.$eval('#profile .dh-panel', (p) => p.scrollWidth <= p.clientWidth + 1);
@@ -78,12 +78,17 @@ check('Guest code tab: ABCD-1234 code, Copy puts it on the clipboard, the switch
   { code: code.replace(/[A-Z]/g, 'A').replace(/\d/g, '1'), copied: clip === code, wasOn, switched },
   /^[A-Z]{4}-\d{4}$/.test(code) && clip === code && switched === !wasOn);
 
-// Badges tab: 12 locked, tapping explains.
+// Badges tab (Phase 14): the 6 rank medals (Visitor earned on arrival) and 10 badges; tapping explains.
 await A.page.click('#profile-tab-badges');
-const locked = await A.page.locator('.v2-badge.locked').count();
-await A.page.click('.v2-badge >> nth=0');
+const medals = await A.page.evaluate(() => ({
+  ranks: document.querySelectorAll('#profile-ranks .v2-badge').length,
+  visitor: !document.querySelector('#profile-ranks [data-badge="rank_visitor"]')?.classList.contains('locked'),
+  badges: document.querySelectorAll('.v2-badges .v2-badge').length,
+}));
+await A.page.click('.v2-badges [data-badge="first_knock"]');
 const info = await A.page.textContent('#badge-info');
-check('Badges tab: 12 locked badges, tapping one says how to earn it', { locked, info }, locked === 12 && /Locked\. Knock/.test(info));
+check('Badges tab: 6 rank medals (Visitor earned) and 10 badges; tapping one says how to earn it', { ...medals, info },
+  medals.ranks === 6 && medals.visitor && medals.badges === 10 && /First knock/.test(info) && /Knock on a friend/.test(info));
 
 // Portrait → character picker.
 await A.page.click('#profile-face');
@@ -115,7 +120,7 @@ await G.fill('#player-name', 'Sam profile');
 await G.click('button[data-character="18"]');
 await G.click('#picker-done');
 await G.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 });
-await G.click('#profile-button');
+await G.click('#xp-chip');
 await G.waitForFunction(() => /\d+ h \d+ min/.test(document.getElementById('profile-time-left')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {});
 const guestCard = await G.evaluate(() => ({
   of: document.getElementById('profile-guest-of')?.textContent,

@@ -13,7 +13,8 @@ import { supabase } from './supabase';
 // rating change often, so they ride on move messages instead (Supabase allows each client only 5 presence
 // updates per 30 s; more and it closes the channel: ClientPresenceRateLimitReached).
 // `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
-export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality };
+// lv / st: level and day streak for name tags (Phase 14); members only, set once known.
+export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality; lv?: number; st?: number };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -23,7 +24,8 @@ export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number
 // being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
 export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
 // An emote (UPDATE.md Phase 11): `e` is an EmoteId; `to` when sent from the tap-a-friend menu.
-export type EmoteMsg = { from: string; e: string; to?: string };
+// cheer: a challenge done or a level up (friends in the same room see confetti).
+export type EmoteMsg = { from: string; e: string; to?: string; cheer?: boolean };
 // Games (UPDATE.md Phase 12): a dice roll over someone's head, and rock-paper-scissors duel messages.
 export type DiceMsg = { from: string; v: number[]; s: number };
 export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
@@ -257,12 +259,14 @@ export class Presence {
         continue;
       }
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
-      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net };
+      const lv = Number.isFinite(m.lv) && m.lv! >= 1 ? Math.floor(m.lv!) : undefined;
+      const st = Number.isFinite(m.st) && m.st! >= 0 ? Math.floor(m.st!) : undefined;
+      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net, lv, st };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);
       if (!old) this.h.onJoin(p);
-      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic || old.net !== p.net) this.h.onInfo(p);
+      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic || old.net !== p.net || old.lv !== p.lv || old.st !== p.st) this.h.onInfo(p);
     }
     for (const id of [...this.known.keys()]) {
       if (!seen.has(id)) {

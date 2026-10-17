@@ -345,9 +345,9 @@
     "medals": {
       "file": "public/assets/ui/medals.png",
       "frame": "48x48",
-      "count": 12,
-      "order": "src/ui/profile.ts BADGES",
-      "source": "OpenGameArt · oga_medals.png (CC0), cropped for design/game/v2.html"
+      "count": 18,
+      "order": "src/challenges/pool.ts (cell): 0-11 achievement medals, 12-17 rank medals",
+      "source": "OpenGameArt · oga_medals.png (CC0), cropped for design/game/v2.html; cells 12-17 re-coloured from cell 9 by scripts/build_rank_medals.py"
     }
   },
   "v2": {

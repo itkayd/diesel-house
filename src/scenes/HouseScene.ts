@@ -23,7 +23,7 @@ import { addSoundSettings } from '../ui/soundSettings';
 import { ChatPanel } from '../ui/chat';
 import type { Space, Voice } from '../net/voice';
 import { saveCharacter, savedCharacter, saveName, savedName, savedShowOwnTag, saveShowOwnTag, savedVolume, saveVolume } from '../prefs';
-import { setNetBadge, setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
+import { overlay, setNetBadge, setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
 import { addGuestSettings } from '../ui/guestSettings';
 import { el } from '../ui/modal';
@@ -32,7 +32,7 @@ import { icon } from '../ui/icons';
 import { setPortraitSource } from '../ui/portrait';
 import { toast } from '../ui/toasts';
 import { isTouchDevice, Joystick } from '../ui/joystick';
-import { addProfileButton, pickCharacter } from '../ui/picker';
+import { pickCharacter } from '../ui/picker';
 import { openProfile } from '../ui/profile';
 import { askForMic, micAlreadyAllowed, resetMicDecline, showMicHelp } from '../ui/micPrompt';
 import { modalOpen } from '../ui/modal';
@@ -50,6 +50,10 @@ import { addHallwaySettings } from '../ui/hallwaySettings';
 import { net, type NetQuality } from '../net/netQuality';
 import { reloadForUpdate, watchForNewVersion } from '../ui/update';
 import { addWhosWhereButton } from '../ui/whosWhere';
+import { Tracker } from '../challenges/tracker';
+import { canRecord, weeklyBoard, type Progress, type Recorded } from '../net/progress';
+import { gamesWon } from '../net/games';
+import { challengeToast, confettiAt, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
 import { WalkGrid, type Pt, type Rect } from './pathfind';
 
 const SPEED = 80; // px per second
@@ -128,6 +132,16 @@ export class HouseScene extends Phaser.Scene {
   private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
   // Walking by itself (Who's where): corner points for the feet, and a door to knock on when we get there.
   private autoPath: Pt[] | null = null;
+  // Phase 14: challenges, XP and levels. The tracker sends what we do to record_events() every 30 s.
+  private tracker = new Tracker(false);
+  private progressHud: ProgressHud | null = null;
+  private progress: Progress | null = null;
+  private voiceConnected = 0; // people we can hear in this room right now
+  private wasOnAir = false;
+  private whispered = new Set<string>(); // friends we've whispered to (once each per visit)
+  private metGuests = new Set<string>();
+  private partied = false;
+  private boardPrompt: HTMLDivElement | null = null;
   private autoKnock: RoomId | null = null;
   private autoCheck = { t: 0, x: 0, y: 0 };
   private wallLayer!: Phaser.Tilemaps.TilemapLayer;
@@ -228,7 +242,7 @@ export class HouseScene extends Phaser.Scene {
     addEventListener('orientationchange', refit);
     screen.orientation?.addEventListener?.('change', refit);
 
-    addProfileButton(() => this.openMyProfile());
+    this.setupProgress(); // includes the XP chip, which opens your profile
     this.me.onTagTap(() => this.openMyProfile());
     if (!savedShowOwnTag()) this.me.setTagVisible(false);
     addSettingsSection(
@@ -351,6 +365,7 @@ export class HouseScene extends Phaser.Scene {
     saveName(name);
     this.me.setCharacter(character);
     this.me.setName(name);
+    this.progressHud?.render();
   }
 
   // `mustPick`: first visit, no way to close without choosing.
@@ -428,6 +443,8 @@ export class HouseScene extends Phaser.Scene {
         }
         this.presence?.update({ name });
       },
+      progress: this.progress,
+      gamesWon: () => gamesWon(user.id),
     });
   }
 
@@ -463,7 +480,7 @@ export class HouseScene extends Phaser.Scene {
     const [{ Presence }, { Voice }] = modules;
     this.presence = new Presence(
       currentUser()?.id ?? crypto.randomUUID(),
-      { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest },
+      { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest, ...this.rankInfo() },
       {
         onJoin: (p) => this.addRemote(p),
         onLeave: (id) => this.removeRemote(id),
@@ -534,6 +551,7 @@ export class HouseScene extends Phaser.Scene {
         onStatus: (s) => {
           // The mic button is for rooms; the hallway has the walkie button instead (design/game/v2.html).
           this.voiceControls?.show(this.voice?.space === 'hallway' ? { state: 'off' } : s);
+          this.voiceConnected = s.state === 'in-room' && s.space !== 'hallway' ? s.connected : 0;
           this.showMyMic();
           // Tried to use the mic and it failed: say so once, so nobody talks without being heard.
           const problem = this.voice?.micProblem;
@@ -577,6 +595,7 @@ export class HouseScene extends Phaser.Scene {
       if (t instanceof HTMLElement && t.closest('input, textarea, select, [contenteditable]')) return;
       const n = Number(e.key);
       if (e.key.toLowerCase() === 'e' && this.games?.promptFor) this.games.open(this.games.promptFor);
+      else if (e.key.toLowerCase() === 'e' && this.boardPrompt) void this.openBoard();
       else if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
       else if (e.key.toLowerCase() === 'q') {
         const id = this.nearestRemote(48);
@@ -602,7 +621,15 @@ export class HouseScene extends Phaser.Scene {
       roll: (r) => this.rollDice(r),
       challenge: (id) => this.startDuel(id),
       record: (game, spot, players, winners, score, seed) => void recordGame(game, spot, players, winners, score, seed),
+      played: (game, won, info) => {
+        this.tracker.emit('game_played', { u: game });
+        if (won) this.tracker.emit('game_won', { u: game });
+        if (won && game === 'quickdraw' && (info.fastestMs ?? Infinity) < 250) this.tracker.emit('qd_fast');
+      },
+      hosted: (_game, players) => players >= 4 && this.tracker.emit('host_game_4'),
+      quickDrawRound: () => this.tracker.emit('qd_round_won'),
     });
+    this.chat.onActivity = (k, room) => this.tracker.emit(k === 'chat' ? 'chat_sent' : 'reaction_sent', k === 'chat' ? { u: room } : {});
     this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
     addVoiceSettings(this.voice, this.voiceControls, () => {
       document.getElementById('settings-close')?.click();
@@ -733,6 +760,7 @@ export class HouseScene extends Phaser.Scene {
     }
     this.lastKnock.set(room, now);
     this.presence?.sendDoor({ kind: 'knock', room, to: r.owner_id, name: this.name, character: this.character });
+    this.tracker.emit('knock');
     play('knock');
     toast({ icon: 'hand', who: `You knocked on ${owner}'s door`, what: 'Waiting for them to answer…', ttl: 3000 });
   }
@@ -770,6 +798,7 @@ export class HouseScene extends Phaser.Scene {
       if (!this.passes.has(m.room)) return;
       play('door_open');
       toast({ face: m.character, who: `${m.name} let you in`, what: 'Come in!', small: true, ttl: 2600 });
+      this.tracker.emit('knock_admitted');
     } else if (m.kind === 'not-now') {
       toast({ face: m.character, who: `${m.name} can't let you in right now`, small: true, ttl: 2600 });
     } else if (m.kind === 'kick') {
@@ -848,6 +877,7 @@ export class HouseScene extends Phaser.Scene {
     const avatar = new Avatar(this, 0, 0, p.character, p.name);
     avatar.setVisible(false); // shown once we know where they are
     avatar.setGuest(!!p.guest);
+    avatar.setProgress(p.guest ? null : (p.lv ?? null), p.st ?? 0);
     this.showHost(p);
     queueMicrotask(() => this.showMicNote(p.id));
     avatar.sprite.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.tapAvatar(p.id));
@@ -917,6 +947,7 @@ export class HouseScene extends Phaser.Scene {
     this.me.showEmote(e);
     play('emote', 0.6);
     this.presence.sendEmote(to ? { e, to } : { e });
+    this.tracker.emit('emote_sent', to ? { u: to } : {});
   }
 
   // Dice (UPDATE.md Phase 12): over our head for everyone, and in a room a line in the chat.
@@ -926,6 +957,8 @@ export class HouseScene extends Phaser.Scene {
     this.lastRoll = now;
     this.me.showDice(r.values, r.sides);
     play('dice_throw', 0.7);
+    this.tracker.emit('game_played', { u: 'dice' });
+    if (r.n === 2 && r.sides === 6 && r.values[0] === 6 && r.values[1] === 6) this.tracker.emit('double_six');
     this.presence.sendDice({ v: r.values, s: r.sides });
     const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
     if (room) void postMessage(room, rollText(r), { name: this.name, character: this.character }, 'roll');
@@ -993,6 +1026,12 @@ export class HouseScene extends Phaser.Scene {
     const av = (id: string) => (id === this.presence?.id ? this.me : this.remotes.get(id)?.avatar);
     av(winner)?.setCrown(30_000);
     av(loser)?.showEmote('swirl');
+    const me = this.presence?.id;
+    if (me === winner || me === loser) this.tracker.emit('game_played', { u: 'rps' });
+    if (me === winner) {
+      this.tracker.emit('rps_won');
+      this.tracker.emit('game_won', { u: 'rps' });
+    }
   }
 
   private receiveDuel(m: DuelMsg) {
@@ -1042,6 +1081,8 @@ export class HouseScene extends Phaser.Scene {
     this.lastEmoteFrom.set(m.from, now);
     r.avatar.showEmote(m.e);
     if (r.avatar.sprite.visible) play('emote', m.to === this.presence?.id ? 0.6 : 0.3);
+    // A friend in our room finished a challenge or levelled up: a little confetti over them.
+    if (m.cheer && r.info.zone === this.zone && this.zone !== 'hallway' && r.avatar.sprite.visible) this.confettiOver(r.avatar.sprite);
   }
 
   private removeRemote(id: string) {
@@ -1065,6 +1106,9 @@ export class HouseScene extends Phaser.Scene {
       this.showRooms();
     }
     r.avatar.setGuest(!!p.guest);
+    r.avatar.setProgress(p.guest ? null : (p.lv ?? null), p.st ?? 0);
+    // Levelled up while in our room: confetti.
+    if (p.lv && r.info.lv && p.lv > r.info.lv && r.info.zone === this.zone && this.zone !== 'hallway' && r.avatar.sprite.visible) this.confettiOver(r.avatar.sprite);
     this.showHost(p);
     r.info = { ...p, zone: r.info.zone, mic: r.info.mic, net: r.info.net };
     this.showMicNote(p.id); // zone from position updates is fresher than presence
@@ -1229,6 +1273,7 @@ export class HouseScene extends Phaser.Scene {
       const was = this.zone;
       this.zone = zone;
       this.showPresenceStatus(this.presenceState);
+      if (zone && zone !== 'hallway') this.tracker.emit('room_enter', { u: zone });
       if (zone && zone !== 'hallway' && zone !== was && this.presence)
         toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
       // (Zone rides on the move message just below; presence is kept for rare changes.)
@@ -1244,6 +1289,7 @@ export class HouseScene extends Phaser.Scene {
     // Standing at a game spot: "Play games · E". Walk off and an open games panel closes.
     const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
     this.games?.showPrompt(modalOpen() ? null : spot);
+    this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
     if (this.games?.openSpot && !spot) this.games.close();
     // The walkie button follows where you are every frame, so it can never be left hidden in the hallway
     // (a missed zone update or a setup hiccup used to leave it off until you walked into a room and back).
@@ -1251,6 +1297,7 @@ export class HouseScene extends Phaser.Scene {
     if (this.hallway && this.zone === 'hallway' && this.time.now - this.hallShown > 100) {
       this.hallShown = this.time.now;
       this.showHallway();
+      this.noticeHallway();
     }
   }
 
@@ -1292,6 +1339,140 @@ export class HouseScene extends Phaser.Scene {
     const v = new Phaser.Math.Vector2(vx, vy);
     return v.lengthSq() > 0 ? v.normalize().scale(SPEED) : v;
   }
+  // ---- Phase 14: challenges, XP, levels, streaks, medals ----
+
+  private setupProgress() {
+    const user = currentUser();
+    const guest = !!user?.guest;
+    this.tracker = new Tracker(canRecord() && !!user && !guest);
+    this.progressHud = new ProgressHud(
+      () => ({ character: this.character, guest }),
+      () => this.openMyChallenges(),
+      () => this.openMyProfile(),
+    );
+    this.tracker.onResult((r) => this.gotProgress(r));
+    this.tracker.start();
+    // Once a minute: time in voice, a full room of your own, guests to welcome.
+    this.time.addEvent({ delay: 60_000, loop: true, callback: () => this.minuteTick() });
+  }
+
+  private rankInfo() {
+    return this.progress ? { lv: this.progress.level, st: this.progress.streak } : {};
+  }
+
+  private gotProgress(r: Recorded) {
+    const first = !this.progress;
+    this.progress = r;
+    this.progressHud?.update(r, first ? 0 : r.gained);
+    this.me.setProgress(r.level, r.streak);
+    this.presence?.update(this.rankInfo());
+    // One after another: challenges, then medals (a new rank shows in the level-up instead), then level up.
+    const levelled = r.level > r.level_before;
+    let wait = 0;
+    for (const c of r.completed) {
+      setTimeout(() => challengeToast(c), wait);
+      wait += 900;
+    }
+    for (const m of r.new_medals) {
+      if (levelled && m.id.startsWith('rank_') && m.id !== 'rank_visitor') continue;
+      setTimeout(() => medalToast(m.id, m.xp), wait);
+      wait += 900;
+    }
+    if (levelled) setTimeout(() => levelUpOverlay(r.level_before, r.level), wait + 300);
+    if (r.completed.length || levelled) this.cheer();
+    // Keep an open Challenges sheet up to date (same tab).
+    const sheet = document.getElementById('challenges');
+    if (sheet) {
+      const tab = sheet.querySelector('[aria-selected="true"]')?.getAttribute('data-tab') === 'week' ? 'week' : 'day';
+      openChallenges(this.progress, false, tab);
+    }
+  }
+
+  // "!" over our head for everyone; friends in the same room also get confetti.
+  private cheer() {
+    if (!this.presence) return;
+    this.me.showEmote('exclamation');
+    this.presence.sendEmote({ e: 'exclamation', cheer: true });
+  }
+
+  private confettiOver(sprite: Phaser.GameObjects.Sprite) {
+    const cam = this.cameras.main;
+    const c = this.game.canvas.getBoundingClientRect();
+    confettiAt(c.left + (sprite.x - cam.worldView.x) * cam.zoom, c.top + (sprite.y - 32 - cam.worldView.y) * cam.zoom);
+  }
+
+  private openMyChallenges() {
+    openChallenges(this.progress, !!currentUser()?.guest);
+    void this.tracker.flush(); // fresh numbers while it's open
+  }
+
+  private async openBoard() {
+    const user = currentUser();
+    const guest = !!user?.guest;
+    openNoticeboard(null, user?.id ?? '', guest, () => this.openMyChallenges());
+    if (guest || !canRecord()) return;
+    const rows = await weeklyBoard();
+    if (document.getElementById('noticeboard')) openNoticeboard(rows, user?.id ?? '', guest, () => this.openMyChallenges());
+  }
+
+  private showBoardPrompt(on: boolean) {
+    if (on === !!this.boardPrompt) return;
+    this.boardPrompt?.remove();
+    this.boardPrompt = null;
+    if (!on) return;
+    const box = document.createElement('div');
+    box.className = 'v2-act';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'dh-btn';
+    b.id = 'board-prompt';
+    b.append(icon('clipboard-list'), document.createTextNode(isTouchDevice() ? 'Read the noticeboard' : 'Noticeboard'));
+    if (!isTouchDevice()) {
+      const k = document.createElement('kbd');
+      k.textContent = 'E';
+      b.append(k);
+    }
+    b.addEventListener('click', () => void this.openBoard());
+    box.append(b);
+    overlay().append(box);
+    this.boardPrompt = box;
+  }
+
+  private minuteTick() {
+    if (!this.presence || document.hidden) return;
+    const room = this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null;
+    if (room && this.voiceConnected >= 1) this.tracker.emit('voice_min');
+    if (room && this.voiceConnected >= 2) this.tracker.emit('voice_min_group');
+    // Party host: 4 or more (you included) in your own room.
+    const me = currentUser()?.id;
+    if (room && !this.partied && me && this.rooms.get(room)?.owner_id === me && this.countIn(room) >= 4) {
+      this.partied = true;
+      this.tracker.emit('party');
+    }
+    // A guest in the same place as you: welcomed.
+    for (const r of this.remotes.values()) {
+      if (r.active && r.info.guest && r.info.zone === this.zone && !this.metGuests.has(r.info.id)) {
+        this.metGuests.add(r.info.id);
+        this.tracker.emit('guest_met', { u: r.info.id });
+      }
+    }
+  }
+
+  // Hallway (10 times a second): on the walkie, and whispering to whoever is close while we talk.
+  private noticeHallway() {
+    const hall = this.hallway;
+    if (!hall || this.zone !== 'hallway') return;
+    if (hall.meTalking && !this.wasOnAir) this.tracker.emit('walkie_used');
+    this.wasOnAir = hall.meTalking;
+    if (hall.meTalking || !this.me.speaking || !hall.whisperOn) return;
+    for (const r of this.remotes.values()) {
+      if (!r.active || r.info.zone !== 'hallway' || this.whispered.has(r.info.id)) continue;
+      if (Math.hypot(r.avatar.sprite.x - this.player.x, r.avatar.sprite.y - this.player.y) > WHISPER) continue;
+      this.whispered.add(r.info.id);
+      this.tracker.emit('whisper_used', { u: r.info.id });
+    }
+  }
+
   // ---- Who's where: the map, and walking there by itself ----
 
   private whosWhere() {

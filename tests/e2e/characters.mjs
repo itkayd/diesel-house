@@ -62,7 +62,7 @@ await page.reload(); await page.waitForFunction(() => window.__house?.player);
 b = await st(); check('choice remembered after reload (no picker)', { n: await page.locator('button[data-character]').count(), anim: b.anim }, b.anim === 'char5-idle-down');
 
 // Change character -> LimeZu Adam (index 16), screenshot (LimeZu art only on screen)
-await page.click('#profile-button');
+await page.click('#xp-chip');
 check('Change character reopens picker', 0, (await page.locator('button[data-character]').count()) === 20);
 await page.click('button[data-character="16"]');
 await page.click('#picker-done');

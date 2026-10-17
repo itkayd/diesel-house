@@ -41,6 +41,8 @@ export class ChatPanel {
   private reactions = new Map<number, Map<string, Set<string>>>(); // message -> emoji -> people
   private openBar: number | null = null;
   private loadToken = 0;
+  // Something you did in the chat (Phase 14 challenges): sent a message, or added a reaction.
+  onActivity: (k: 'chat' | 'react', room: string) => void = () => {};
 
   // `command`: chat commands like /roll; returns true when it handled the text.
   constructor(
@@ -130,11 +132,12 @@ export class ChatPanel {
       if (!text || !this.room) return;
       input.value = '';
       if (text.startsWith('/') && this.command(text)) return;
-      const err = await postMessage(this.room, text, this.me());
+      const room = this.room;
+      const err = await postMessage(room, text, this.me());
       if (err) {
         input.value = text;
         this.note(`Couldn't send: ${err}`);
-      }
+      } else this.onActivity('chat', room);
     });
     sheet.append(head, this.list, form);
     overlay().append(sheet);
@@ -239,7 +242,10 @@ export class ChatPanel {
           b.setAttribute('aria-pressed', String(mine));
           b.setAttribute('aria-label', `${emoji} ${people.size}`);
           b.append(emojiImg(emoji, 16), el('span', '', String(people.size)));
-          b.addEventListener('click', () => void setReaction(m.id, emoji, !mine));
+          b.addEventListener('click', () => {
+            void setReaction(m.id, emoji, !mine);
+            if (!mine && this.room) this.onActivity('react', this.room);
+          });
           reacts.append(b);
         }
         row.append(reacts);
@@ -274,6 +280,7 @@ export class ChatPanel {
       b.addEventListener('click', () => {
         this.openBar = null;
         void setReaction(m.id, emoji, !mine);
+        if (!mine && this.room) this.onActivity('react', this.room);
       });
       bar.append(b);
     }

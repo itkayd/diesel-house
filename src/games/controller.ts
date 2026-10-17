@@ -8,7 +8,8 @@ import { diceView, type Roll } from './dice';
 import { FourHost, FourView } from './fourInARow';
 import { HigherLowerHost, HigherLowerView } from './higherLower';
 import { HotTakesHost, HotTakesView } from './hotTakes';
-import { QuickDrawHost, QuickDrawView } from './quickDraw';
+import { topScorers } from './kit';
+import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
 import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type Table, type TableHost, type TableView } from './table';
 
 // The games corner (west end of the hallway) and room tables (UPDATE.md Phase 12): walking onto a spot
@@ -51,6 +52,7 @@ type TableGame = {
   host: (c: Ctx) => TableHost;
   view: (me: string, act: (a: unknown) => void, names: Names) => TableView;
   running: (state: unknown) => boolean;
+  winners: (s: Snapshot) => string[];
 };
 const TABLE: Record<TableGameId, TableGame> = {
   quickdraw: {
@@ -59,6 +61,7 @@ const TABLE: Record<TableGameId, TableGame> = {
     host: (c) => new QuickDrawHost(c.table, c.record),
     view: (me, act, names) => new QuickDrawView(me, act, names),
     running: (st) => (st as { phase: string }).phase === 'round',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
   },
   higherlower: {
     short: 'hl', min: 2, max: 8,
@@ -66,6 +69,7 @@ const TABLE: Record<TableGameId, TableGame> = {
     host: (c) => new HigherLowerHost(c.table, c.record),
     view: (me, act, names) => new HigherLowerView(me, act, names),
     running: (st) => (st as { phase: string }).phase === 'turn',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
   },
   wyr: {
     short: 'wyr', min: 2, max: 8,
@@ -73,6 +77,7 @@ const TABLE: Record<TableGameId, TableGame> = {
     host: (c) => new HotTakesHost(c.table, c.record, c.prompts),
     view: (me, act, names) => new HotTakesView(me, act, names),
     running: (st) => (st as { phase: string }).phase !== 'done',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
   },
   four: {
     short: 'four', min: 2, max: 2,
@@ -80,6 +85,10 @@ const TABLE: Record<TableGameId, TableGame> = {
     host: (c) => new FourHost(c.table, c.record),
     view: (me, act, names) => new FourView(me, act, names),
     running: (st) => (st as { phase: string }).phase === 'play',
+    winners: (s) => {
+      const w = (s.state as { winner?: string | null }).winner;
+      return w ? [w] : [];
+    },
   },
 };
 const isTableGame = (g: string): g is TableGameId => g in TABLE;
@@ -99,6 +108,10 @@ export type GameDeps = {
   roll: (r: Roll) => void;
   challenge: (id: string) => void;
   record: (game: GameId, spot: SpotId, players: string[], winners: string[], score: unknown, seed?: string) => void;
+  // Phase 14: a table game we played in ended (everyone at the table, not just the host); we started one.
+  played?: (game: GameId, won: boolean, info: { fastestMs?: number }) => void;
+  hosted?: (game: GameId, players: number) => void;
+  quickDrawRound?: () => void; // we were fastest in a Quick Draw round
 };
 
 export class Games {
@@ -234,7 +247,34 @@ export class Games {
     return s.host === t.id || t.people.some((p) => p.id === s.host);
   }
 
+  // Phase 14: notice a game ending for us (once per game), and our Quick Draw round wins and times.
+  private seenEnd = new Set<string>();
+  private qdBest = new Map<string, number>();
+  private qdRound = new Set<string>();
+  private notice(t: GameTable, s: Snapshot) {
+    if (!isTableGame(s.game) || !s.players.some((p) => p.id === t.id)) return;
+    const key = `${s.game}:${s.players.map((p) => p.id).join(',')}:${(s.state as { commit?: string }).commit ?? s.v}`;
+    if (s.game === 'quickdraw') {
+      const last = (s.state as QDState).last;
+      const mine = last?.times[t.id];
+      if (last && mine !== undefined && mine >= 0) {
+        this.qdBest.set(key, Math.min(this.qdBest.get(key) ?? Infinity, mine));
+        const fastest = Math.min(...Object.values(last.times).filter((ms) => ms >= 0));
+        const r = `${key}:${last.round}`;
+        if (mine === fastest && !this.qdRound.has(r)) {
+          this.qdRound.add(r);
+          this.deps.quickDrawRound?.();
+        }
+      }
+    }
+    if (TABLE[s.game].running(s.state) || this.seenEnd.has(key)) return;
+    this.seenEnd.add(key);
+    this.deps.played?.(s.game, TABLE[s.game].winners(s).includes(t.id), { fastestMs: this.qdBest.get(key) });
+  }
+
   private snapshot(spot: SpotId, s: Snapshot) {
+    const tbl = this.tables.get(spot);
+    if (tbl) this.notice(tbl, s);
     if (spot !== this.spot) return;
     const t = this.tables.get(spot)!;
     // Someone else started a new game: we're not the host any more.
@@ -386,6 +426,7 @@ export class Games {
       this.host?.stop();
       this.host = this.newHost(t, game);
       void this.host.start(players);
+      this.deps.hosted?.(game, players.length);
     });
     return b;
   }

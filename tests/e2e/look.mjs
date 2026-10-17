@@ -95,7 +95,7 @@ await A.page.click('#settings-close');
 check('settings: mic, push to talk, name-tag switch (which works)', { items, tagHidden, tagBack }, items.every(Boolean) && tagHidden && tagBack);
 
 // Picker: reopening from the profile button has a Close; nothing changes if you close it.
-await A.page.click('#profile-button');
+await A.page.click('#xp-chip');
 await A.page.waitForSelector('#picker');
 const hasClose = await A.page.locator('#picker-close').count();
 await A.page.screenshot({ path: `${out}/look_picker.png` });

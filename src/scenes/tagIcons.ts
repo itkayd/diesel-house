@@ -55,6 +55,11 @@ export function makeTagIcons(scene: Phaser.Scene) {
     px(2, 5, OK);
     px(3, 5, OK);
   });
+  // Day streak flame (Phase 14).
+  paint(scene, 'tag-flame', 5, 7, (px) => {
+    const F = ['..#..', '.##..', '.###.', '##.##', '#.o.#', '#ooo#', '.###.'];
+    F.forEach((row, y) => [...row].forEach((c, x) => c !== '.' && px(x, y, c === 'o' ? '#ffd36b' : '#ff8a3d')));
+  });
   bars('tag-net-poor', 1, ERROR);
   bars('tag-net-strong', 2, LAMP);
   bars('tag-net-super', 3, OK);

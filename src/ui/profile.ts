@@ -6,27 +6,15 @@ import { icon, type IconName } from './icons';
 import { el, openModal } from './modal';
 import { portrait } from './portrait';
 import { toast } from './toasts';
+import { ACHIEVEMENTS, RANK_MEDALS, type Medal } from '../challenges/pool';
+import { formatXp, legendStars, progress as levelProgress, rankOf, xpFor } from '../challenges/levels';
+import type { Progress } from '../net/progress';
+import { levelChip, medalEl } from './progressUi';
 
 // Profile (design/game/v2.html `showProfile`): opened from the HUD button or by tapping your own name tag.
-// Members: portrait (tap to change character), editable display name, level / streak / XP (placeholders
-// until challenges arrive in Phase 14), and tabs About · Guest code · Badges. Guests: a smaller card with
-// whose guest they are and how long their visit lasts.
-
-// Badges (order matches public/assets/ui/medals.png, 12 × 48 px). All locked until Phase 14.
-export const BADGES = [
-  { id: 'first_knock', name: 'First knock', how: "Knock on a friend's door." },
-  { id: 'night_owl', name: 'Night owl', how: 'Be in the house after midnight.' },
-  { id: 'high_roller', name: 'High roller', how: 'Roll a double six at the games table.' },
-  { id: 'duelist', name: 'Duelist', how: 'Win 3 rock-paper-scissors duels.' },
-  { id: 'fast_hand', name: 'Fastest hand', how: 'Win a round of Quick Draw.' },
-  { id: 'over_out', name: 'Over and out', how: 'Use the walkie 3 times.' },
-  { id: 'steady', name: 'Slow & steady', how: 'Keep a 7-day streak.' },
-  { id: 'host', name: 'Party host', how: 'Have 4 people in your room at once.' },
-  { id: 'lvl5', name: 'Level 5', how: 'Reach level 5.' },
-  { id: 'legend', name: 'House legend', how: 'Reach level 10.' },
-  { id: 'decor', name: 'Home maker', how: 'Name your room.' },
-  { id: 'social', name: 'Social butterfly', how: 'Send emotes to 3 different friends.' },
-];
+// Members: portrait (tap to change character), editable display name, level / rank / streak / XP
+// (Phase 14, LEVELS.md), and tabs About · Guest code · Badges (rank medals and achievement medals).
+// Guests: a smaller card with whose guest they are and how long their visit lasts (no XP).
 
 export type ProfileContext = {
   name: string;
@@ -35,6 +23,8 @@ export type ProfileContext = {
   host: string | null; // guests: the member who invited you (if known already)
   changeCharacter: () => void;
   rename: (name: string) => Promise<void> | void;
+  progress: Progress | null; // null while it's loading (or offline)
+  gamesWon: () => Promise<number | null>;
 };
 
 const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'unknown');
@@ -113,19 +103,29 @@ export function openProfile(ctx: ProfileContext) {
   nm.append(input);
   const chips = el('div');
   chips.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
-  chips.append(el('span', 'v2-chip gold', 'Lv 1'), el('span', 'v2-chip', '0-day streak'));
+  const p = ctx.progress;
+  const pr = levelProgress(p?.xp ?? 0);
+  const rank = rankOf(pr.level);
+  const stars = legendStars(pr.level);
+  chips.id = 'profile-chips';
+  chips.append(levelChip(pr.level), el('span', 'v2-chip', rank.title + (stars ? ` ${stars}` : '')), el('span', 'v2-chip', `${p?.streak ?? 0}-day streak`));
+  chips.lastElementChild!.setAttribute('style', 'background:#ffae6b');
   right.append(nm, chips);
   me.append(face(ctx.character, () => (close(), ctx.changeCharacter())), right);
 
-  // XP bar (placeholder until Phase 14).
+  // XP within this level (the bar never stalls at high levels).
   const xp = el('div');
   xp.style.cssText = 'display:grid;gap:6px';
   const meta = el('div', 'v2-meta');
-  meta.append(el('span', '', '0 / 100 XP to level 2'), el('span', '', 'Challenges coming soon'));
+  meta.id = 'profile-xp';
+  meta.append(
+    el('span', '', p ? `${pr.intoLevel.toLocaleString()} / ${pr.levelSize.toLocaleString()} XP to level ${(pr.level + 1).toLocaleString()}` : 'Loading your XP…'),
+    el('span', '', p ? `${formatXp(p.xp)} in all` : ''),
+  );
   const bar = el('div', 'v2-bar');
   bar.style.height = '12px';
   const fill = el('b');
-  fill.style.width = '0%';
+  fill.style.width = `${pr.pct}%`;
   bar.append(fill);
   xp.append(meta, bar);
 
@@ -138,7 +138,7 @@ export function openProfile(ctx: ProfileContext) {
   const TABS: [string, IconName, string, () => void | Promise<void>][] = [
     ['about', 'id-card', 'About', () => about(body, ctx)],
     ['code', 'ticket', 'Guest code', () => guestCode(body, user.id)],
-    ['badges', 'award', 'Badges', () => badges(body)],
+    ['badges', 'award', 'Badges', () => badges(body, ctx.progress)],
   ];
   const buttons = TABS.map(([id, ic, label, render]) => {
     const b = el('button');
@@ -165,18 +165,24 @@ function about(body: HTMLElement, ctx: ProfileContext) {
     ctx.ownedRoom ? fact('door-open', 'Owns ', bold(ctx.ownedRoom)) : fact('door-open', 'No room of your own yet'),
     fact('calendar', 'Joined with an invite from Diesel on ', bold(day(user.joinedAt))),
     fact('clock', 'Signed in ', bold(time(user.signedInAt))),
-    fact('award', bold('0'), ` of ${BADGES.length} badges`),
+    fact('award', bold(String(ACHIEVEMENTS.filter((m) => earned(ctx.progress, m)).length)), ` of ${ACHIEVEMENTS.length} badges`),
   );
   const login = loginName(user.email);
   if (login && login !== ctx.name.toLowerCase()) facts.append(fact('info', 'You sign in as ', bold(login)));
   const stats = el('div', 'v2-stats');
-  for (const [n, label] of [['1', 'Level'], ['0', 'Day streak'], ['0', 'Games won']]) {
+  stats.id = 'profile-stats';
+  const p = ctx.progress;
+  const won = el('b', '', '…');
+  for (const [n, label] of [[levelProgress(p?.xp ?? 0).level.toLocaleString(), 'Level'], [String(p?.streak ?? 0), `Day streak · best ${p?.best_streak ?? 0}`], [won, 'Games won']] as const) {
     const s = el('div', 'v2-stat');
-    s.append(el('b', '', n), el('span', '', label));
+    s.append(typeof n === 'string' ? el('b', '', n) : n, el('span', '', label));
     stats.append(s);
   }
   body.append(facts, stats);
+  void ctx.gamesWon().then((n) => (won.textContent = n === null ? '–' : n.toLocaleString()));
 }
+
+const earned = (p: Progress | null, m: Medal) => !!p?.medals.some((x) => x.id === m.id);
 
 async function guestCode(body: HTMLElement, me: string) {
   const status = el('p', 'v2-note');
@@ -270,24 +276,37 @@ async function guestCode(body: HTMLElement, me: string) {
   render();
 }
 
-function badges(body: HTMLElement) {
-  const grid = el('div', 'v2-badges');
-  const info = el('div', 'v2-badgeinfo', 'Tap a badge to see how to earn it.');
+function badges(body: HTMLElement, p: Progress | null) {
+  const info = el('div', 'v2-badgeinfo', 'Tap a medal to see how to earn it.');
   info.id = 'badge-info';
-  BADGES.forEach((b, i) => {
-    const btn = el('button', 'v2-badge locked');
+  const level = levelProgress(p?.xp ?? 0).level;
+  const button = (m: Medal, grid: HTMLElement) => {
+    const has = earned(p, m);
+    const btn = el('button', 'v2-badge' + (has ? '' : ' locked'));
     btn.type = 'button';
-    btn.dataset.badge = b.id;
-    const medal = el('span', 'v2-medal');
-    medal.style.cssText = `background-image:url(assets/ui/medals.png);background-size:576px 48px;background-position:-${i * 48}px 0`;
-    btn.append(medal, el('span', '', b.name));
+    btn.dataset.badge = m.id;
+    // The next rank to earn: "Lv 30 · 4,000 XP to go" under its silhouette.
+    const next = !has && m.rank !== undefined && RANK_MEDALS.find((r) => !earned(p, r))?.id === m.id;
+    btn.append(medalEl(m), el('span', '', next ? `${m.name} · Lv ${m.rank} · ${Math.max(0, xpFor(m.rank!) - (p?.xp ?? 0)).toLocaleString()} XP to go` : m.name));
     btn.addEventListener('click', () => {
-      grid.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === btn)));
-      info.replaceChildren(bold(b.name), ` · Locked. ${b.how}`);
+      body.querySelectorAll('.v2-badge').forEach((x) => x.setAttribute('aria-pressed', String(x === btn)));
+      const at = p?.medals.find((x) => x.id === m.id)?.at;
+      const how = has ? `Earned ${at ? new Date(at).toLocaleDateString() : ''}. ${m.how}` : `Locked. ${m.how}`;
+      const togo = !has && m.rank ? ` ${(Math.max(0, xpFor(m.rank) - (p?.xp ?? 0))).toLocaleString()} XP to go.` : '';
+      info.replaceChildren(bold(m.name), ` · ${how}${m.xp ? ` (+${m.xp} XP)` : ''}${togo}`);
     });
     grid.append(btn);
-  });
-  body.append(grid, info, el('p', 'v2-note', 'Badges, XP and streaks start counting when challenges arrive.'));
+  };
+  // Rank: every rank medal, earned ones in colour; the Legend medal gets its stars.
+  const ranks = el('div', 'v2-rankrow');
+  ranks.id = 'profile-ranks';
+  RANK_MEDALS.forEach((m) => button(m, ranks));
+  const stars = legendStars(level);
+  if (stars) ranks.lastElementChild?.querySelector('span:last-child')?.append(` ${stars}`);
+  const grid = el('div', 'v2-badges');
+  ACHIEVEMENTS.forEach((m) => button(m, grid));
+  body.append(el('div', 'dh-label', 'Rank'), ranks, el('div', 'dh-label', 'Badges'), grid, info);
+  if (!p) body.append(el('p', 'v2-note', 'Couldn’t load your medals just now.'));
 }
 
 async function openGuestProfile(ctx: ProfileContext) {

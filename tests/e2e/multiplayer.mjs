@@ -77,7 +77,7 @@ await B.page.waitForTimeout(400);
 await B.page.screenshot({ path: `${out}/p3_b_view.png` });
 
 // Change character + name on A
-await A.page.click('#profile-button');
+await A.page.click('#xp-chip');
 await A.page.fill('#player-name', 'Alice renamed');
 await A.page.click('button[data-character="17"]');
 await A.page.click('#picker-done');

@@ -557,3 +557,43 @@ html, body, #game, #overlay, #overlay * {
 .v2-mini .dot canvas { display: block; width: 10px; height: 10px; }
 .v2-mini .dot.me { background: var(--lamp); width: 12px; height: 12px; animation: v2-blink 1s steps(1) infinite; }
 .v2-item .s { font-size: 13px; color: var(--muted); }
+
+/* Phase 14 (design/game/v2.html): XP chip, challenges, level up, confetti, noticeboard, rank chips. */
+.v2-xp { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; padding: 4px 10px 4px 4px; min-height: 40px; pointer-events: auto;
+  background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge); font-family: var(--font-display); position: relative; max-width: calc(100vw - 40px); }
+.v2-xp:hover { background: var(--panel-hi); }
+.v2-xp .dh-portrait { width: 30px; height: 30px; }
+.v2-xp .mid { display: grid; gap: 3px; justify-items: start; min-width: 0; }
+.v2-xp .lv { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--gold); letter-spacing: .03em; white-space: nowrap; }
+.v2-xp .lv .v2-medal { flex: none; }
+.v2-xp .v2-bar { width: 64px; }
+.v2-xp .streak { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: #ffae6b; white-space: nowrap; }
+.v2-xp .streak svg { width: 13px; height: 13px; }
+@media (max-width: 600px) { .v2-xp .v2-bar { width: 44px; } }
+.v2-float { position: absolute; left: 60px; top: 0; font-family: var(--font-display); font-size: 15px; color: var(--gold); pointer-events: none; white-space: nowrap;
+  text-shadow: 2px 2px 0 var(--panel-edge); animation: v2-up 1.2s steps(8) forwards; }
+@keyframes v2-up { to { transform: translateY(-26px); opacity: 0; } }
+.v2-item.done { box-shadow: inset 0 0 0 2px #3fa865; }
+.v2-item .ic { width: 36px; height: 36px; display: grid; place-items: center; background: var(--panel); color: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge); }
+.v2-item .ic svg { width: 20px; height: 20px; }
+.v2-item.done .ic { color: var(--ok); }
+.v2-item.done .v2-xpchip { background: var(--ok); }
+.v2-lvchip { color: var(--panel-edge); }
+.v2-lvchip .stars { letter-spacing: 0; }
+.v2-lvl { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(13,9,18,.6); cursor: pointer; overflow: hidden; pointer-events: auto; }
+.v2-lvl .card { display: grid; justify-items: center; gap: 10px; padding: 22px 28px; text-align: center; animation: v2-zoom .35s steps(5) both; max-width: 92%; }
+.v2-lvl .card .k { font-family: var(--font-display); color: var(--muted); letter-spacing: .12em; font-size: 13px; text-transform: uppercase; }
+.v2-lvl .card .n { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 11vw, 54px); line-height: 1; color: var(--gold); text-shadow: 4px 4px 0 var(--panel-edge); overflow-wrap: anywhere; }
+.v2-lvl .card p { margin: 0; color: var(--muted); }
+@keyframes v2-zoom { from { transform: scale(.3); opacity: 0; } }
+.v2-conf { position: absolute; width: 8px; height: 8px; top: -10px; animation: v2-fall linear forwards; pointer-events: none; }
+@keyframes v2-fall { to { transform: translateY(110vh) rotate(540deg); } }
+.v2-burst { position: absolute; width: 60px; height: 70px; transform: translate(-50%, -100%); overflow: hidden; pointer-events: none; z-index: 30; }
+.v2-burst .v2-conf { width: 4px; height: 4px; animation-name: v2-pop; }
+@keyframes v2-pop { to { transform: translateY(70px) rotate(360deg); opacity: 0; } }
+.v2-rankrow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.v2-rankrow .v2-badge { cursor: default; }
+.v2-rankrow .v2-badge .v2-medal { width: 40px; height: 40px; }
+.v2-board-row .s { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-board-row b .v2-medal { vertical-align: -3px; }
+@media (prefers-reduced-motion: reduce) { .v2-lvl .card, .v2-float { animation: none; } }

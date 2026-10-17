@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { animKey, type Dir } from '../characters';
 import type { NetQuality } from '../net/netQuality';
+import { rankOf } from '../challenges/levels';
 import { makeTagIcons, micKey, netKey, type MicIcon } from './tagIcons';
 
 const PANEL = 0x2b2034;
@@ -28,6 +29,13 @@ export class Avatar {
   private host: string | null = null;
   private micImg: Phaser.GameObjects.Image;
   private netImg: Phaser.GameObjects.Image;
+  // Phase 14: [Lv] before the name in the rank's colour, and a flame with the day streak after it.
+  private lvText: Phaser.GameObjects.Text;
+  private stText: Phaser.GameObjects.Text;
+  private flameImg: Phaser.GameObjects.Image;
+  private lvColour = 0xfff4e0;
+  level: number | null = null; // shown on the tag (read by automated checks)
+  streak = 0;
   mic: MicIcon | null = null; // shown on the tag (read by automated checks)
   net: NetQuality | null = null;
   private note: string | null = null;
@@ -73,7 +81,11 @@ export class Avatar {
     makeTagIcons(scene);
     this.micImg = scene.add.image(0, 0, micKey('on')).setOrigin(0, 1).setVisible(false);
     this.netImg = scene.add.image(0, 0, netKey('super')).setOrigin(0, 1).setVisible(false);
-    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.micImg, this.netImg]).setDepth(100000);
+    const small = { fontFamily: '"Pixelify Sans", monospace', fontSize: '6px' };
+    this.lvText = scene.add.text(0, 0, '', { ...small, color: '#0d0912' }).setOrigin(0, 1).setResolution(8).setVisible(false);
+    this.stText = scene.add.text(0, 0, '', { ...small, color: '#ffae6b' }).setOrigin(0, 1).setResolution(8).setVisible(false);
+    this.flameImg = scene.add.image(0, 0, 'tag-flame').setOrigin(0, 1).setVisible(false);
+    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.lvText, this.flameImg, this.stText, this.micImg, this.netImg]).setDepth(100000);
     this.drawTagBg();
     this.animate(false);
   }
@@ -93,19 +105,45 @@ export class Avatar {
     const text = Math.ceil(this.tagText.width);
     const icons = [this.micImg, this.netImg].filter((i) => i.visible);
     const iconsW = icons.reduce((sum, i) => sum + i.width + 2, 0);
-    const w = text + 6 + iconsW;
+    // Level badge (any number of digits) and streak, when known.
+    const lvW = this.lvText.visible ? Math.ceil(this.lvText.width) + 4 : 0;
+    const stW = this.stText.visible ? this.flameImg.width + 1 + Math.ceil(this.stText.width) + 2 : 0;
+    const w = text + 6 + iconsW + (lvW ? lvW + 2 : 0) + stW;
     const h = Math.max(Math.ceil(this.tagText.height), 8) + 2;
     this.tagBg.clear();
     this.tagBg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
     this.tagBg.fillStyle(PANEL, 0.92).fillRect(-w / 2, -h, w, h);
     if (this.tag?.input) (this.tag.input.hitArea as Phaser.Geom.Rectangle).setTo(-w / 2 - 1, -h - 1, w + 2, h + 2);
-    const left = -w / 2 + 3;
+    let left = -w / 2 + 3;
+    if (lvW) {
+      this.tagBg.fillStyle(this.lvColour, 1).fillRect(left - 2, -h + 1, lvW, h - 2);
+      this.lvText.setPosition(Math.round(left), -1);
+      left += lvW + 2;
+    }
     this.tagText.setPosition(Math.round(left + text / 2), -1);
     let x = left + text + 2;
+    if (stW) {
+      this.flameImg.setPosition(Math.round(x), -2);
+      this.stText.setPosition(Math.round(x + this.flameImg.width + 1), -1);
+      x += stW;
+    }
     for (const i of icons) {
       i.setPosition(Math.round(x), -2);
       x += i.width + 2;
     }
+  }
+
+  // Level (in the rank's colour) and day streak on the tag; null level hides both (guests, unknown).
+  setProgress(level: number | null, streak = 0) {
+    if (level === this.level && streak === this.streak) return;
+    this.level = level;
+    this.streak = streak;
+    this.lvText.setVisible(level !== null).setText(level === null ? '' : String(level));
+    if (level !== null) this.lvColour = Number.parseInt(rankOf(level).colour.slice(1), 16);
+    const showStreak = level !== null && streak > 1;
+    this.stText.setVisible(showStreak).setText(String(streak));
+    this.flameImg.setVisible(showStreak);
+    this.drawTagBg();
   }
 
   // Mic icon: on (green), off/muted (red, crossed), not working (amber, crossed). Null hides it.

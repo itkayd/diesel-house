@@ -31,7 +31,7 @@ are made in code (`src/ui/radioSfx.ts`).
 | Music Jingles (`kenney_music-jingles.zip`) | Kenney | Win and lose jingles (8-bit) | CC0 |
 | The Essential Retro Video Game Sound Effects Collection [512 sounds] | **Juhani Junkala** | Error, level-up fanfare | CC0 (credited anyway) |
 | SoundPack01 | OpenGameArt | Challenge done (rise), coin | CC0 |
-| `oga_medals.png` | OpenGameArt | Badge medals: `public/assets/ui/medals.png` (12 × 48 px strip, cropped for design/game/v2.html) | CC0 |
+| `oga_medals.png` | OpenGameArt | Badge medals: `public/assets/ui/medals.png` (18 × 48 px strip: 12 cropped for design/game/v2.html, plus 6 rank medals re-coloured from the star medal by `scripts/build_rank_medals.py`) | CC0 |
 | Casino Audio (`kenney_casino-audio.zip`) | Kenney | Dice shake and throw, card place / flip / shuffle, chips | CC0 |
 | Playing Cards Pack (`kenney_playing-cards-pack.zip`) | Kenney | Pixel cards (52, backs, jokers) and 7 dice faces: `public/assets/games/cards.png` + `.json` (32 px cells, medium tilemap) | CC0 |
 | Emotes Pack (`kenney_emotes-pack.zip`) | Kenney | Emote bubbles, Pixel **Style 1** only (as the v2 mock): `public/assets/emotes/emotes.png` + `.json` (16 px) | CC0 |

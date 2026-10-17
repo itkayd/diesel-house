@@ -145,7 +145,7 @@ const RECIPES = {
 // Hallway decor, world px (hallway face y 192-224, floor 224-304).
 const HALL = [['door_double', 20, 196, 'wall'], ['fairy_lights', 128, 194, WARM], ['fairy_lights', 190, 194, WARM], ['fairy_lights', 304, 194, WARM],
   ['fairy_lights', 366, 194, WARM], ['fairy_lights', 480, 194, WARM], ['fairy_lights', 542, 194, WARM], ['fairy_lights', 656, 194, WARM],
-  ['picture_land', 166, 206, 'wall'], ['picture_c', 520, 206, 'wall'], ['picture_b', 340, 206, 'wall'],
+  ['picture_c', 520, 206, 'wall'], ['picture_b', 340, 206, 'wall'], // (the noticeboard hangs where picture_land was)
   ['rug_small_red', 188, 250, 'flat'], ['rug_small_red', 368, 250, 'flat'], ['rug_small_red', 548, 250, 'flat'],
   ['plant_palm', 130, 272], ['plant_tree', 330, 279], ['plant_palm', 500, 272], ['plant_tree', 680, 279],
   ['lamp_cream', 226, 226, WARM], ['lamp_cream', 586, 226, WARM],
@@ -186,6 +186,10 @@ for (const [id, key, zoneName] of GAME_TABLES) {
   const props = [{ name: 'kind', type: 'string', value: rug ? 'sofa' : 'table' }];
   spots.push({ id: nextId++, name: id, type: 'spot', x, y, width: 0, height: 0, point: true, rotation: 0, visible: true, properties: props });
 }
+// The noticeboard (Phase 14: weekly leaderboard and challenges), on the hallway wall near the games corner,
+// between the first two fairy lights (where a picture used to hang). Stand at the point to read it.
+spots.push({ id: nextId++, name: 'board', type: 'spot', x: 175, y: 240, width: 0, height: 0, point: true, rotation: 0, visible: true,
+  properties: [{ name: 'kind', type: 'string', value: 'board' }, { name: 'boardX', type: 'int', value: 160 }, { name: 'boardY', type: 'int', value: 200 }] });
 
 // Doors: one object per doorway (the gap through the wall), for door frames now and door states later.
 const doors = [];

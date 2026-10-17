@@ -162,5 +162,10 @@ Game messages **sent** (the `game` kind in `msgStats`), measured in `tests/e2e/t
 
 Even at 10 table games a night, every night: ~40k billed messages a month, under 3% of the 1.5 M target. TURN: unchanged (games add no voice).
 
+### Measured: Phase 14 challenges and XP (17 Oct 2026)
+- `record_events()` is a normal database call (HTTP), **not Realtime**: at most one every 30 s per person while something happens, plus one on arrival. No Realtime cost.
+- Realtime adds only: a presence update when your level or streak changes (a few a day), and one "!" emote broadcast per challenge done or level up (≈ 6–10 a day per person). Under 0.1% of the budget.
+- `xp_ledger`, daily tallies and old daily challenge rows older than 90 days are deleted by the first visitor of each (UTC) day, inside `record_events()`; totals stay on `profiles`.
+
 ## 7. Order
 Phase 9 assets → 10 hallway voice → 11 emotes → 12 quick games → 13 table games → 14 challenges/XP. Stop after each phase for Diesel to test.

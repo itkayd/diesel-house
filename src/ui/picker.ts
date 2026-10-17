@@ -3,7 +3,6 @@ import { CHARACTER_COUNT, characterFrames, portraitFrame } from '../characters';
 import { NAME_MAX } from '../prefs';
 import { icon } from './icons';
 import { el, openModal } from './modal';
-import { hudButtons } from './overlay';
 
 const SCALE = 3;
 
@@ -140,15 +139,4 @@ export function pickCharacter(
       resolve(result);
     }
   });
-}
-
-// Profile button (top-right) that reopens the picker.
-export function addProfileButton(onClick: () => void) {
-  const b = el('button', 'dh-iconbtn');
-  b.type = 'button';
-  b.id = 'profile-button';
-  b.setAttribute('aria-label', 'Your profile');
-  b.append(icon('user-round'));
-  b.addEventListener('click', onClick);
-  hudButtons().prepend(b);
 }

@@ -14,10 +14,19 @@ const EDGE = 0x0d0912;
 
 export class GameSpots {
   readonly spots: { id: SpotId; x: number; y: number; kind: SpotKind }[] = [];
+  // The noticeboard (Phase 14): where you stand to read it.
+  board: { x: number; y: number } | null = null;
 
   constructor(scene: Phaser.Scene, map: Phaser.Tilemaps.Tilemap) {
     for (const o of map.getObjectLayer('spots')?.objects ?? []) {
-      const kind = (o.properties as { name: string; value: unknown }[] | undefined)?.find((p) => p.name === 'kind')?.value === 'sofa' ? 'sofa' : 'table';
+      const props = (o.properties as { name: string; value: unknown }[] | undefined) ?? [];
+      const prop = (n: string) => props.find((p) => p.name === n)?.value;
+      if (prop('kind') === 'board') {
+        this.board = { x: o.x!, y: o.y! };
+        drawBoard(scene, Number(prop('boardX')), Number(prop('boardY')));
+        continue;
+      }
+      const kind = prop('kind') === 'sofa' ? 'sofa' : 'table';
       this.spots.push({ id: o.name as SpotId, x: o.x!, y: o.y!, kind });
     }
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -38,6 +47,11 @@ export class GameSpots {
     }
   }
 
+  // Standing at the noticeboard (and not at a games spot, which wins when both are close).
+  nearBoard(x: number, y: number) {
+    return !!this.board && Math.hypot(this.board.x - x, this.board.y - y) < 26 && !this.near(x, y);
+  }
+
   kind(id: SpotId): SpotKind | null {
     return this.spots.find((s) => s.id === id)?.kind ?? null;
   }
@@ -52,4 +66,26 @@ export class GameSpots {
     }
     return best;
   }
+}
+
+// A cork board with pinned notes (design/game/v2.html .v2-board), 30 x 20 px, on the wall.
+function drawBoard(scene: Phaser.Scene, x: number, y: number) {
+  const g = scene.add.graphics().setDepth(3);
+  g.fillStyle(EDGE, 1).fillRect(x - 1, y - 1, 32, 22);
+  g.fillStyle(0x6b3f22, 1).fillRect(x, y, 30, 20);
+  g.fillStyle(0xa8743f, 1).fillRect(x + 2, y + 2, 26, 16);
+  [0xffe9a8, 0xffb3c7, 0x9ec9ff, 0x9be0a8, 0xfff4e0].forEach((c, i) => {
+    const nx = x + 3 + (i % 3) * 8;
+    const ny = y + 3 + Math.floor(i / 3) * 8;
+    g.fillStyle(0x000000, 0.25).fillRect(nx + 1, ny + 1, 6, 6);
+    g.fillStyle(c, 1).fillRect(nx, ny, 6, 6);
+    g.fillStyle(0xd94f4f, 1).fillRect(nx + 2, ny, 2, 1);
+  });
+  // A little "CHALLENGES" sign above it, like the games signs.
+  const text = scene.add.text(0, 0, 'CHALLENGES', { fontFamily: '"Pixelify Sans", monospace', fontSize: '6px', color: '#0d0912' }).setOrigin(0.5).setResolution(8);
+  const w = Math.ceil(text.width) + 6;
+  const bg = scene.add.graphics();
+  bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -5, w + 2, 10);
+  bg.fillStyle(LAMP, 1).fillRect(-w / 2, -4, w, 8);
+  scene.add.container(x + 15, y - 9, [bg, text]).setDepth(90_000);
 }

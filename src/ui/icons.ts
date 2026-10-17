@@ -50,6 +50,11 @@ import {
   ArrowUpDown,
   ArrowUp,
   Footprints,
+  Flame,
+  Trophy,
+  Sun,
+  CalendarDays,
+  ClipboardList,
   Map as MapIcon,
   ArrowDown,
   Swords,
@@ -66,6 +71,7 @@ const ICONS = {
   'audio-lines': AudioLines, 'award': Award, 'calendar': Calendar, 'clock': Clock, 'copy': Copy, 'ellipsis': Ellipsis, 'id-card': IdCard, 'info': Info, 'pencil': Pencil, 'play': Play, 'radio': Radio, 'refresh-cw': RefreshCw, 'share-2': Share2, 'speaker': Speaker, 'square': Square, 'ticket': Ticket, 'timer': Timer, 'users': Users, 'smile-plus': SmilePlus, swords: Swords,
   'dice-5': Dice5, zap: Zap, 'arrow-left': ArrowLeft, 'rotate-ccw': RotateCcw, 'grid-3x3': Grid3x3, 'messages-square': MessagesSquare, 'arrow-up-down': ArrowUpDown,
   'arrow-up': ArrowUp, 'arrow-down': ArrowDown, footprints: Footprints, map: MapIcon,
+  flame: Flame, trophy: Trophy, sun: Sun, 'calendar-days': CalendarDays, 'clipboard-list': ClipboardList,
 } satisfies Record<string, IconNode>;
 export type IconName = keyof typeof ICONS;
 

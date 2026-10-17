@@ -8,16 +8,22 @@ import { recordEvents, type GameEvent, type Recorded } from '../net/progress';
 const EVERY_MS = 30_000;
 const SOON_MS = 2_000; // the first batch after a quiet spell goes out quickly
 const MAX_QUEUED = 300;
+const RETRY_MS = 15_000; // after a failed send
 
 export class Tracker {
   private queue = new Map<string, GameEvent>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private lastSent = 0;
   private busy = false;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners = new Set<(r: Recorded) => void>();
   last: Recorded | null = null;
 
-  constructor(readonly enabled: boolean) {}
+  constructor(
+    readonly enabled: boolean,
+    private send: (events: GameEvent[]) => Promise<Recorded | null> = recordEvents, // (tests swap this)
+    private retryMs = RETRY_MS,
+  ) {}
 
   start() {
     if (!this.enabled) return;
@@ -56,14 +62,19 @@ export class Tracker {
     this.queue.clear();
     this.lastSent = Date.now();
     try {
-      const r = await recordEvents(batch);
+      const r = await this.send(batch);
       if (r) {
         this.last = r;
         for (const f of this.listeners) f(r);
       }
     } catch {
-      // Offline or a hiccup: put them back for next time.
+      // Offline or a hiccup: put them back and try again soon, even with nothing to send (the first load
+      // failing used to leave "Loading…" up until something else happened).
       for (const e of batch) if (this.queue.size < MAX_QUEUED) this.queue.set(`${e.k}|${e.u ?? ''}`, e);
+      this.retryTimer ??= setTimeout(() => {
+        this.retryTimer = null;
+        void this.flush();
+      }, this.retryMs);
     } finally {
       this.busy = false;
       if (this.queue.size) this.schedule();

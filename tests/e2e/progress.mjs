@@ -125,6 +125,23 @@ const board = await page.evaluate(() => [...document.querySelectorAll('#board-li
 check('noticeboard: "Noticeboard" offered at the board; this week’s XP with level and wins, you marked', { prompt, board },
   prompt && board.length === 2 && /Sami/.test(board[0]) && /1,250 XP/.test(board[0]) && /Lv 31/.test(board[0]) && /\(you\)/.test(board[1]));
 
+// 8. The first load fails (database not reachable): it tries again by itself, so "Loading…" doesn't stay.
+const retry = await page.evaluate(async () => {
+  const { Tracker } = await import('/src/challenges/tracker.ts');
+  let calls = 0;
+  const got = [];
+  const t = new Tracker(true, async () => {
+    calls++;
+    if (calls === 1) throw new Error('offline');
+    return { level: 2 };
+  }, 100);
+  t.onResult((r) => got.push(r.level));
+  await t.flush();
+  await new Promise((r) => setTimeout(r, 400));
+  return { calls, got };
+});
+check('a failed first load is retried by itself', retry, retry.calls === 2 && retry.got.join() === '2');
+
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

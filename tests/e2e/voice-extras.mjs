@@ -96,6 +96,8 @@ await B.page.locator('#volume-slider').fill('30');
 const playedAt = (id) => B.page.evaluate(async (id) => {
   const { mixer } = await import('/src/ui/mixer.ts');
   const a = document.querySelector(`audio[data-peer="${id}"]`);
+  const room = window.__house.voice.peers.get(id)?.room;
+  if (a?.muted && room) return room.gain.gain.value; // through Web Audio: the voices and master buses do the rest
   return a ? a.volume / (mixer.levels.master * mixer.levels.voices) : null;
 }, id);
 const vol = await playedAt(A.id);

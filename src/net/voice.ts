@@ -56,11 +56,16 @@ type Signal =
 // Hallway: how we hear one person (receiver-side effects, see createFx).
 type Fx = { src: MediaStreamAudioSourceNode; whisper: GainNode; radio: GainNode; hiss: GainNode; noise: AudioBufferSourceNode };
 
+// Rooms: their voice through Web Audio, so the volume sliders work on phones too (they ignore
+// volume on <audio>). The element stays, muted, to keep the stream flowing in Chrome.
+type Room = { src: MediaStreamAudioSourceNode; gain: GainNode };
+
 type Peer = {
   id: string;
   pc: RTCPeerConnection;
   sender: RTCRtpSender | null; // our mic to them (null track = they get nothing)
   fx: Fx | null;
+  room: Room | null;
   session: number;
   relay: boolean;
   initiator: boolean;
@@ -175,6 +180,7 @@ export class Voice {
   private pushToTalk = false;
   private talking = false;
   private volumes = new Map<string, number>();
+  private watchingCtx = false;
   private absent = new Map<string, number>(); // peer -> bytes received when last checked, while off the room list
 
   constructor(
@@ -202,6 +208,13 @@ export class Voice {
 
     this.ctx = audioContext();
     void this.ctx.resume();
+    if (!this.watchingCtx) {
+      // Sound unlocked (or locked again): move voices between the element and Web Audio.
+      this.watchingCtx = true;
+      this.ctx.addEventListener('statechange', () => {
+        for (const id of this.peers.keys()) this.applyVolume(id);
+      });
+    }
     const cancelled = new Promise<void>((r) => (this.cancelJoin = r));
     const wantMic = await this.h.askMic(cancelled, space);
     if (token !== this.joinToken) return;
@@ -380,8 +393,15 @@ export class Voice {
   }
 
   private applyVolume(id: string) {
-    const a = this.peers.get(id)?.audio;
-    if (a && this.space !== 'hallway') a.volume = mixer.voiceVolume(this.volumes.get(id) ?? this.h.volumeFor(id));
+    const p = this.peers.get(id);
+    const a = p?.audio;
+    if (!p || !a || this.space === 'hallway') return;
+    const person = this.volumes.get(id) ?? this.h.volumeFor(id);
+    // Through Web Audio once sound is unlocked (the sliders are the bus gains); until then the element plays.
+    const web = !!p.room && this.ctx?.state === 'running';
+    if (p.room) p.room.gain.gain.value = web ? Math.max(0, Math.min(1, person)) : 0;
+    a.muted = web;
+    if (!web) a.volume = mixer.voiceVolume(person);
   }
 
   // The live mic stream while we're in a room (Settings → Mic meters and tests it).
@@ -736,7 +756,7 @@ export class Voice {
     const sender = track ? pc.addTrack(track, this.stream!) : null;
     if (!track) pc.addTransceiver('audio', { direction: 'recvonly' });
 
-    const peer: Peer = { id, pc, sender, fx: null, session, relay, initiator, audio: null, meter: null, timer: 0, pendingIce: [], created: Date.now() };
+    const peer: Peer = { id, pc, sender, fx: null, room: null, session, relay, initiator, audio: null, meter: null, timer: 0, pendingIce: [], created: Date.now() };
     this.peers.set(id, peer);
     this.gate(peer);
 
@@ -759,6 +779,13 @@ export class Voice {
         peer.fx?.src.disconnect();
         peer.fx?.noise.stop();
         peer.fx = this.createFx(stream);
+      } else if (this.ctx) {
+        peer.room?.src.disconnect();
+        const src = this.ctx.createMediaStreamSource(stream);
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0;
+        src.connect(gain).connect(mixer.bus('voices'));
+        peer.room = { src, gain };
       }
       this.applyVolume(id);
       const speaker = savedSpeaker();
@@ -811,6 +838,10 @@ export class Voice {
     peer.pc.ontrack = peer.pc.onicecandidate = peer.pc.onconnectionstatechange = null;
     peer.pc.close();
     peer.meter?.disconnect();
+    if (peer.room) {
+      peer.room.src.disconnect();
+      peer.room.gain.disconnect();
+    }
     if (peer.fx) {
       peer.fx.src.disconnect();
       peer.fx.noise.stop();

@@ -50,8 +50,14 @@ const afterGame = await levels(A);
 check('Sound tab: Game sounds and Music sliders each change only their own sound', { tabs, before: [before.game, before.music], afterMusic: [afterMusic.game, afterMusic.music], afterGame: [afterGame.game, afterGame.music] },
   tabs[0] === 'sound' && afterMusic.music === 0 && afterMusic.game === before.game && afterGame.game === 0.25 && afterGame.music === 0);
 
-// Voices: a friend's voice volume follows the Voices slider (master × voices × theirs).
-const vol = () => A.page.$eval('audio[data-peer]', (a) => a.volume);
+// Voices: a friend's voice volume follows the Voices slider (master × voices × theirs). Once sound is
+// unlocked voices play through Web Audio (their gain, then the mixer's voices and master buses).
+const vol = () => A.page.evaluate(async () => {
+  const { mixer } = await import('/src/ui/mixer.ts');
+  const a = document.querySelector('audio[data-peer]');
+  const room = window.__house.voice.peers.get(a.dataset.peer)?.room;
+  return a.muted && room ? room.gain.gain.value * mixer.levels.voices * mixer.levels.master : a.volume;
+});
 const v1 = await vol();
 await setSlider(A, 'vol-voices', 50);
 const v2 = await vol();

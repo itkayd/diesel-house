@@ -61,8 +61,6 @@ export function addSoundSettings() {
       );
       const note = el('p', 'v2-note', "To change one friend's volume, tap them in a room. Saved on this device.");
       box.append(note);
-      if (/iPhone|iPad|iPod/.test(navigator.userAgent))
-        box.append(el('p', 'v2-note', "On iPhone, voices follow the phone's volume buttons; the other sliders work as normal."));
     },
     true,
     'sound',

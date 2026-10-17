@@ -1,11 +1,12 @@
 import { audioContext } from '../net/audio';
 
 // One place for every volume in the game, saved per device. Game sounds and music play through one Web
-// Audio bus (a GainNode per category, then master), so the sliders apply everywhere. Voices play on
-// <audio> elements (the reliable path for calls on phones); their level is master × voices × that
-// friend's own volume. iPhones ignore volume on <audio>, so there voices follow the phone's buttons.
+// Audio bus (a GainNode per category, then master), so the sliders apply everywhere. Voices in rooms go
+// through the 'voices' bus too (src/net/voice.ts), because phones ignore volume on <audio> elements:
+// only while sound is locked (before the first tap) do they fall back to an element at
+// master × voices × that friend's own volume.
 
-export type Category = 'game' | 'music' | 'radio';
+export type Category = 'game' | 'music' | 'radio' | 'voices';
 export type Levels = { master: number; voices: number; game: number; music: number; radio: number };
 export type Switches = { sfx: boolean; doors: boolean; chimes: boolean; muteHidden: boolean };
 

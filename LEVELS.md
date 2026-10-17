@@ -55,7 +55,7 @@ Rough pace for a friend who does most challenges (~130 XP/day): Level 5 in about
 | 40–49 | Landlord | purple |
 | 50+ | Legend | gold, plus **one star per 50 levels** (50 = ★, 100 = ★★, 150 = ★★★ …) |
 
-Show the title on the profile sheet and in the level-up overlay. The name-tag badge shows just the number in the rank colour.
+Show the title on the profile sheet and in the level-up overlay. The name-tag badge shows just the number in the rank colour. Each rank also has its own **medal** — see section 7.
 
 ## 4. Display rules for big numbers
 - Level badge on name tags and the HUD XP chip must fit **3+ digits** (test with level 999) without overflowing.
@@ -66,11 +66,61 @@ Show the title on the profile sheet and in the level-up overlay. The name-tag ba
 ## 5. Rewards (cosmetic only, nothing that gives an advantage in games)
 - Every level: level-up overlay + sound, confetti for people in the same room.
 - Every 5 levels: a new name-tag frame colour to choose from on the profile.
-- Every 10 levels: new rank title + badge (adds to the existing "Level 5" and "House legend (level 10)" badges).
-- Every 50 levels: a Legend star.
+- Every 10 levels: new rank title + rank medal (section 7).
+- Every 50 levels: a Legend star on the Legend medal.
 - Later (ask Diesel first): room decorations unlocked by level.
 
 ## 6. Leaderboard
 Weekly leaderboard stays on **XP earned this week** (from `xp_ledger`), not total level, so newer friends can still win a week. Show each person's level and rank badge next to their name.
 
-**Done when:** the Phase 14 "Done when" in `UPDATE.md` passes, the unit tests above pass on both TS and SQL, a test account with 10,000,000 XP shows level 5,010 correctly on the name tag, HUD and profile, and no code path rejects a level over 100.
+## 7. Medals (linked to levels both ways)
+
+Medals are the badges already in the profile (`src/ui/profile.ts`, sprites in `public/assets/ui/medals.png`, OpenGameArt `oga_medals.png`, CC0). Levels and medals feed each other:
+
+1. **Levels → rank medals.** Reaching each rank awards that rank's medal.
+2. **Medals → XP.** Earning any medal for the first time gives a one-off XP bonus, which moves you towards the next level.
+
+### 7.1 Rank medals (new, one per rank)
+| Medal | Awarded at | Medal style |
+|---|---|---|
+| Visitor | Level 1 (everyone, on first visit) | plainest / darkest medal |
+| Housemate | Level 10 | bronze |
+| Regular | Level 20 | silver |
+| Keyholder | Level 30 | gold |
+| Landlord | Level 40 | the most ornate medal on the sheet |
+| Legend | Level 50 | star / crown medal, with **star pips drawn in code** under it: one ★ per 50 levels (★ at 50, ★★ at 100 …). Above 5 stars show "★ × 7" so it never runs out of room. |
+
+- Crop 6 medals from `assets/raw/new-packs/oga_medals.png` (48 px cells) that read as a clear plain → bronze → silver → gold → fancy progression. If the sheet hasn't got enough matching ones, reuse one medal shape and tint it in code with the rank colours from section 3.
+- Append them to the strip as **cells 12–17** so the existing 12 achievement medals keep their positions (`public/assets/ui/medals.png` becomes 18 × 48 px). Update `assets/manifest.json`.
+- Profile: a **"Rank" row** above the Badges grid showing all 6 rank medals — earned ones in colour, the next one as a silhouette with "Level 30 · 4,000 XP to go".
+- Your current rank medal appears small (16 px) on the HUD XP chip next to your level, and on the weekly leaderboard next to each name.
+- Level-up overlay: when the new level starts a new rank, show the new medal big with the title ("New rank: Keyholder").
+
+### 7.2 Replace the old level badges
+The mock's `lvl5` ("Level 5") and `legend` ("House legend — reach level 10") achievement badges overlap with ranks. **Remove both**; the rank medals replace them. Their two medal sprites (cells 8 and 9) can be reused for new achievements later. That leaves **10 achievement medals**.
+
+### 7.3 XP for achievement medals (one-off, first time only)
+| Medal | XP |
+|---|---|
+| Home maker (name your room) | 25 |
+| First knock | 25 |
+| Social butterfly | 50 |
+| Over and out (walkie 3×) | 50 |
+| Night owl | 50 |
+| High roller (double six) | 75 |
+| Fastest hand (win Quick Draw) | 75 |
+| Duelist (win 3 RPS duels) | 100 |
+| Party host (4 people in your room) | 150 |
+| Slow & steady (7-day streak) | 200 |
+| **Total** | **800** |
+
+Rank medals give **no** XP (they come *from* XP, so no loops).
+
+### 7.4 Storage and rules
+- New table `user_medals(user_id uuid, medal_id text, earned_at timestamptz default now(), primary key (user_id, medal_id))`. RLS: members can read everyone's medals; nobody writes directly.
+- Medals are awarded only inside the `record_events` RPC (achievement medals from events, rank medals whenever `level_for_xp()` crosses 10, 20, 30, 40, 50). The primary key means a medal — and its XP — can only ever be given once, even on refresh or replay.
+- Achievement medal XP goes into `xp_ledger` with reason `medal:<id>` so it shows on the weekly leaderboard like any other XP.
+- Guests: medals and XP don't apply (same as the rest of Phase 14).
+- Toast on earning: medal sprite + name + "+75 XP", medal sound, then the level-up overlay if the bonus caused a level-up (medal toast first, level-up second).
+
+**Done when:** the Phase 14 "Done when" in `UPDATE.md` passes, the unit tests above pass on both TS and SQL, a test account with 10,000,000 XP shows level 5,010 correctly on the name tag, HUD and profile, no code path rejects a level over 100, a test account crossing level 30 gets the Keyholder medal exactly once, the Legend medal shows ★★ at level 100, and earning "Party host" adds exactly 150 XP once (not again on refresh).

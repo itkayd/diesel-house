@@ -74,6 +74,7 @@ export class Critters {
   private newSlot(slot: number) {
     this.slot = slot;
     this.remove(false);
+    this.spawn = null; // a quiet slot has no critter (the last one has wandered off)
     for (const k of [...this.caught.keys()]) if (k < slot - 2) this.caught.delete(k);
     const id = critterFor(slot);
     if (!id || !this.places.length) return;

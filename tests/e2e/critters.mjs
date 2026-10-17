@@ -52,14 +52,19 @@ await page.waitForFunction(() => !window.__house.critters.current, null, { timeo
 const caught = await page.evaluate(() => ({ current: window.__house.critters.current, toasts: window.__critterToasts }));
 check('walking into it catches it: a toast, and it hops away', caught, !caught.current && caught.toasts.some((t) => /You caught the fox/.test(t)));
 
-// 5. A slot with no critter: nothing there.
+// 5. A critter nobody caught, then a slot with no critter: it's gone from the world AND the map (it used to
+// linger on the map, and could be "caught" while invisible).
 const none = await page.evaluate(async () => {
   const { SLOT_MS } = await import('/src/critters/critters.ts');
-  window.__house.critters.now = () => 14600003 * SLOT_MS + 1000;
+  const c = window.__house.critters;
+  c.now = () => 14600002 * SLOT_MS + 1000; // a frog, not caught
   await new Promise((r) => setTimeout(r, 300));
-  return window.__house.critters.current;
+  const before = c.current?.id ?? null;
+  c.now = () => 14600003 * SLOT_MS + 1000; // nothing
+  await new Promise((r) => setTimeout(r, 300));
+  return { before, after: c.current, sprite: !!c.img, map: window.__house.whosWhere().critter };
 });
-check('a quiet slot has no critter', { none }, none === null);
+check('when a quiet slot starts, the last critter leaves the world and the map', none, none.before === 'frog' && none.after === null && !none.sprite && none.map === null);
 
 // 6. Noticeboard: "Today's catches" with counts, XP and what they caught.
 await page.evaluate(async () => {

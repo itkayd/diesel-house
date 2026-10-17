@@ -106,6 +106,7 @@ export class Games {
   private host: TableHost | null = null;
   private view: TableView | null = null;
   private viewGame: TableGameId | null = null;
+  private shownKey = ''; // what the table screen showed last (see tableKey)
   private ui: ReturnType<typeof openModal> | null = null;
   private body: HTMLDivElement | null = null;
   private screen: 'list' | 'dice' | 'rps' | TableGameId = 'list';
@@ -196,7 +197,8 @@ export class Games {
       onPeople: () => {
         this.host?.onPeople();
         // Lobby: refresh who's here. A game we're not showing yet (we sat down before we knew its host was here): show it.
-        if (this.spot === spot && isTableGame(this.screen) && (!this.running(spot) || !this.view)) this.render();
+        // Only when something changed, so the Start button isn't rebuilt under a finger.
+        if (this.spot === spot && isTableGame(this.screen) && (!this.running(spot) || !this.view) && this.tableKey(spot) !== this.shownKey) this.render();
       },
       onTakeover: (s) => {
         if (!isTableGame(s.game) || this.spot !== spot) return;
@@ -216,6 +218,12 @@ export class Games {
       record: (players, winners, score, seed) => this.deps.record(game, spot, players, winners, score, seed),
       prompts: () => this.deps.prompts(spot),
     });
+  }
+
+  // What the table screen depends on: the game shown, whether one is going, who's sitting there.
+  private tableKey(spot: SpotId) {
+    const t = this.tables.get(spot);
+    return `${this.screen}|${this.running(spot)}|${!!this.view}|${t?.people.map((p) => p.id).join(',') ?? ''}`;
   }
 
   // A game is going at this table, and its host is still sitting there.
@@ -259,6 +267,7 @@ export class Games {
     if (!body || !spot) return;
     if (this.screen !== this.viewGame) this.dropView();
     body.replaceChildren();
+    this.shownKey = '';
     if (this.screen === 'list') return this.renderList(body, spot);
     if (this.screen === 'dice') body.append(diceView((r) => this.deps.roll(r)));
     if (this.screen === 'rps') this.renderRps(body);
@@ -322,6 +331,7 @@ export class Games {
       body.append(this.view.root);
       this.view.show(s);
       this.again(t, s);
+      this.shownKey = this.tableKey(spot);
       return;
     }
     // Lobby: the first `max` people at the table play (us first), the rest watch.
@@ -337,7 +347,10 @@ export class Games {
     }
     body.append(list);
     if (watching) body.append(el('p', 'v2-note', `${watching} more at the table will watch.`));
-    body.append(this.startButton(t, game, people.length < g.min ? 'Waiting for someone to join…' : `Start with ${people.length} players`, people.length < g.min));
+    const alone = people.length < g.min;
+    if (alone) body.append(el('p', 'v2-note', 'Nobody else is at this table yet. Ask a friend to walk over and open it too.'));
+    body.append(this.startButton(t, game, alone ? 'Waiting for someone to join…' : `Start with ${people.length} players`, alone));
+    this.shownKey = this.tableKey(spot);
   }
 
   // Who plays: us first, then by when they sat down, up to the game's maximum.

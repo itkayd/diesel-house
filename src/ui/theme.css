@@ -541,3 +541,19 @@ html, body, #game, #overlay, #overlay * {
 .v2-vs .side.turn { box-shadow: inset 0 0 0 2px var(--lamp); }
 .v2-vs .side.won { box-shadow: inset 0 0 0 2px var(--ok); }
 @media (prefers-reduced-motion: reduce) { .v2-card.flip, .v2-piece.drop, .v2-piece.win { animation: none; } }
+
+/* Buttons never double-tap zoom, so their quick second taps aren't cancelled (src/ui/noZoom.ts). */
+:where(#overlay) :where(button, [role=button], label, input) { touch-action: manipulation; } /* zero specificity: hold buttons keep touch-action: none */
+
+/* Who's where (design/game/v2.html .v2-mini): the house in miniature, rooms to tap, everyone as a dot. */
+.v2-mini { position: relative; width: 100%; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); overflow: hidden; }
+.v2-mini .zone { position: absolute; box-sizing: border-box; border: 0; padding: 0; margin: 0; font: inherit; background: var(--panel-hi); box-shadow: inset 0 0 0 2px var(--panel-edge); display: grid; place-items: center; }
+.v2-mini .zone.hall { background: #2a2232; }
+.v2-mini button.zone { cursor: pointer; }
+.v2-mini button.zone:hover, .v2-mini button.zone:focus-visible { background: #4a3a58; box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.v2-mini .lab { font-family: var(--font-display); font-size: 10px; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 2px; }
+.v2-mini .dots { position: absolute; inset: 0; pointer-events: none; }
+.v2-mini .dot { position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--panel-edge); background: var(--cream); display: block; }
+.v2-mini .dot canvas { display: block; width: 10px; height: 10px; }
+.v2-mini .dot.me { background: var(--lamp); width: 12px; height: 12px; animation: v2-blink 1s steps(1) infinite; }
+.v2-item .s { font-size: 13px; color: var(--muted); }

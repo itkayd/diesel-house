@@ -2,6 +2,8 @@
 // `user-scalable=no`, so a quick double tap (joystick, map, buttons) or a pinch zoomed the whole page.
 // This blocks double-tap and pinch zoom, and if the page ends up zoomed anyway, puts it back.
 
+const CONTROLS = 'button, [role=button], a[href], label, input, select, textarea';
+const isControl = (t: EventTarget | null) => t instanceof Element && !!t.closest(CONTROLS);
 const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable]');
 
 // Text that may still be selected (and long-pressed): typing, chat messages, codes to copy.
@@ -31,14 +33,16 @@ export function installNoZoom() {
 
   // Double tap: a second tap within 350 ms in about the same spot would zoom, so it doesn't get the
   // browser's default. (Only the same spot: a quick tap on a different button, like an emote straight after
-  // the emote button, must still be a click.)
+  // the emote button, must still be a click.) Never on buttons and other controls: cancelling the touch
+  // there also cancels the click, so a quick second tap (Higher twice, Roll again) did nothing. They
+  // can't zoom anyway (touch-action: manipulation, theme.css).
   let lastTap = { t: 0, x: 0, y: 0 };
   document.addEventListener(
     'touchend',
     (e) => {
       const p = e.changedTouches[0];
       const tap = { t: Date.now(), x: p?.clientX ?? 0, y: p?.clientY ?? 0 };
-      if (tap.t - lastTap.t < 350 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 40 && !isTyping(e.target)) e.preventDefault();
+      if (tap.t - lastTap.t < 350 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 40 && !isTyping(e.target) && !isControl(e.target)) e.preventDefault();
       lastTap = tap;
     },
     { passive: false },

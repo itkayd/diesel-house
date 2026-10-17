@@ -209,6 +209,7 @@ export class HotTakesView implements TableView {
     this.rid = st.rid;
     // A new prompt, or a new host (who restarts the voting): our vote is still to make.
     const key = `${s.host}:${st.round}`;
+    const redraw = fresh || key !== this.key;
     if (key !== this.key) {
       this.key = key;
       this.mine = null;
@@ -217,59 +218,62 @@ export class HotTakesView implements TableView {
     const name = (id: string) => nameOf(id, this.me, this.names, s.players);
 
     this.note.textContent = st.phase === 'done' ? 'Game over.' : `Prompt ${st.round} of ${WYR_ROUNDS}${playing ? '' : ' · watching'}. A point for siding with the majority.`;
-    const p = st.prompt;
-    const head = el('span', 'k', p.take ? 'Hot take' : 'Would you rather…');
-    if (p.own) head.textContent += ' · this room’s';
-    const q = el('b', '', p.take ?? `${p.a} or ${p.b}?`);
-    this.card.replaceChildren(head, q);
-    if (fresh && st.phase === 'vote') play('card_flip', 0.6);
-    if (fresh && st.phase === 'reveal') play('card_place', 0.7);
+    // The card and the A / B buttons only change when the game moves on (not on each "Ben voted"),
+    // so a tap is never lost to the buttons being rebuilt under the finger.
+    if (redraw) {
+      const p = st.prompt;
+      const head = el('span', 'k', p.take ? 'Hot take' : 'Would you rather…');
+      if (p.own) head.textContent += ' · this room’s';
+      const q = el('b', '', p.take ?? `${p.a} or ${p.b}?`);
+      this.card.replaceChildren(head, q);
+      if (fresh && st.phase === 'vote') play('card_flip', 0.6);
+      if (fresh && st.phase === 'reveal') play('card_place', 0.7);
 
-    this.sides.replaceChildren();
-    if (st.phase !== 'done') {
-      const votes = st.phase === 'reveal' ? (st.votes ?? {}) : {};
-      const total = Object.keys(votes).length;
-      const side = st.phase === 'reveal' ? majority(votes) : null;
-      for (const c of ['a', 'b'] as const) {
-        const picked = st.phase === 'reveal' ? st.votes?.[this.me] === c : this.mine === c;
-        const b = el('button', 'v2-side' + (picked ? ' picked' : '') + (side === c ? ' top' : ''));
-        b.type = 'button';
-        b.id = `wyr-${c}`;
-        b.dataset.choice = c;
-        b.disabled = !playing || st.phase !== 'vote' || !!this.mine;
-        b.append(el('span', 'ab', c.toUpperCase()), el('span', 't', c === 'a' ? p.a : p.b));
-        if (st.phase === 'reveal') {
-          const who = Object.keys(votes).filter((id) => votes[id] === c);
-          const pct = total ? Math.round((who.length / total) * 100) : 0;
-          const bar = el('span', 'bar');
-          const fill = el('i');
-          fill.style.width = `${pct}%`;
-          bar.append(fill);
-          const faces = el('span', 'who');
-          for (const id of who) {
-            const f = portrait(this.names(id).character ?? 0, 20);
-            f.title = name(id);
-            faces.append(f);
+      this.sides.replaceChildren();
+      if (st.phase !== 'done') {
+        const votes = st.phase === 'reveal' ? (st.votes ?? {}) : {};
+        const total = Object.keys(votes).length;
+        const side = st.phase === 'reveal' ? majority(votes) : null;
+        for (const c of ['a', 'b'] as const) {
+          const picked = st.phase === 'reveal' ? st.votes?.[this.me] === c : this.mine === c;
+          const b = el('button', 'v2-side' + (picked ? ' picked' : '') + (side === c ? ' top' : ''));
+          b.type = 'button';
+          b.id = `wyr-${c}`;
+          b.dataset.choice = c;
+          b.disabled = !playing || st.phase !== 'vote' || !!this.mine;
+          b.append(el('span', 'ab', c.toUpperCase()), el('span', 't', c === 'a' ? p.a : p.b));
+          if (st.phase === 'reveal') {
+            const who = Object.keys(votes).filter((id) => votes[id] === c);
+            const pct = total ? Math.round((who.length / total) * 100) : 0;
+            const bar = el('span', 'bar');
+            const fill = el('i');
+            fill.style.width = `${pct}%`;
+            bar.append(fill);
+            const faces = el('span', 'who');
+            for (const id of who) {
+              const f = portrait(this.names(id).character ?? 0, 20);
+              f.title = name(id);
+              faces.append(f);
+            }
+            const n = el('span', 'n', `${who.length} · ${pct}%`);
+            n.dataset.count = String(who.length);
+            b.append(bar, n, faces);
+            b.setAttribute('aria-label', `${c.toUpperCase()}: ${who.length ? who.map(name).join(', ') : 'nobody'}`);
           }
-          const n = el('span', 'n', `${who.length} · ${pct}%`);
-          n.dataset.count = String(who.length);
-          b.append(bar, n, faces);
-          b.setAttribute('aria-label', `${c.toUpperCase()}: ${who.length ? who.map(name).join(', ') : 'nobody'}`);
-        }
-        b.addEventListener('click', () => {
-          if (this.mine || st.phase !== 'vote') return;
-          this.mine = c;
-          play('click', 0.5);
-          this.sides.querySelectorAll('button').forEach((x) => {
-            (x as HTMLButtonElement).disabled = true;
-            x.classList.toggle('picked', x === b);
+          b.addEventListener('click', () => {
+            if (this.mine || st.phase !== 'vote') return;
+            this.mine = c;
+            play('click', 0.5);
+            this.sides.querySelectorAll('button').forEach((x) => {
+              (x as HTMLButtonElement).disabled = true;
+              x.classList.toggle('picked', x === b);
+            });
+            this.act({ t: 'vote', rid: st.rid, c });
           });
-          this.act({ t: 'vote', rid: st.rid, c });
-        });
-        this.sides.append(b);
+          this.sides.append(b);
+        }
       }
     }
-
     if (st.phase === 'vote') {
       const left = s.players.filter((pl) => !st.voted.includes(pl.id));
       this.status.textContent = playing && !this.mine ? 'Pick one. Nobody sees until everyone has voted.' : left.length ? `Waiting for ${left.map((pl) => name(pl.id)).join(', ')}…` : 'Revealing…';

@@ -229,6 +229,9 @@ export class HigherLowerView implements TableView {
   show(s: Snapshot) {
     const st = s.state as HLState;
     const fresh = st.rid !== this.rid;
+    // Shown again with nothing new (the panel re-drawn): keep the buttons as they are, so a tap in
+    // progress isn't lost to them being rebuilt.
+    if (!fresh) return;
     this.rid = st.rid;
     const playing = s.players.some((p) => p.id === this.me);
     const cur = turnOf(s, st);

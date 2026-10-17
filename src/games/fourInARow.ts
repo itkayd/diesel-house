@@ -143,6 +143,9 @@ export class FourView implements TableView {
   show(s: Snapshot) {
     const st = s.state as FourState;
     const fresh = st.rid !== this.rid;
+    // Shown again with nothing new (the panel re-drawn): keep the buttons as they are, so a tap in
+    // progress isn't lost to them being rebuilt.
+    if (!fresh) return;
     this.rid = st.rid;
     const seat = s.players.findIndex((p) => p.id === this.me);
     const mine = st.phase === 'play' && seat === st.turn && this.sent !== st.rid;

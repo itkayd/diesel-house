@@ -81,6 +81,34 @@ const allowed = await page.evaluate(() => {
 });
 check('chat messages can still be selected and copied', allowed, allowed.chatSelectable);
 
+// Two quick taps on the same button are two clicks (the double-tap-zoom guard used to cancel the second,
+// so "Higher" twice or "Roll again" did nothing). The guard still applies off buttons.
+{
+  await page.evaluate(() => {
+    const b = document.createElement('button');
+    b.id = 'tap-twice';
+    b.textContent = 'Tap me';
+    b.style.cssText = 'position:absolute;left:150px;top:300px;width:90px;height:50px;pointer-events:auto;z-index:99';
+    b.dataset.n = '0';
+    b.addEventListener('click', () => (b.dataset.n = String(Number(b.dataset.n) + 1)));
+    document.getElementById('overlay').append(b);
+  });
+  const c = await centre('#tap-twice');
+  for (let i = 0; i < 2; i++) {
+    await touches('touchStart', [{ x: c.x, y: c.y, id: 3 }]);
+    await touches('touchEnd', []);
+    await page.waitForTimeout(120);
+  }
+  const clicks = await page.evaluate(() => Number(document.getElementById('tap-twice').dataset.n));
+  const offButton = await page.evaluate(() => {
+    const t = (type) => { const e = new TouchEvent(type, { bubbles: true, cancelable: true, changedTouches: [new Touch({ identifier: 9, target: document.body, clientX: 20, clientY: 600 })] }); document.body.dispatchEvent(e); return e.defaultPrevented; };
+    t('touchend');
+    return t('touchend');
+  });
+  await page.evaluate(() => document.getElementById('tap-twice').remove());
+  check('two quick taps on a button are two clicks; a double tap elsewhere still can’t zoom', { clicks, offButton }, clicks === 2 && offButton);
+}
+
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

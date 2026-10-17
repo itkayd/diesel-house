@@ -49,6 +49,8 @@ import { WalkieButton } from '../ui/walkie';
 import { addHallwaySettings } from '../ui/hallwaySettings';
 import { net, type NetQuality } from '../net/netQuality';
 import { reloadForUpdate, watchForNewVersion } from '../ui/update';
+import { addWhosWhereButton } from '../ui/whosWhere';
+import { WalkGrid, type Pt, type Rect } from './pathfind';
 
 const SPEED = 80; // px per second
 const ZONE_SETTLE_MS = 150; // a zone change counts once you have been in the new zone this long
@@ -124,6 +126,12 @@ export class HouseScene extends Phaser.Scene {
   private presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
   private tappedAvatar = false; // pointer went down on a character: don't start walking towards it
+  // Walking by itself (Who's where): corner points for the feet, and a door to knock on when we get there.
+  private autoPath: Pt[] | null = null;
+  private autoKnock: RoomId | null = null;
+  private autoCheck = { t: 0, x: 0, y: 0 };
+  private wallLayer!: Phaser.Tilemaps.TilemapLayer;
+  private doorBlocks!: Phaser.Physics.Arcade.StaticGroup;
   private rooms = new Map<RoomId, Room>();
   private ownerNames = new Map<string, string>();
   private replacedToast: (() => void) | null = null;
@@ -145,6 +153,7 @@ export class HouseScene extends Phaser.Scene {
     const floor = map.createLayer('floor', tiles)!;
     const walls = map.createLayer('walls', tiles)!;
     walls.setCollisionByExclusion([-1]);
+    this.wallLayer = walls;
 
     for (const obj of map.getObjectLayer('zones')!.objects) {
       if (obj.name === 'hallway' || (ROOM_IDS as readonly string[]).includes(obj.name))
@@ -191,6 +200,7 @@ export class HouseScene extends Phaser.Scene {
       doorBlocks.add(this.add.rectangle(d.x!, d.y!, d.width!, d.height!).setOrigin(0).setVisible(false).setData('room', room));
     }
     doorBlocks.refresh();
+    this.doorBlocks = doorBlocks;
     this.physics.add.collider(
       this.player,
       doorBlocks,
@@ -598,6 +608,7 @@ export class HouseScene extends Phaser.Scene {
       document.getElementById('settings-close')?.click();
       void this.fixMic();
     });
+    addWhosWhereButton(() => this.whosWhere());
     addRoomSettings(
       () => [...this.rooms.values()].find((r) => r.owner_id && r.owner_id === currentUser()?.id) ?? null,
       async (change) => {
@@ -1244,6 +1255,16 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private inputVelocity() {
+    const v = this.manualVelocity();
+    if (v.lengthSq() > 0) {
+      this.autoPath = null; // any move of your own stops walking by itself
+      this.autoKnock = null;
+      return v;
+    }
+    return this.autoVelocity();
+  }
+
+  private manualVelocity() {
     // Typing in a box (chat, names) must never walk your character around.
     const focus = document.activeElement;
     if (focus instanceof HTMLInputElement || focus instanceof HTMLTextAreaElement || focus instanceof HTMLSelectElement) {
@@ -1271,7 +1292,105 @@ export class HouseScene extends Phaser.Scene {
     const v = new Phaser.Math.Vector2(vx, vy);
     return v.lengthSq() > 0 ? v.normalize().scale(SPEED) : v;
   }
+  // ---- Who's where: the map, and walking there by itself ----
+
+  private whosWhere() {
+    const here = (r: Remote) => r.info.zone ?? null;
+    return {
+      size: { w: this.wallLayer.width, h: this.wallLayer.height },
+      zones: this.zones.map((z) => ({ name: z.name, rect: { x: z.rect.x, y: z.rect.y, w: z.rect.width, h: z.rect.height } })),
+      me: { x: this.player.x, y: this.player.y, zone: this.zone },
+      people: [...this.remotes.values()]
+        .filter((r) => r.active)
+        .map((r) => ({
+          id: r.info.id,
+          name: r.info.name,
+          character: r.info.character,
+          x: r.avatar.sprite.x,
+          y: r.avatar.sprite.y,
+          zone: here(r),
+          talking: !!here(r) && here(r) !== 'hallway' && this.countIn(here(r)!) > 1,
+        })),
+      label: (z: Zone) => zoneLabel(z),
+      goRoom: (room: RoomId) => this.walkToRoom(room),
+      goTo: (id: string) => {
+        const r = this.remotes.get(id);
+        if (!r?.active) return;
+        const s = r.avatar.sprite;
+        if (this.walkTo(s.x + (s.x > this.player.x ? -14 : 14), s.y)) toast({ icon: 'footprints', who: `Walking to ${r.info.name}`, what: 'Move any way to stop.', small: true, ttl: 1600 });
+      },
+    };
+  }
+
+  // Into a room: the middle of its floor. A door that's shut to you: walk up to it and knock.
+  private walkToRoom(room: RoomId) {
+    const z = this.zones.find((q) => q.name === room)?.rect;
+    if (!z) return;
+    if (this.doorShut(room)) {
+      const d = this.doorSpots.get(room);
+      if (d && this.walkTo(d.x, d.y + (d.north ? 6 : -6))) this.autoKnock = room;
+      return;
+    }
+    const hall = this.zones.find((q) => q.name === 'hallway')!.rect;
+    // Rooms above the hallway: aim a little below the middle (their top is wall).
+    this.walkTo(z.centerX, z.y < hall.y ? z.centerY + 16 : z.centerY);
+  }
+
+  // Walk the feet to (x, y), around walls, furniture and shut doors. False if there's no way there.
+  private walkTo(x: number, y: number) {
+    const b = this.body;
+    const off = { x: b.center.x - this.player.x, y: b.center.y - this.player.y };
+    const blocked: Rect[] = [];
+    this.wallLayer.forEachTile((t) => {
+      if (t.index !== -1) blocked.push({ x: t.pixelX, y: t.pixelY, w: t.width, h: t.height });
+    });
+    for (const o of [...(this.look.solids.getChildren() as Phaser.GameObjects.Rectangle[]), ...(this.doorBlocks.getChildren() as Phaser.GameObjects.Rectangle[])]) {
+      const room = o.getData('room') as RoomId | undefined;
+      if (room && !this.doorShut(room)) continue;
+      blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height });
+    }
+    const grid = new WalkGrid(this.wallLayer.width, this.wallLayer.height, blocked, { hw: b.width / 2 + 2, hh: b.height / 2 + 2 } /* 2 px to spare, so corners don't catch */);
+    const path = grid.find({ x: b.center.x, y: b.center.y }, { x: x + off.x, y: y + off.y });
+    this.autoKnock = null;
+    if (!path) {
+      this.autoPath = null;
+      toast({ icon: 'footprints', who: 'Can’t get there', what: 'Something’s in the way.', small: true, ttl: 1800 });
+      return false;
+    }
+    this.autoPath = path;
+    this.autoCheck = { t: this.time.now, x: b.center.x, y: b.center.y };
+    return true;
+  }
+
+  private autoVelocity() {
+    const none = new Phaser.Math.Vector2(0, 0);
+    const path = this.autoPath;
+    if (!path) return none;
+    const c = this.body.center;
+    while (path.length && Math.hypot(path[0].x - c.x, path[0].y - c.y) < 2) path.shift();
+    if (!path.length) {
+      this.autoPath = null;
+      if (this.autoKnock) this.bumpDoor(this.autoKnock);
+      this.autoKnock = null;
+      return none;
+    }
+    // Stuck (a friend in the way, a door that just shut): give up rather than push forever.
+    if (this.time.now - this.autoCheck.t > 900) {
+      const moved = Math.hypot(c.x - this.autoCheck.x, c.y - this.autoCheck.y);
+      this.autoCheck = { t: this.time.now, x: c.x, y: c.y };
+      if (moved < 4) {
+        this.autoPath = null;
+        return none;
+      }
+    }
+    const dx = path[0].x - c.x;
+    const dy = path[0].y - c.y;
+    // Last few px: slow down so we don't overshoot the point.
+    const d = Math.hypot(dx, dy);
+    return eightWay(dx, dy).scale(d < 6 ? SPEED * SLOW : SPEED);
+  }
 }
+
 
 // Unit vector along the nearest of the 8 compass directions.
 function eightWay(x: number, y: number) {

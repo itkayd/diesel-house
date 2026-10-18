@@ -1,21 +1,13 @@
-// Generates maps/house.tmj (Tiled JSON). Run: npm run map
-// Layout: 4 rooms on top, a hallway, 4 rooms below. Each room has one door onto the hallway.
+// Generates maps/house.tmj (Tiled JSON) from the house data in src/house/rooms.ts. Run: npm run map
+// Every area (the hall and each room) is a polygon of tiles: floor inside, a 2-row wall face along each
+// top edge, solid wall everywhere else, and a gap through the wall at each room's door. Diagonal edges
+// come out stepped. Furniture, game spots, the noticeboard, doors and the spawn point come from the
+// same file, so the map and the game's zones can't disagree.
 import { readFileSync, writeFileSync } from 'node:fs';
+import { bounds, doorTiles, HALL, houseSize, ROOMS, tileIn } from '../src/house/rooms.ts';
 
 const COLS = 17; // limezu_room_builder.png is 17 tiles wide
-const ROOM_W = 10; // interior width in tiles
-const ROOM_H = 10; // interior height incl. the 2-tile wall face at the top
-const HALL_H = 7; // hallway height incl. its 2-tile wall face
-const DOOR_W = 2;
-
-const W = 1 + 4 * (ROOM_W + 1);
-const TOP_Y = 1; // first interior row of the top rooms
-const HALL_Y = TOP_Y + ROOM_H + 1;
-const BOT_Y = HALL_Y + HALL_H + 1;
-const H = BOT_Y + ROOM_H + 1;
-
 const WALL_TOP = 12; // solid dark "ceiling" tile
-
 // Wall face styles: top-left tile index of each 2-row group. Pieces used: +7/+8/+9 (left/mid/right), +24/+25/+26 below.
 const WALL = { pink: 85, yellow: 119, mint: 153, wood: 187, brown: 221, red: 255, grey: 289, beige: 323 };
 // Floors: top-left of each 3x2 block. "pattern" blocks repeat; "flat" blocks have a shadow row/column for under walls.
@@ -31,19 +23,8 @@ const FLOOR = {
   slate: { base: 201, pattern: false },
 };
 
-// The free pack has only four patterned floors; its plain floors are all near the same grey-taupe, so
-// those get a colour tint (stored as a "floorTint" property on the room zone; HouseScene applies it).
-const ROOM_STYLES = [
-  { wall: 'pink', floor: 'brick' },
-  { wall: 'mint', floor: 'stone', tint: '#a9c6ff' }, // dusty blue
-  { wall: 'yellow', floor: 'teal' },
-  { wall: 'brown', floor: 'rose', tint: '#c4e3a4' }, // sage
-  { wall: 'grey', floor: 'yellow' },
-  { wall: 'red', floor: 'mauve', tint: '#dcbcff' }, // lavender
-  { wall: 'beige', floor: 'herringbone' },
-  { wall: 'wood', floor: 'slate', tint: '#ffcf8f' }, // warm amber
-];
-const HALL_STYLE = { wall: 'beige', floor: 'grey' };
+const { w: W, h: H } = houseSize();
+const AREAS = [{ id: 'hallway', ...HALL }, ...ROOMS];
 
 const floorData = new Array(W * H).fill(0);
 const wallData = new Array(W * H).fill(0);
@@ -59,101 +40,60 @@ function floorTile(name, fx, fy) {
 // Everything starts as wall top; areas are carved out below.
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) set(wallData, x, y, WALL_TOP);
 
-// Carves an area: 2-row wall face on top, floor beneath. `gaps` are x ranges where the face is a doorway instead.
-function carve(x0, y0, w, h, style, gaps = []) {
-  const inGap = (x) => gaps.some(([a, b]) => x >= a && x < b);
-  const wallBase = WALL[style.wall];
-  for (let x = x0; x < x0 + w; x++) {
-    const left = x === x0 || inGap(x - 1);
-    const right = x === x0 + w - 1 || inGap(x + 1);
-    const piece = left ? 7 : right ? 9 : 8;
-    for (let r = 0; r < 2; r++) {
-      if (inGap(x)) {
-        set(wallData, x, y0 + r, 0);
-      } else {
-        set(wallData, x, y0 + r, wallBase + piece + COLS * r);
-      }
-    }
-    for (let y = y0 + 2; y < y0 + h; y++) set(wallData, x, y, 0);
-  }
-  // Floor runs under the face too, so doorways have floor.
-  for (let y = y0; y < y0 + h; y++)
-    for (let x = x0; x < x0 + w; x++) {
-      const plain = y < y0 + 2 && inGap(x); // doorways get plain floor, not the under-wall shadow
-      set(floorData, x, y, plain ? floorTile(style.floor, 1, 1) : floorTile(style.floor, x - x0, Math.max(0, y - y0 - 2)));
+// Doorways: the gap tiles, and the two face rows just below each one (the face of whatever is below).
+const doors = ROOMS.flatMap((r) => doorTiles(r.door));
+const gapBelowDoor = new Set(doors.flatMap(([x, y]) => [`${x},${y + 1}`, `${x},${y + 2}`]));
+
+function carve(area) {
+  const inside = (x, y) => tileIn(area.polygon, x, y);
+  const gap = (x, y) => gapBelowDoor.has(`${x},${y}`);
+  const b = bounds(area.polygon);
+  for (let y = b.y; y < b.y + b.h; y++)
+    for (let x = b.x; x < b.x + b.w; x++) {
+      if (!inside(x, y)) continue;
+      // How far below this column's top edge: rows 0 and 1 are wall face.
+      let depth = 0;
+      while (y - depth - 1 >= b.y && inside(x, y - depth - 1)) depth++;
+      if (depth < 2 && !gap(x, y)) {
+        const left = !inside(x - 1, y) || gap(x - 1, y);
+        const right = !inside(x + 1, y) || gap(x + 1, y);
+        set(wallData, x, y, WALL[area.wall] + (left ? 7 : right ? 9 : 8) + COLS * depth);
+      } else set(wallData, x, y, 0);
+      // Floor runs under the face too, so doorways have floor. Doorways get plain floor, not the shadow.
+      const fx = inside(x - 1, y) ? x - b.x : 0;
+      const fy = Math.max(0, depth - 2);
+      set(floorData, x, y, gap(x, y) && depth < 2 ? floorTile(area.floor, 1, 1) : floorTile(area.floor, fx, fy));
     }
 }
+for (const a of AREAS) carve(a);
 
-const zones = [];
+// The gap through the dividing wall: floor of whatever is just below it (the hall for rooms above it).
+for (const [x, y] of doors) {
+  set(wallData, x, y, 0);
+  const below = AREAS.find((a) => tileIn(a.polygon, x, y + 1)) ?? HALL;
+  set(floorData, x, y, floorTile(below.floor, 1, 1));
+}
+
 let nextId = 1;
-const rect = (name, x, y, w, h, properties = []) =>
-  zones.push({ id: nextId++, name, type: 'zone', x: x * 16, y: y * 16, width: w * 16, height: h * 16, rotation: 0, visible: true, properties });
 
-// Hallway, with door gaps in its face for the 4 top rooms.
-const roomX = (i) => 1 + i * (ROOM_W + 1);
-const doorX = (i) => roomX(i) + Math.floor((ROOM_W - DOOR_W) / 2);
-const topGaps = [0, 1, 2, 3].map((i) => [doorX(i), doorX(i) + DOOR_W]);
-carve(1, HALL_Y, W - 2, HALL_H, HALL_STYLE, topGaps);
-rect('hallway', 1, HALL_Y, W - 2, HALL_H);
-
-for (let i = 0; i < 8; i++) {
-  const top = i < 4;
-  const col = i % 4;
-  const x = roomX(col);
-  const y = top ? TOP_Y : BOT_Y;
-  const style = ROOM_STYLES[i];
-  const dx = doorX(col);
-  carve(x, y, ROOM_W, ROOM_H, style, top ? [] : [[dx, dx + DOOR_W]]);
-  // Door cells in the dividing wall row.
-  const doorRow = top ? y + ROOM_H : y - 1;
-  for (let d = 0; d < DOOR_W; d++) {
-    set(wallData, dx + d, doorRow, 0);
-    set(floorData, dx + d, doorRow, floorTile(top ? HALL_STYLE.floor : style.floor, 1, 1));
-  }
-  // Room zone includes its own door cell, so stepping through the door puts you in the room.
-  const name = `room_${String(i + 1).padStart(2, '0')}`;
-  const props = style.tint ? [{ name: 'floorTint', type: 'color', value: style.tint }] : [];
-  if (top) rect(name, x, y, ROOM_W, ROOM_H + 1, props);
-  else rect(name, x, y - 1, ROOM_W, ROOM_H + 1, props);
-}
+// Zones (for looking at the map in Tiled; the game reads src/house/rooms.ts itself).
+const zones = AREAS.map((a) => {
+  const b = bounds(a.polygon);
+  return {
+    id: nextId++, name: a.id, type: 'zone', x: b.x * 16, y: b.y * 16, width: 0, height: 0, rotation: 0, visible: true,
+    polygon: a.polygon.map(([x, y]) => ({ x: (x - b.x) * 16, y: (y - b.y) * 16 })),
+    properties: a.tint ? [{ name: 'floorTint', type: 'color', value: a.tint }] : [],
+  };
+});
 
 // ---- Furniture ------------------------------------------------------------------------------
 // From the design mock (design/game/build_mvp.py recipes, design/game/sprites.json pixel rects on
 // limezu_interiors.png). Each piece is a map object; the game draws it as a sprite, depth-sorted with
-// people by its bottom edge. Recipe x,y are px from the room's wall-face top-left (room 160 wide; face
-// y 0-32, floor 32-160). Flags: 'wall' hangs on the wall, 'flat' is a rug, '#rrggbb' gives off light.
+// people by its bottom edge.
 const SPRITES = JSON.parse(readFileSync(new URL('../design/game/sprites.json', import.meta.url), 'utf8')).items;
-const WARM = '#f4b860', FIRE = '#ff8a3d', COOL = '#9ec9ff', PINK = '#ffb3c7';
-const RECIPES = {
-  room_01: [['window_curtain', 22, 4, 'wall'], ['picture_land', 120, 10, 'wall'], ['sofa_grey', 56, 33], ['rug_blue', 60, 62, 'flat'],
-    ['plant_palm', 4, 30], ['lamp_cream', 140, 33, WARM], ['armchair_red', 14, 78], ['plant_small', 142, 128]],
-  room_02: [['fireplace', 64, 10, FIRE], ['picture_a', 24, 10, 'wall'], ['picture_b', 124, 10, 'wall'], ['rug_red', 50, 58, 'flat'],
-    ['armchair_red', 34, 62], ['armchair_red', 110, 62], ['sofa_red', 64, 94], ['lamp_red', 8, 36, WARM], ['plant_tree', 138, 130]],
-  room_03: [['map_world', 14, 8, 'wall'], ['aquarium', 70, 14, COOL], ['desk_study', 8, 36], ['desk_study', 124, 36], ['rug_green', 68, 72, 'flat'],
-    ['stool', 40, 72], ['stool', 106, 72], ['sofa_brown', 64, 92], ['lamp_blue', 8, 100, COOL], ['plant_small', 142, 130]],
-  room_04: [['bookshelf', 6, 8], ['bookshelf_2', 40, 8], ['map_world', 112, 10, 'wall'], ['desk_study', 112, 40], ['globe', 143, 38],
-    ['rug_beige', 42, 82, 'flat'], ['armchair_red', 22, 80], ['lamp_cream', 90, 60, WARM], ['plant_tree', 140, 128]],
-  room_05: [['window_red', 16, 6, 'wall'], ['picture_c', 124, 10, 'wall'], ['plant_small', 8, 40], ['rug_olive', 68, 92, 'flat'],
-    ['sofa_brown', 14, 124], ['sofa_white', 54, 126], ['lamp_red', 140, 40, PINK], ['plant_palm', 132, 126]],
-  room_06: [['picture_a', 24, 10, 'wall'], ['bookshelf_2', 122, 8], ['rug_red', 50, 88, 'flat'], ['table_wood', 61, 90], ['chair_a', 42, 96],
-    ['chair_c', 103, 96], ['lamp_cream', 8, 40, WARM], ['plant_pot', 12, 140]],
-  room_07: [['bed_big', 8, 38], ['wardrobe', 128, 4], ['mirror', 106, 8, 'wall'], ['rug_small_red', 60, 118, 'flat'], ['dresser', 120, 132],
-    ['plant_pot', 10, 140], ['lamp_table', 52, 40, WARM]],
-  room_08: [['picture_land', 24, 10, 'wall'], ['window_curtain', 120, 4, 'wall'], ['dresser', 10, 36], ['bed_blue', 118, 40],
-    ['rug_small_blue', 68, 110, 'flat'], ['plant_palm', 130, 124], ['lamp_blue', 8, 120, COOL]],
-};
-// Hallway decor, world px (hallway face y 192-224, floor 224-304).
-const HALL = [['door_double', 20, 196, 'wall'], ['fairy_lights', 128, 194, WARM], ['fairy_lights', 190, 194, WARM], ['fairy_lights', 304, 194, WARM],
-  ['fairy_lights', 366, 194, WARM], ['fairy_lights', 480, 194, WARM], ['fairy_lights', 542, 194, WARM], ['fairy_lights', 656, 194, WARM],
-  ['picture_c', 520, 206, 'wall'], ['picture_b', 340, 206, 'wall'], // (the noticeboard hangs where picture_land was)
-  ['rug_small_red', 188, 250, 'flat'], ['rug_small_red', 368, 250, 'flat'], ['rug_small_red', 548, 250, 'flat'],
-  ['plant_palm', 130, 272], ['plant_tree', 330, 279], ['plant_palm', 500, 272], ['plant_tree', 680, 279],
-  ['lamp_cream', 226, 226, WARM], ['lamp_cream', 586, 226, WARM],
-  // Games corner (UPDATE.md Phase 12, design/game/v2.html): a table and two stools at the west end.
-  ['table_wood', 64, 234], ['stool', 58, 262], ['stool', 98, 262]];
-
 const furniture = [];
 function place(key, x, y, flag) {
+  if (!SPRITES[key]) throw new Error(`no sprite called ${key} in design/game/sprites.json`);
   const [sx, sy, w, h] = SPRITES[key].px;
   const kind = flag === 'wall' ? 'wall' : flag === 'flat' ? 'rug' : 'thing';
   const props = [
@@ -161,52 +101,50 @@ function place(key, x, y, flag) {
     { name: 'sy', type: 'int', value: sy },
   ];
   if (flag?.startsWith('#')) props.push({ name: 'light', type: 'color', value: flag });
-  furniture.push({ id: nextId++, name: key, type: kind, x, y, width: w, height: h, rotation: 0, visible: true, properties: props });
+  const obj = { id: nextId++, name: key, type: kind, x, y, width: w, height: h, rotation: 0, visible: true, properties: props };
+  furniture.push(obj);
+  return obj;
 }
-for (let i = 0; i < 8; i++) {
-  const x = roomX(i % 4) * 16;
-  const y = (i < 4 ? TOP_Y : BOT_Y) * 16; // the room's wall-face top-left
-  for (const [key, rx, ry, flag] of RECIPES[`room_${String(i + 1).padStart(2, '0')}`]) place(key, x + rx, y + ry, flag);
+const placed = new Map(); // area id -> its pieces
+for (const a of [...ROOMS, { id: 'hallway', ...HALL }]) {
+  const b = bounds(a.polygon);
+  placed.set(a.id, a.furniture.map(([key, x, y, flag]) => place(key, b.x * 16 + x, b.y * 16 + y, flag)));
 }
-for (const [key, x, y, flag] of HALL) place(key, x, y, flag);
 
-// Game spots (UPDATE.md Phase 12): stand here for "Play games". The hallway's games table, and rooms with a
-// table or desk: a point just in front of the piece. Rooms without one get a sofa corner on their rug
-// (Phase 13: Would you rather works in any room) with only the games that need no table.
+// Game spots (UPDATE.md Phase 12): stand here for "Play games". In front of a table or desk; on a rug it's
+// a sofa corner (Phase 13: Would you rather works in any room) with only the games that need no table.
 const spots = [];
-const GAME_TABLES = [['hall', 'table_wood', 'hall'], ['room_03', 'desk_study', 'room_03'], ['room_04', 'desk_study', 'room_04'], ['room_06', 'table_wood', 'room_06'],
-  ['room_01', 'rug_blue', 'room_01'], ['room_02', 'rug_red', 'room_02'], ['room_05', 'rug_olive', 'room_05'], ['room_07', 'rug_small_red', 'room_07'], ['room_08', 'rug_small_blue', 'room_08']];
-for (const [id, key, zoneName] of GAME_TABLES) {
-  const z = zones.find((o) => o.name === (zoneName === 'hall' ? 'hallway' : zoneName));
-  const piece = furniture.find((o) => o.name === key && o.x >= z.x && o.x < z.x + z.width && o.y + o.height > z.y && o.y < z.y + z.height);
-  if (!piece) throw new Error('no ' + key + ' in ' + zoneName);
+for (const a of [{ id: 'hallway', ...HALL }, ...ROOMS]) {
+  if (!a.spot) continue;
+  const piece = placed.get(a.id).find((o) => o.name === a.spot);
+  if (!piece) throw new Error(`no ${a.spot} in ${a.id}`);
   const rug = piece.type === 'rug';
   const x = piece.x + Math.round(piece.width / 2);
   const y = rug ? piece.y + Math.round(piece.height / 2) : piece.y + piece.height + 11;
-  const props = [{ name: 'kind', type: 'string', value: rug ? 'sofa' : 'table' }];
-  spots.push({ id: nextId++, name: id, type: 'spot', x, y, width: 0, height: 0, point: true, rotation: 0, visible: true, properties: props });
-}
-// The noticeboard (Phase 14: weekly leaderboard and challenges), on the hallway wall near the games corner,
-// between the first two fairy lights (where a picture used to hang). Stand at the point to read it.
-spots.push({ id: nextId++, name: 'board', type: 'spot', x: 175, y: 240, width: 0, height: 0, point: true, rotation: 0, visible: true,
-  properties: [{ name: 'kind', type: 'string', value: 'board' }, { name: 'boardX', type: 'int', value: 160 }, { name: 'boardY', type: 'int', value: 200 }] });
-
-// Doors: one object per doorway (the gap through the wall), for door frames now and door states later.
-const doors = [];
-for (let i = 0; i < 8; i++) {
-  const top = i < 4;
-  const dx = doorX(i % 4);
-  // Top rooms: the dividing wall row plus the hallway's wall face. Bottom rooms: the dividing row plus the room's face.
-  const y = top ? HALL_Y - 1 : BOT_Y - 1;
-  doors.push({
-    id: nextId++, name: `room_${String(i + 1).padStart(2, '0')}`, type: 'door',
-    x: dx * 16, y: y * 16, width: DOOR_W * 16, height: 3 * 16, rotation: 0, visible: true,
-    properties: [{ name: 'side', type: 'string', value: top ? 'north' : 'south' }],
+  spots.push({
+    id: nextId++, name: a.id === 'hallway' ? 'hall' : a.id, type: 'spot', x, y, width: 0, height: 0, point: true, rotation: 0, visible: true,
+    properties: [{ name: 'kind', type: 'string', value: rug ? 'sofa' : 'table' }],
   });
 }
+// The noticeboard (Phase 14: weekly leaderboard and challenges) on the hall wall. Stand at the point to read it.
+const board = HALL.board;
+spots.push({ id: nextId++, name: 'board', type: 'spot', x: board.x, y: board.y, width: 0, height: 0, point: true, rotation: 0, visible: true,
+  properties: [{ name: 'kind', type: 'string', value: 'board' }, { name: 'boardX', type: 'int', value: board.boardX }, { name: 'boardY', type: 'int', value: board.boardY }] });
 
-// Spawn: west end of the hallway, in the clear lane below the games table (UPDATE.md Phase 12).
-zones.push({ id: nextId++, name: 'spawn', type: 'spawn', x: 3 * 16, y: (HALL_Y + 6) * 16, width: 0, height: 0, point: true, rotation: 0, visible: true });
+// Doors: one object per doorway (the gap and the two face rows past it), for the door sign and the
+// do-not-disturb check.
+const doorObjects = ROOMS.map((r) => {
+  const d = r.door;
+  const across = d.side === 'north' || d.side === 'south';
+  return {
+    id: nextId++, name: r.id, type: 'door',
+    x: d.x * 16, y: d.y * 16, width: (across ? d.w : 1) * 16, height: (across ? 3 : d.w) * 16, rotation: 0, visible: true,
+    properties: [{ name: 'side', type: 'string', value: d.side }],
+  };
+});
+
+// Spawn: the front door.
+zones.push({ id: nextId++, name: 'spawn', type: 'spawn', x: HALL.spawn.x, y: HALL.spawn.y, width: 0, height: 0, point: true, rotation: 0, visible: true });
 
 const tileLayer = (id, name, data, props = []) => ({
   id, name, type: 'tilelayer', x: 0, y: 0, width: W, height: H, opacity: 1, visible: true, data, properties: props,
@@ -229,7 +167,7 @@ const map = {
     tileLayer(1, 'floor', floorData),
     tileLayer(2, 'walls', wallData, [{ name: 'collides', type: 'bool', value: true }]),
     { id: 3, name: 'zones', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: zones },
-    { id: 8, name: 'doors', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: doors },
+    { id: 8, name: 'doors', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: doorObjects },
     { id: 9, name: 'furniture', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: furniture },
     { id: 10, name: 'spots', type: 'objectgroup', draworder: 'topdown', x: 0, y: 0, opacity: 1, visible: true, objects: spots },
   ],
@@ -251,4 +189,4 @@ const map = {
 };
 
 writeFileSync(new URL('../maps/house.tmj', import.meta.url), JSON.stringify(map) + '\n');
-console.log(`maps/house.tmj: ${W}x${H} tiles, ${zones.length} objects`);
+console.log(`maps/house.tmj: ${W}x${H} tiles, ${AREAS.length} areas, ${furniture.length} pieces of furniture`);

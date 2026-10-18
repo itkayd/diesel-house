@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { ROOM_IDS, TILE_SIZE, type RoomId, type Zone } from '../config';
+import { Zones } from '../house/zones';
+import { HALL, ROOMS } from '../house/rooms';
 import { GUEST_CHARACTERS, guestCharacter, type Dir } from '../characters';
 // Presence and Voice (and the Supabase client behind them) load after the picker; see start().
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
@@ -73,7 +75,6 @@ const GLIDE_MS = 150; // ms to glide out a small correction
 const STALE_AFTER = 30_000; // ms without any message before someone is hidden (locked phone, closed tab)
 const JOIN_VOICE_AFTER = 300; // ms standing in a room before joining its voice (avoids flapping in doorways)
 
-type ZoneRect = { name: Zone; rect: Phaser.Geom.Rectangle };
 // Last movement heard from someone, with t already moved onto our clock.
 type Motion = { t: number; x: number; y: number; vx: number; vy: number; dir: Dir };
 // clockOffset: smallest (our clock - their clock) seen; maps their timestamps onto our timeline.
@@ -94,7 +95,7 @@ export class HouseScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
   private body!: Phaser.Physics.Arcade.Body;
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
-  private zones: ZoneRect[] = [];
+  private zones!: Zones;
   private zone: Zone | null = null;
   private joystick: Joystick | null = null;
   private character = 0;
@@ -174,29 +175,27 @@ export class HouseScene extends Phaser.Scene {
     walls.setCollisionByExclusion([-1]);
     this.wallLayer = walls;
 
-    for (const obj of map.getObjectLayer('zones')!.objects) {
-      if (obj.name === 'hallway' || (ROOM_IDS as readonly string[]).includes(obj.name))
-        this.zones.push({ name: obj.name as Zone, rect: new Phaser.Geom.Rectangle(obj.x!, obj.y!, obj.width!, obj.height!) });
-      // Rooms whose floor is one of the plain greys get a colour (see scripts/build-map.mjs).
-      const tint = (obj.properties as { name: string; value: string }[] | undefined)?.find((p) => p.name === 'floorTint')?.value;
-      if (tint) {
-        const colour = Phaser.Display.Color.HexStringToColor(tint).color;
-        // Rooms above the hallway end in their doorway row, which has hallway floor: leave that untinted.
-        const hall = this.zones.find((z) => z.name === 'hallway')!.rect;
-        const rows = obj.height! / TILE_SIZE - (obj.y! < hall.y ? 1 : 0);
-        floor.forEachTile((t) => (t.tint = colour), this, obj.x! / TILE_SIZE, obj.y! / TILE_SIZE, obj.width! / TILE_SIZE, rows);
+    // Where each part of the house is comes from src/house/rooms.ts (the map is built from the same file).
+    this.zones = new Zones(map.width, map.height);
+    // Rooms whose floor is one of the plain greys get a colour.
+    for (const a of [{ id: 'hallway', ...HALL }, ...ROOMS]) {
+      if (!a.tint) continue;
+      const colour = Phaser.Display.Color.HexStringToColor(a.tint).color;
+      for (const [tx, ty] of this.zones.tintTiles(a.id)) {
+        const t = floor.getTileAt(tx, ty);
+        if (t) t.tint = colour;
       }
     }
     this.look = new HouseLook(
       this,
       map,
-      this.zones.filter((z) => z.name !== 'hallway') as { name: RoomId; rect: Phaser.Geom.Rectangle }[],
+      ROOMS.map((r) => ({ name: r.id, box: this.zones.box(r.id)! })),
     );
 
     this.spots = new GameSpots(this, map);
 
     // Sprite position is the character's feet; the physics body is a small box around them.
-    const spawn = map.findObject('zones', (o) => o.name === 'spawn')!;
+    const spawn = HALL.spawn;
     const isGuest = !!currentUser()?.guest;
     const remembered = savedCharacter();
     const saved = isGuest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered; // guests: 2 choices
@@ -1275,7 +1274,7 @@ export class HouseScene extends Phaser.Scene {
 
     // Standing on a doorway line flips between hallway and room; only count a change that lasts
     // ZONE_SETTLE_MS (and ignore gaps between zones), so voice, chat and presence don't flicker.
-    const here = this.zones.find((z) => z.rect.contains(this.player.x, this.player.y - 3))?.name ?? null;
+    const here = this.zones.at(this.player.x, this.player.y - 3);
     if (here !== this.zoneCandidate) {
       this.zoneCandidate = here;
       this.zoneSince = this.time.now;
@@ -1510,13 +1509,14 @@ export class HouseScene extends Phaser.Scene {
     });
     for (const o of this.look.solids.getChildren() as Phaser.GameObjects.Rectangle[]) blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height });
     const grid = new WalkGrid(this.wallLayer.width, this.wallLayer.height, blocked, { hw: b.width / 2 + 4, hh: b.height / 2 + 4 });
-    const avoid = [...this.spots.spots, ...(this.spots.board ? [this.spots.board] : []), { x: 48, y: 288 }];
-    const canReach = grid.reachableFrom({ x: 48 + feet.x, y: 288 + feet.y }); // from the front door
+    const door = HALL.spawn;
+    const avoid = [...this.spots.spots, ...(this.spots.board ? [this.spots.board] : []), door];
+    const canReach = grid.reachableFrom({ x: door.x + feet.x, y: door.y + feet.y }); // from the front door
     const places = grid
       .freePoints(2)
       .filter(canReach)
       .map((p) => ({ x: p.x - feet.x, y: p.y - feet.y }))
-      .filter((p) => this.zones.some((z) => z.rect.contains(p.x, p.y - 3)) && avoid.every((a) => Math.hypot(a.x - p.x, a.y - p.y) > 28));
+      .filter((p) => this.zones.at(p.x, p.y - 3) !== null && avoid.every((a) => Math.hypot(a.x - p.x, a.y - p.y) > 28));
     this.critters = new Critters(this, places, {
       appeared: (s) => this.critterAppeared(s),
       near: (s) => void this.catchCritter(s),
@@ -1527,7 +1527,7 @@ export class HouseScene extends Phaser.Scene {
   }
 
   private zoneOf(x: number, y: number) {
-    return this.zones.find((z) => z.rect.contains(x, y - 3))?.name ?? null;
+    return this.zones.at(x, y - 3);
   }
 
   // Critters turned up: one hint, about the ones where we are (or how many are about).
@@ -1604,7 +1604,7 @@ export class HouseScene extends Phaser.Scene {
     const here = (r: Remote) => r.info.zone ?? null;
     return {
       size: { w: this.wallLayer.width, h: this.wallLayer.height },
-      zones: this.zones.map((z) => ({ name: z.name, rect: { x: z.rect.x, y: z.rect.y, w: z.rect.width, h: z.rect.height } })),
+      zones: this.zones.ids.map((z) => ({ name: z, rect: this.zones.box(z)!, outline: this.zones.outline(z) })),
       me: { x: this.player.x, y: this.player.y, zone: this.zone },
       people: [...this.remotes.values()]
         .filter((r) => r.active)
@@ -1632,16 +1632,14 @@ export class HouseScene extends Phaser.Scene {
 
   // Into a room: the middle of its floor. A door that's shut to you: walk up to it and knock.
   private walkToRoom(room: RoomId) {
-    const z = this.zones.find((q) => q.name === room)?.rect;
-    if (!z) return;
+    const c = this.zones.floorCentre(room);
+    if (!c) return;
     if (this.doorShut(room)) {
       const d = this.doorSpots.get(room);
       if (d && this.walkTo(d.x, d.y + (d.north ? 6 : -6))) this.autoKnock = room;
       return;
     }
-    const hall = this.zones.find((q) => q.name === 'hallway')!.rect;
-    // Rooms above the hallway: aim a little below the middle (their top is wall).
-    this.walkTo(z.centerX, z.y < hall.y ? z.centerY + 16 : z.centerY);
+    this.walkTo(c.x, c.y);
   }
 
   // Walk the feet to (x, y), around walls, furniture and shut doors. False if there's no way there.

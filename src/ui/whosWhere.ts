@@ -12,7 +12,7 @@ import { critterIcon } from '../critters/art';
 type Box = { x: number; y: number; w: number; h: number };
 export type WhoWhere = {
   size: { w: number; h: number }; // the house, px
-  zones: { name: Zone; rect: Box }[];
+  zones: { name: Zone; rect: Box; outline: { x: number; y: number }[] }[]; // rect: bounding box; outline: the real shape
   me: { x: number; y: number; zone: Zone | null };
   people: { id: string; name: string; character: number; x: number; y: number; zone: Zone | null; talking: boolean }[];
   label: (zone: Zone) => string;
@@ -58,6 +58,8 @@ export function openWhosWhere(get: () => WhoWhere) {
     const room = z.name !== 'hallway';
     const zb = el(room ? 'button' : 'div', 'zone' + (room ? '' : ' hall'));
     zb.style.cssText = `left:${pct(z.rect.x, w0.size.w)};top:${pct(z.rect.y, w0.size.h)};width:${pct(z.rect.w, w0.size.w)};height:${pct(z.rect.h, w0.size.h)}`;
+    // Odd shapes (the octagon house's diagonal rooms) are cut to their outline.
+    if (z.outline.length > 4) zb.style.clipPath = `polygon(${z.outline.map((p) => `${pct(p.x - z.rect.x, z.rect.w)} ${pct(p.y - z.rect.y, z.rect.h)}`).join(',')})`;
     if (room) {
       const b = zb as HTMLButtonElement;
       b.type = 'button';

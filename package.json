@@ -8,7 +8,7 @@
     "dev:https": "vite --mode https",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "map": "node scripts/build-map.mjs",
+    "map": "node --experimental-strip-types --no-warnings scripts/build-map.mjs",
     "test:e2e": "node tests/e2e/run-all.mjs"
   },
   "dependencies": {

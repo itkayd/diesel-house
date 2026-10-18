@@ -64,7 +64,7 @@ export class HouseLook {
   constructor(
     private scene: Phaser.Scene,
     map: Phaser.Tilemaps.Tilemap,
-    rooms: { name: RoomId; rect: Phaser.Geom.Rectangle }[],
+    rooms: { name: RoomId; box: { x: number; y: number; w: number; h: number } }[], // px
   ) {
     glowTexture(scene);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -100,12 +100,10 @@ export class HouseLook {
       .setDepth(LIGHT_DEPTH);
     for (const r of rooms) {
       // A warm wash over rooms with people in them: you can see which rooms are lively from the hallway.
-      const top = r.rect.y < 12 * 16;
-      const ox = r.rect.x;
-      const oy = top ? r.rect.y : r.rect.y + 16;
+      const { x, y, w, h } = r.box;
       const glow = scene.add
-        .image(ox + 80, oy + 96, 'glow')
-        .setDisplaySize(190, 160)
+        .image(x + w / 2, y + h * 0.6, 'glow')
+        .setDisplaySize(w * 1.2, h)
         .setTint(0xf4b860)
         .setAlpha(0)
         .setBlendMode(Phaser.BlendModes.ADD)

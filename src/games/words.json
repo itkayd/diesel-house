@@ -1,0 +1,31 @@
+{
+  "note": "Sketch & guess words (easy to draw, family-friendly) and Letter rush categories. src/games/sketch.ts, src/games/letterRush.ts.",
+  "sketch": [
+    "apple", "banana", "pizza", "cake", "ice cream", "donut", "burger", "carrot", "cookie", "egg",
+    "cat", "dog", "fish", "bird", "snake", "spider", "elephant", "giraffe", "rabbit", "turtle",
+    "duck", "owl", "frog", "horse", "camel", "whale", "octopus", "bee", "butterfly", "snail",
+    "house", "castle", "tent", "bridge", "tower", "igloo", "lighthouse", "pyramid", "windmill", "church",
+    "car", "bus", "bike", "train", "plane", "rocket", "boat", "helicopter", "tractor", "skateboard",
+    "sun", "moon", "star", "cloud", "rain", "rainbow", "snowman", "tree", "flower", "cactus",
+    "mountain", "volcano", "island", "river", "beach", "waterfall", "lightning", "tornado", "leaf", "mushroom",
+    "phone", "laptop", "camera", "clock", "lamp", "key", "door", "window", "chair", "bed",
+    "book", "pencil", "scissors", "glasses", "hat", "shoe", "sock", "umbrella", "backpack", "crown",
+    "ball", "kite", "balloon", "drum", "guitar", "piano", "trumpet", "dice", "robot", "ghost",
+    "dragon", "unicorn", "pirate", "alien", "mermaid", "king", "wizard", "ninja", "astronaut", "clown",
+    "heart", "smile", "eye", "hand", "foot", "nose", "ear", "tooth", "beard", "brain",
+    "sword", "shield", "bow", "anchor", "map", "treasure", "candle", "bell", "magnet", "ladder",
+    "toothbrush", "cup", "fork", "spoon", "bottle", "teapot", "pan", "fridge", "oven", "sink",
+    "football", "goal", "medal", "trophy", "fishing rod", "swing", "slide", "sandcastle", "fireworks", "popcorn",
+    "headphones", "television", "microphone", "envelope", "gift", "calendar", "battery", "light bulb", "paint", "rocket ship"
+  ],
+  "categories": [
+    "An animal", "A fruit or vegetable", "A country", "A city", "A name", "A food", "Something in a kitchen",
+    "A job", "A sport or game", "A colour", "A film or TV show", "A famous person", "Something you wear",
+    "A drink", "Something in the house", "A brand", "A body part", "Something cold", "Something round",
+    "A singer or band", "A thing at school", "Something in the sky", "A word for happy", "Something loud",
+    "A dessert", "A video game", "Something with wheels", "A hobby", "A plant or flower", "An insect",
+    "Something you can't touch", "A musical instrument", "A superhero or villain", "Something soft",
+    "A place to go on holiday", "Something green", "A toy", "Something in a bathroom", "A weather word",
+    "A cartoon character"
+  ]
+}

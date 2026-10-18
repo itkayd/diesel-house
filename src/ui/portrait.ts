@@ -6,8 +6,8 @@ import { portraitFrame } from '../characters';
 let textures: Phaser.Textures.TextureManager | null = null;
 export const setPortraitSource = (t: Phaser.Textures.TextureManager) => (textures = t);
 
-// Where the face sits in each sheet's 16x32 frame (LimeZu heads sit a little lower).
-export const faceTop = (character: number) => (character < 16 ? 4 : 8);
+// Where the face sits in each sheet's 16x32 frame (chibis are small and stand low in theirs).
+export const faceTop = (character: number) => (character < 16 ? 10 : 8);
 
 export function portrait(character: number, size = 32, cls = 'dh-portrait') {
   const c = document.createElement('canvas');

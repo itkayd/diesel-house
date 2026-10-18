@@ -26,10 +26,10 @@ export function installUpdateReload() {
 
 // A new version went live while this page was open (or the phone resumed an old copy): the site's
 // index.html now points at a different main-<hash>.js. Checked when the page comes back to the front and
-// every few minutes. Out of a call it reloads straight away; in a call it offers "Reload" instead of
+// every 2 minutes. Out of a call it reloads straight away; in a call it offers "Reload" instead of
 // cutting anyone off. While the page is in use (the timer), it only offers. (Dev builds have no hashed
 // files, so this does nothing there.)
-const CHECK_EVERY = 5 * 60_000;
+const CHECK_EVERY = 2 * 60_000;
 let offered = false;
 
 async function latestMain(): Promise<string | null> {

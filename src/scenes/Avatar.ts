@@ -11,7 +11,8 @@ const CREAM = '#fff4e0';
 const LAMP = '#f4b860';
 const MUTED = '#bcaccb';
 const OK = 0x6fdc8c;
-const TAG_GAP = 32; // tag sits just above the head (feet - 32)
+// The tag sits just above the head: chibis are about 20 px tall in their 32 px frame, LimeZu people 23.
+const tagGap = (character: number) => (character < 16 ? 23 : 26);
 
 // A character sprite with a name tag and a speaking ring (design/game/mvp.html .dh-tag / .dh-ring).
 // Position is the character's feet.
@@ -23,6 +24,9 @@ export class Avatar {
   private ring: Phaser.GameObjects.Ellipse;
   private pulse: Phaser.Time.TimerEvent;
   private character: number;
+  private get gap() {
+    return tagGap(this.character);
+  }
   private tagWanted = true;
   private isSpeaking = false;
   private name: string;
@@ -87,7 +91,7 @@ export class Avatar {
     this.lvText = scene.add.text(0, 0, '', { ...small, color: '#0d0912' }).setOrigin(0, 1).setResolution(8).setVisible(false);
     this.stText = scene.add.text(0, 0, '', { ...small, color: '#ffae6b' }).setOrigin(0, 1).setResolution(8).setVisible(false);
     this.flameImg = scene.add.image(0, 0, 'tag-flame').setOrigin(0, 1).setVisible(false);
-    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.lvText, this.flameImg, this.stText, this.micImg, this.netImg]).setDepth(DEPTH.tag);
+    this.tag = scene.add.container(x, y - this.gap, [this.tagBg, this.tagText, this.lvText, this.flameImg, this.stText, this.micImg, this.netImg]).setDepth(DEPTH.tag);
     this.drawTagBg();
     this.animate(false);
   }
@@ -142,7 +146,7 @@ export class Avatar {
     this.streak = streak;
     this.lvText.setVisible(level !== null).setText(level === null ? '' : String(level));
     if (level !== null) this.lvColour = Number.parseInt(rankOf(level).colour.slice(1), 16);
-    const showStreak = level !== null && streak > 1;
+    const showStreak = level !== null && streak >= 3; // a real streak, not just yesterday and today
     this.stText.setVisible(showStreak).setText(String(streak));
     this.flameImg.setVisible(showStreak);
     this.drawTagBg();
@@ -157,12 +161,13 @@ export class Avatar {
     this.drawTagBg();
   }
 
-  // Connection bars: poor (1 red), strong (2 amber), super strong (3 green). Null hides them.
+  // Connection bars: poor (1 red), strong (2 amber), super strong (3 green). Null hides them, and so does
+  // super strong: the tag only mentions a connection worth knowing about.
   setNet(q: NetQuality | null) {
     if (q === this.net) return;
     this.net = q;
     if (q) this.netImg.setTexture(netKey(q));
-    this.netImg.setVisible(!!q);
+    this.netImg.setVisible(!!q && q !== 'super');
     this.drawTagBg();
   }
 
@@ -267,7 +272,7 @@ export class Avatar {
     bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
     bg.fillStyle(0xfff4e0, 1).fillRect(-w / 2, -h, w, h);
     t.setPosition(0, -2);
-    this.bubble = scene.add.container(this.sprite.x, this.sprite.y - TAG_GAP - 12, [bg, t]).setDepth(DEPTH.bubble);
+    this.bubble = scene.add.container(this.sprite.x, this.sprite.y - this.gap - 12, [bg, t]).setDepth(DEPTH.bubble);
     this.bubbleTimer = scene.time.delayedCall(4000, () => {
       this.bubble?.destroy();
       this.bubble = null;
@@ -341,17 +346,17 @@ export class Avatar {
     const depth = depthOf(this.sprite.x, this.sprite.y);
     this.sprite.setDepth(depth);
     this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(depth - 0.5);
-    this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP));
-    this.bubble?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 12));
-    this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
-    this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
+    this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - this.gap));
+    this.bubble?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - this.gap - 12));
+    this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - this.gap - 11)).setVisible(this.sprite.visible);
+    this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - this.gap - 11)).setVisible(this.sprite.visible);
     this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(depth - 1);
-    const top = Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11));
+    const top = Math.round(this.sprite.y - this.gap - (this.bubble ? 28 : 11));
     this.diceImgs.forEach((d, i) => d.setPosition(Math.round(this.sprite.x + (i - (this.diceImgs.length - 1) / 2) * 12), top).setVisible(this.sprite.visible));
-    this.crownImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 10)).setVisible(this.sprite.visible && !this.radioImg);
+    this.crownImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - this.gap - 10)).setVisible(this.sprite.visible && !this.radioImg);
     // Above the chat bubble if there is one, else just above the tag (beside the radio).
     this.emoteImg
-      ?.setPosition(Math.round(this.sprite.x - (this.radioImg && !this.bubble ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11)))
+      ?.setPosition(Math.round(this.sprite.x - (this.radioImg && !this.bubble ? 10 : 0)), Math.round(this.sprite.y - this.gap - (this.bubble ? 28 : 11)))
       .setVisible(this.sprite.visible);
   }
 

@@ -1,6 +1,7 @@
 import { icon } from './icons';
 import { hudBottomRight } from './overlay';
 import { keysBlocked, notGameKey } from './modal';
+import { isTouchDevice } from './joystick';
 
 // The walkie-talkie button (hallway only; UPDATE.md Phase 10, design/game/v2.html): hold it, or hold the
 // walkie key (T by default), to talk to the whole hallway. A small LED shows the channel: green while
@@ -106,7 +107,7 @@ export class WalkieButton {
     this.el.dataset.state = this.view;
     this.led.dataset.state = this.view;
     const key = this.cb.key().toUpperCase();
-    this.label.textContent = this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? `On air ${this.left}s` : `Hold · ${key}`;
+    this.label.textContent = this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? `On air ${this.left}s` : isTouchDevice() ? 'Hold' : `Hold · ${key}`;
     this.el.setAttribute('aria-label', this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? 'On air: let go to stop' : `Walkie-talkie: hold to talk to the Great Hall (or hold ${key})`);
     this.el.title = this.el.getAttribute('aria-label')!;
   }

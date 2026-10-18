@@ -91,9 +91,10 @@
 .dh-iconbtn:hover { background: var(--panel-hi); }
 .dh-iconbtn svg { width: 22px; height: 22px; }
 .dh-badge-dot {
-  position: absolute; top: -5px; right: -5px; width: 12px; height: 12px;
-  background: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge);
+  position: absolute; top: 5px; right: 5px; width: 8px; height: 8px;
+  background: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge); animation: dh-blink 1.6s steps(2) infinite;
 }
+@media (prefers-reduced-motion: reduce) { .dh-badge-dot { animation: none; } }
 
 /* big mic button — states: live | muted | ptt | talking | blocked */
 .dh-mic {
@@ -332,7 +333,13 @@ html, body { margin: 0; height: 100%; background: var(--night); color: var(--cre
 [hidden] { display: none !important; }
 /* The top row: the "where" pill is as tall as the round buttons beside it, and the XP chip sits under it
    with the same gap, so the corner reads as one tidy block. */
-.dh-pill.dh-where { max-width: calc(100vw - 150px); min-height: var(--tap); overflow: hidden; text-overflow: ellipsis; }
+.dh-pill.dh-where { max-width: calc(100vw - 150px); min-height: var(--tap); overflow: hidden; padding-top: 4px; padding-bottom: 4px; }
+.dh-where-text { display: grid; gap: 1px; min-width: 0; line-height: 1.15; }
+.dh-where-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.dh-where-top #where-zone { overflow: hidden; text-overflow: ellipsis; }
+.dh-where-top .dh-mood { flex: none; }
+.dh-where-sub { display: flex; align-items: center; min-width: 0; }
+.dh-where-sub #status { overflow: hidden; text-overflow: ellipsis; }
 .dh-hud-tl, .dh-hud-tr { gap: 10px; }
 .vol-pop { position: absolute; width: min(260px, calc(100% - 32px)); box-sizing: border-box; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 50; pointer-events: auto; }
 .dh-voice-detail { position: absolute; right: 0; bottom: calc(100% + 12px); visibility: hidden; font-family: var(--font-body); font-size: var(--fs-xs); }
@@ -412,7 +419,8 @@ html, body, #game, #overlay, #overlay * {
 .dh-walkie[hidden] { display: none; }
 .dh-walkie svg { width: 26px; height: 26px; }
 .dh-walkie .lab { font-size: 11px; letter-spacing: .04em; color: var(--cream); }
-.dh-walkie .led { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #3a3344; box-shadow: 0 0 0 2px var(--panel-edge); }
+.dh-walkie .led { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background: var(--radio); opacity: .35; }
+.dh-walkie .led[data-state="talking"], .dh-walkie .led[data-state="busy"] { opacity: 1; }
 .dh-walkie[data-state="talking"] { background: var(--radio); color: var(--panel-edge); }
 .dh-walkie[data-state="talking"] .lab { color: var(--panel-edge); }
 .dh-walkie .led[data-state="talking"] { background: var(--ok); }
@@ -448,9 +456,10 @@ html, body, #game, #overlay, #overlay * {
 
 /* Games (UPDATE.md Phase 12, design/game/v2.html). */
 .v2-act { position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); z-index: 20; pointer-events: auto; max-width: calc(100% - 32px); }
-.v2-act .dh-btn { white-space: nowrap; }
+.v2-act .dh-btn { white-space: nowrap; font-size: 15px; min-height: 44px; padding: 6px 14px 9px; }
+.v2-act .dh-btn svg { width: 18px; height: 18px; }
 /* Phones: above the joystick and the chat / emote / mic buttons instead of on top of them. */
-@media (pointer: coarse) { .v2-act { bottom: calc(164px + var(--safe-b)); } }
+@media (pointer: coarse) { .v2-act { bottom: calc(150px + var(--safe-b)); } }
 .v2-act .dh-btn { animation: dh-drop .18s steps(3); }
 .v2-act kbd { font-family: var(--font-display); font-size: 12px; background: rgba(13,9,18,.25); padding: 0 5px; }
 .v2-list { display: grid; gap: 8px; }

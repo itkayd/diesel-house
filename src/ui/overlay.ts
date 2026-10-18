@@ -4,7 +4,7 @@ import { DND_ICON, icon } from './icons';
 import { roomDef } from '../house/rooms';
 
 // HUD, as in design/game/mvp.html:
-//   top-left:  [house  Hallway  ● 4 in the house]   or   [door  Sami's room  (Chill)  2 here]
+//   top-left:  [house  Great Hall / ● 4 in the house]   or   [door  Lounge (Quiet) / 2 here]  (two lines)
 //   top-centre: toasts and banners          top-right: [profile] [settings]
 //   bottom-left: joystick (touch)           bottom-right: [chat] [MIC]   (in a room)
 export const overlay = () => document.getElementById('overlay') as HTMLDivElement;
@@ -80,7 +80,7 @@ function netBars(q: NetQuality) {
   box.dataset.net = q;
   box.title = `Your connection: ${NET_LABEL[q]}`;
   box.setAttribute('aria-label', box.title);
-  box.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:8px';
+  box.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:6px';
   const label = document.createElement('span');
   label.className = 'dh-sub';
   label.textContent = NET_LABEL[q];
@@ -105,14 +105,19 @@ export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' |
   const status = document.createElement('span');
   status.className = 'dh-sub';
   status.id = 'status';
-  const parts: Node[] = [icon(inRoom ? 'door-open' : 'house'), place];
+  // Two short lines: where you are (and Do not disturb), then the head count and your connection.
+  const top = document.createElement('span');
+  top.className = 'dh-where-top';
+  top.append(place);
   if (inRoom && info.dnd) {
     const badge = document.createElement('span');
     badge.className = 'dh-mood';
     badge.id = 'where-dnd';
     badge.dataset.mood = 'dnd';
-    badge.append(icon(DND_ICON), 'Do not disturb');
-    parts.push(badge);
+    badge.title = 'Do not disturb';
+    badge.setAttribute('aria-label', 'Do not disturb');
+    badge.append(icon(DND_ICON));
+    top.append(badge);
   }
   if (!inRoom || state !== 'ok') {
     const dot = document.createElement('span');
@@ -120,7 +125,12 @@ export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' |
     status.append(dot, ' ');
   }
   status.append(sub);
-  parts.push(status);
-  if (netBadge) parts.push(netBars(netBadge));
-  pill.replaceChildren(...parts);
+  const line = document.createElement('span');
+  line.className = 'dh-where-sub';
+  line.append(status);
+  if (netBadge) line.append(netBars(netBadge));
+  const text = document.createElement('span');
+  text.className = 'dh-where-text';
+  text.append(top, line);
+  pill.replaceChildren(icon(inRoom ? 'door-open' : 'house'), text);
 }

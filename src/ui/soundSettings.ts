@@ -20,7 +20,8 @@ export function addSoundSettings() {
     (box) => {
       for (const [key, ic, label, sample] of SLIDERS) {
         const row = el('div', 'v2-sl');
-        const lab = el('span', 'lab', label);
+        const lab = el('span', 'lab');
+        lab.append(icon(ic), document.createTextNode(label));
         const range = el('input', 'dh-range');
         range.type = 'range';
         range.id = `vol-${key}`;
@@ -28,13 +29,14 @@ export function addSoundSettings() {
         range.max = '100';
         range.value = String(Math.round(mixer.levels[key] * 100));
         range.setAttribute('aria-label', label);
-        const val = el('span', 'val', `${range.value}%`);
+        const pctText = () => (range.value === '0' ? 'Off' : `${range.value}%`);
+        const val = el('span', 'val', pctText());
         range.addEventListener('input', () => {
           mixer.set(key, Number(range.value) / 100);
-          val.textContent = `${range.value}%`;
+          val.textContent = pctText();
         });
         if (sample) range.addEventListener('change', () => play(sample));
-        row.append(lab, icon(ic), range, val);
+        row.append(lab, range, val);
         if (sample) {
           const b = el('button', 'dh-iconbtn');
           b.type = 'button';

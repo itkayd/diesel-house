@@ -20,13 +20,14 @@ import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type 
 // a lobby of everyone sitting there, then the game, with anyone not playing watching.
 
 export { ALL_GAMES, gamesFor, SOFA_GAMES, TABLE_GAMES, type GameId } from './catalog';
-const GAMES: Record<GameId, { icon: IconName; title: string; sub: string }> = {
-  dice: { icon: 'dice-5', title: 'Dice', sub: 'Roll two dice. Everyone sees it.' },
-  rps: { icon: 'swords', title: 'Rock paper scissors', sub: 'Best of three. Picks are locked in first.' },
-  quickdraw: { icon: 'zap', title: 'Quick Draw', sub: 'Wait for DRAW!, then tap. Too soon = out.' },
-  higherlower: { icon: 'arrow-up-down', title: 'Higher or lower', sub: 'Guess the next card. Bank before you bust.' },
-  wyr: { icon: 'messages-square', title: 'Would you rather', sub: 'Vote in secret, then see who picked what.' },
-  four: { icon: 'grid-3x3', title: 'Four in a row', sub: 'Two players, a 7 by 6 grid. Others watch.' },
+// players: shown on the card ("1+", "2", "2–8").
+const GAMES: Record<GameId, { icon: IconName; title: string; sub: string; players: string }> = {
+  dice: { icon: 'dice-5', title: 'Dice', sub: 'Roll two dice. Everyone sees it.', players: '1+' },
+  rps: { icon: 'swords', title: 'Rock paper scissors', sub: 'Best of three. Picks are locked in first.', players: '2' },
+  quickdraw: { icon: 'zap', title: 'Quick Draw', sub: 'Wait for DRAW!, then tap. Too soon = out.', players: '2–8' },
+  higherlower: { icon: 'arrow-up-down', title: 'Higher or lower', sub: 'Guess the next card. Bank before you bust.', players: '2–8' },
+  wyr: { icon: 'messages-square', title: 'Would you rather', sub: 'Vote in secret, then see who picked what.', players: '2–8' },
+  four: { icon: 'grid-3x3', title: 'Four in a row', sub: 'Two players, a 7 by 6 grid. Others watch.', players: '2' },
 };
 
 // The games played on a spot's table: who can play, the lobby's line, and their host and screen.
@@ -222,7 +223,7 @@ export class Games {
         this.host?.onPeople();
         // Lobby: refresh who's here. A game we're not showing yet (we sat down before we knew its host was here): show it.
         // Only when something changed, so the Start button isn't rebuilt under a finger.
-        if (this.spot === spot && isTableGame(this.screen) && (!this.running(spot) || !this.view) && this.tableKey(spot) !== this.shownKey) this.render();
+        if (this.spot === spot && (this.screen === 'list' || (isTableGame(this.screen) && (!this.running(spot) || !this.view))) && this.tableKey(spot) !== this.shownKey) this.render();
       },
       running: (s) => isTableGame(s.game) && TABLE[s.game].running(s.state),
       onTakeover: (s) => {
@@ -329,7 +330,10 @@ export class Games {
     if (this.screen !== this.viewGame) this.dropView();
     body.replaceChildren();
     this.shownKey = '';
-    if (this.screen === 'list') return this.renderList(body, spot);
+    if (this.screen === 'list') {
+      this.shownKey = this.tableKey(spot);
+      return this.renderList(body, spot);
+    }
     if (this.screen === 'dice') body.append(diceView((r) => this.deps.roll(r)));
     if (this.screen === 'rps') this.renderRps(body);
     if (isTableGame(this.screen)) this.renderTable(body, spot, this.screen);
@@ -340,21 +344,47 @@ export class Games {
     const allowed = this.deps.allowed(spot);
     const here = gamesFor(this.deps.kind(spot)).map((g) => g.id);
     const grid = el('div', 'v2-games');
+    const t = this.tables.get(spot);
+    const playing = this.running(spot) ? t?.snap?.game : null;
     for (const id of ALL_GAMES.filter((g) => here.includes(g))) {
       const g = GAMES[id];
       const off = allowed !== null && !allowed.includes(id);
-      const b = el('button', 'v2-game' + (off ? ' soon' : ''));
+      const b = el('button', 'v2-game' + (off ? ' soon' : '') + (playing === id ? ' live' : ''));
       b.type = 'button';
       b.dataset.game = id;
       b.disabled = off;
       const gi = el('span', 'gi');
       gi.append(icon(g.icon));
-      b.append(gi, el('b', '', g.title), el('span', '', off ? 'Off in this room' : g.sub));
+      const top = el('span', 'top');
+      const tag = el('span', 'tag', playing === id ? 'Playing now' : g.players);
+      tag.setAttribute('aria-label', playing === id ? 'Being played now' : `${g.players} players`);
+      if (playing !== id) tag.prepend(icon('users', { width: 12 }));
+      top.append(gi, tag);
+      b.append(top, el('b', '', g.title), el('span', '', off ? 'Off in this room' : g.sub));
       if (!b.disabled) b.addEventListener('click', () => this.show(id as Games['screen']));
       grid.append(b);
     }
-    const at = this.tables.get(spot)?.people.length ?? 0;
-    body.append(grid, el('p', 'v2-note', at > 1 ? `${at} people at this table.` : 'Games are quick and you stay in voice while you play.'));
+    body.append(this.whoIsHere(spot), grid, el('p', 'v2-note', 'Games are quick and you stay in voice while you play.'));
+  }
+
+  // Faces of everyone sitting at this table (you first).
+  private whoIsHere(spot: SpotId) {
+    const t = this.tables.get(spot);
+    const people = t?.people ?? [];
+    const row = el('div', 'v2-seated');
+    row.id = 'games-seated';
+    const faces = el('span', 'faces');
+    const shown = people.slice(0, 6);
+    for (const p of shown) {
+      const who = this.deps.names(p.id);
+      const f = portrait(who.character ?? p.character, 24);
+      f.title = p.id === t?.id ? 'You' : who.name || p.name;
+      faces.append(f);
+    }
+    const n = people.length;
+    const text = n <= 1 ? 'Just you here. Games need 2+, so wave someone over.' : `${n} at this table${n > shown.length ? ` (+${n - shown.length})` : ''}`;
+    row.append(faces, el('span', '', text));
+    return row;
   }
 
   private renderRps(body: HTMLElement) {

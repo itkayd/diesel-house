@@ -70,7 +70,7 @@ export function gotProgress(this: HouseScene, r: Recorded) {
   const sheet = document.getElementById('challenges');
   if (sheet) {
     const tab = sheet.querySelector('[aria-selected="true"]')?.getAttribute('data-tab') === 'week' ? 'week' : 'day';
-    openChallenges(this.progress, false, tab);
+    openChallenges(this.progress, false, tab, () => this.openMyChallenges());
   }
 }
 
@@ -88,7 +88,7 @@ export function confettiOver(this: HouseScene, sprite: Phaser.GameObjects.Sprite
 }
 
 export function openMyChallenges(this: HouseScene) {
-  openChallenges(this.progress, !!currentUser()?.guest);
+  openChallenges(this.progress, !!currentUser()?.guest, 'day', () => this.openMyChallenges());
   void this.tracker.flush(); // fresh numbers while it's open
 }
 

@@ -164,7 +164,7 @@ export async function start(this: HouseScene) {
   });
   addHallwaySettings(hall);
   new EmoteButton((e) => this.sendEmote(e));
-  // Keys 1-6: quick emotes. Q: the menu for whoever is right next to us.
+  // Keys 1-6: quick emotes. Q: the menu for whoever is right next to us. M: Who's where. Enter: room chat.
   addEventListener('keydown', (e) => {
     if (e.repeat || notGameKey(e) || keysBlocked()) return;
     const n = Number(e.key);
@@ -175,6 +175,10 @@ export async function start(this: HouseScene) {
     else if (e.key.toLowerCase() === 'q') {
       const id = this.nearestRemote(48);
       if (id) this.tapAvatar(id);
+    } else if (e.key.toLowerCase() === 'm') document.getElementById('map-button')?.click();
+    else if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement) && this.chat && !this.chat.isOpen) {
+      e.preventDefault();
+      void this.chat.openToType();
     }
   });
   this.chat = new ChatPanel(

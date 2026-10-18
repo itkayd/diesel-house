@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { TILE_SIZE, type RoomId, type Zone } from '../config';
 import { zoneLabel } from '../ui/overlay';
 import { toast } from '../ui/toasts';
+import { openSettings } from '../ui/settings';
+import { currentUser } from '../net/profile';
 import { friendMenuOpen } from '../ui/friendMenu';
 import { WalkGrid, type Rect } from '../scenes/pathfind';
 import { critterById } from '../critters/critters';
@@ -92,6 +94,7 @@ export function whosWhere(this: HouseScene) {
     critters: (this.critters?.current ?? []).map((s) => ({ id: s.id, name: critterById(s.id)!.name, x: s.x, y: s.y, zone: this.zoneOf(s.x, s.y) })),
     critterSeconds: this.critters?.secondsLeft ?? 0,
     goRoom: (room: RoomId) => this.walkToRoom(room),
+    invite: currentUser() && !currentUser()!.guest ? () => void openSettings('more') : undefined,
     goTo: (id: string) => {
       const r = this.remotes.get(id);
       if (!r?.active) return;

@@ -115,7 +115,7 @@ export class ProgressHud {
 
 // ---- The Challenges sheet ----
 
-export function openChallenges(p: Progress | null, guest: boolean, tab: 'day' | 'week' = 'day') {
+export function openChallenges(p: Progress | null, guest: boolean, tab: 'day' | 'week' = 'day', retry?: () => void) {
   const { panel, close } = openModal('challenges', { dismissable: true, label: 'challenges-title' });
   const head = el('div', 'v2-head');
   const h = el('h2', '', 'Challenges');
@@ -133,7 +133,22 @@ export function openChallenges(p: Progress | null, guest: boolean, tab: 'day' | 
     return;
   }
   if (!p) {
-    panel.append(el('p', 'dh-lede', 'Loading your challenges…'));
+    // Still loading. If nothing comes (offline, a slow network), say so and offer to try again.
+    const wait = el('p', 'dh-lede', 'Loading your challenges…');
+    panel.append(wait);
+    setTimeout(() => {
+      if (!wait.isConnected) return;
+      wait.textContent = 'Couldn’t load your challenges. Check your connection.';
+      if (!retry) return;
+      const again = el('button', 'dh-btn dh-btn--quiet', 'Try again');
+      again.type = 'button';
+      again.id = 'challenges-retry';
+      again.addEventListener('click', () => {
+        close();
+        retry();
+      });
+      panel.append(again);
+    }, 8000);
     return;
   }
   const pr = progress(p.xp);

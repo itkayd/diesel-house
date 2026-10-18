@@ -5,6 +5,7 @@ import { icon } from './icons';
 import { el } from './modal';
 import { hudBottomRight, overlay, zoneLabel } from './overlay';
 import { portrait } from './portrait';
+import { play } from './sounds';
 
 // Room chat (design/game/mvp.html `openChat`): a button by the mic while you're in a room (with an unread
 // dot), opening a side panel on desktop or a bottom sheet on phones. Late joiners see the last 100
@@ -28,6 +29,14 @@ const emojiImg = (emoji: string, size = 18) => {
   return img;
 };
 const GROUP_MS = 5 * 60_000; // messages this close together from one person are grouped
+// One-tap lines above the box (handy on a phone). /roll rolls the dice for the room.
+const QUICK: [string, string][] = [
+  ['👋 Hi all', 'Hi all 👋'],
+  ['🎲 Game?', 'Anyone up for a game? 🎲'],
+  ['☕ brb', 'brb ☕'],
+  ['😂', '😂'],
+  ['🎲 /roll', '/roll'],
+];
 
 type Me = { id: string; name: string; character: number };
 
@@ -64,6 +73,14 @@ export class ChatPanel {
 
   get isOpen() {
     return !!this.sheet;
+  }
+
+  // Enter on a keyboard: open the chat (in a room) and put the cursor in the box.
+  async openToType() {
+    if (!this.room) return false;
+    await this.open();
+    document.getElementById('chat-input')?.focus();
+    return true;
   }
 
   // Entering a room shows the button and loads its chat; the hallway hides both.
@@ -125,21 +142,56 @@ export class ChatPanel {
     send.setAttribute('aria-label', 'Send');
     send.style.cssText = 'background:var(--lamp);color:var(--panel-edge)';
     send.append(icon('send'));
-    form.append(input, send);
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const text = input.value.trim();
+    // Characters left, once you're close to the limit.
+    const left = el('span', 'dh-chat-left');
+    left.hidden = true;
+    const counted = () => {
+      const n = MAX_LENGTH - input.value.length;
+      left.hidden = n > 40;
+      left.textContent = String(n);
+      send.disabled = !input.value.trim();
+    };
+    input.addEventListener('input', counted);
+    form.append(input, left, send);
+    const say = async (text: string) => {
       if (!text || !this.room) return;
-      input.value = '';
       if (text.startsWith('/') && this.command(text)) return;
       const room = this.room;
+      play('click', 0.25);
       const err = await postMessage(room, text, this.me());
       if (err) {
-        input.value = text;
+        if (!input.value) input.value = text;
+        counted();
         this.note(`Couldn't send: ${err}`);
+        play('error', 0.4);
       } else this.onActivity('chat', room);
+    };
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      input.value = '';
+      counted();
+      void say(text);
     });
-    sheet.append(head, this.list, form);
+    const quick = el('div', 'dh-chat-quick');
+    quick.id = 'chat-quick';
+    for (const [label, text] of QUICK) {
+      const b = el('button', 'dh-chip', label);
+      b.type = 'button';
+      b.addEventListener('click', () => void say(text));
+      quick.append(b);
+    }
+    // Escape closes the chat (desktop), unless a reaction bar is open: that closes first.
+    sheet.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      if (this.openBar !== null) {
+        this.openBar = null;
+        this.render();
+      } else this.close();
+    });
+    sheet.append(head, this.list, quick, form);
+    counted();
     overlay().append(sheet);
     this.sheet = sheet;
     this.dot.hidden = true;
@@ -194,8 +246,8 @@ export class ChatPanel {
     const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
     list.replaceChildren();
     if (!this.messages.length) {
-      const empty = el('div', 'dh-lede', 'No messages yet. Say hi.');
-      empty.style.cssText = 'text-align:center;padding:30px 10px';
+      const empty = el('div', 'dh-chat-empty');
+      empty.append(icon('message-square', { width: 28, height: 28 }), el('b', '', 'No messages yet'), el('span', '', 'Say hi, or tap one of the quick lines below. Only people in this room see it.'));
       list.append(empty);
       return;
     }

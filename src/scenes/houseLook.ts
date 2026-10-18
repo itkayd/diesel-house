@@ -59,6 +59,7 @@ export class HouseLook {
   private roomGlow = new Map<RoomId, Phaser.GameObjects.Image>();
   private plates = new Map<RoomId, Nameplate>();
   readonly solids: Phaser.Physics.Arcade.StaticGroup;
+  private tall: { x: number; y: number; w: number; h: number; depth: number }[] = []; // things you can stand behind
 
   constructor(
     private scene: Phaser.Scene,
@@ -79,6 +80,7 @@ export class HouseLook {
       // Rugs under everyone; wall hangings just above the walls; the rest sorted with people.
       const depth = o.type === 'rug' ? DEPTH.rug : o.type === 'wall' ? DEPTH.wallDecor : depthOf(Number(prop(o, 'depthX')), Number(prop(o, 'depthY')));
       scene.add.image(at.x, at.y, sheetKey, key).setOrigin(0).setDepth(depth);
+      if (o.type === 'thing') this.tall.push({ x: at.x, y: at.y, w: o.width!, h: o.height!, depth });
       const foot = prop(o, 'foot');
       if (o.type === 'thing' && foot) {
         // Only the footprint blocks, so you can stand "behind" the top of tall things.
@@ -146,6 +148,12 @@ export class HouseLook {
 
   plate(room: RoomId) {
     return this.plates.get(room);
+  }
+
+  // Is someone standing at (x, y) (feet, screen px) half hidden behind furniture drawn in front of them?
+  hides(x: number, y: number, depth: number) {
+    const inside = (px: number, py: number) => this.tall.some((t) => t.depth > depth && px > t.x + 2 && px < t.x + t.w - 2 && py > t.y + 2 && py < t.y + t.h - 2);
+    return inside(x, y - 3) && inside(x, y - 8);
   }
 }
 

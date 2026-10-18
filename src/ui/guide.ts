@@ -215,6 +215,25 @@ export function setupGuide(firstVisit: boolean) {
         openGuide();
       });
       box.append(g);
+      // Keyboard shortcuts (only worth showing with a keyboard).
+      if (window.matchMedia('(pointer: fine)').matches) {
+        const keys = el('div', 'dh-keys');
+        keys.id = 'settings-keys';
+        for (const [k, what] of [
+          ['WASD / arrows', 'Walk'],
+          ['E', 'Use what you’re next to (games, board, timer)'],
+          ['Space', 'Push to talk (when it’s on)'],
+          ['T', 'Walkie-talkie in the Great Hall (hold; change the key under Mic)'],
+          ['1–6', 'Quick emotes'],
+          ['Q', 'Menu for the friend next to you'],
+          ['M', 'Who’s where'],
+          ['Enter', 'Room chat'],
+          ['Esc', 'Close'],
+        ]) {
+          keys.append(el('kbd', '', k), el('span', '', what));
+        }
+        box.append(el('div', 'dh-label', 'Keyboard shortcuts'), keys);
+      }
     },
     false,
     'more',

@@ -20,6 +20,7 @@ export type WhoWhere = {
   critterSeconds: number; // until they wander off
   goRoom: (room: RoomId) => void;
   goTo: (id: string) => void;
+  invite?: () => void; // members: open the invite code (shown when nobody else is in)
 };
 
 export function addWhosWhereButton(get: () => WhoWhere) {
@@ -70,8 +71,14 @@ export function openWhosWhere(get: () => WhoWhere) {
         get().goRoom(z.name as RoomId);
       });
     }
-    const lab = el('span', 'lab', room ? w0.label(z.name).replace(/'s room$/, '') : '');
+    const lab = el('span', 'lab', room ? w0.label(z.name) : 'Great Hall');
     zb.append(lab);
+    // How many friends are in there (set as they move).
+    if (room) {
+      const n = el('span', 'n');
+      n.hidden = true;
+      zb.append(n);
+    }
     mini.append(zb);
   }
   const dots = el('div', 'dots');
@@ -96,6 +103,16 @@ export function openWhosWhere(get: () => WhoWhere) {
         return d;
       }),
     );
+    // People per room, on the map.
+    const count = new Map<Zone, number>();
+    for (const p of w.people) if (p.zone) count.set(p.zone, (count.get(p.zone) ?? 0) + 1);
+    for (const b of mini.querySelectorAll<HTMLButtonElement>('button.zone')) {
+      const n = b.querySelector<HTMLElement>('.n')!;
+      const k = count.get(b.dataset.go as Zone) ?? 0;
+      n.hidden = !k;
+      n.textContent = String(k);
+      b.setAttribute('aria-label', `Go to ${w.label(b.dataset.go as Zone)}${k ? ` (${k} here)` : ''}`);
+    }
     const crit = el('p', 'v2-note');
     crit.id = 'whos-where-critter';
     for (const c of w.critters) {
@@ -109,7 +126,7 @@ export function openWhosWhere(get: () => WhoWhere) {
     if (w.critters.length) {
       const m = Math.floor(w.critterSeconds / 60);
       const left = m ? `${m}:${String(w.critterSeconds % 60).padStart(2, '0')}` : `${w.critterSeconds} s`;
-      const where = (z: Zone | null) => (!z || z === 'hallway' ? 'the hallway' : w.label(z));
+      const where = (z: Zone | null) => (!z || z === 'hallway' ? 'the Great Hall' : w.label(z));
       const c0 = w.critters[0];
       crit.textContent =
         w.critters.length === 1
@@ -127,14 +144,28 @@ export function openWhosWhere(get: () => WhoWhere) {
     if (key === lastList) return;
     lastList = key;
     list.replaceChildren();
-    if (!w.people.length) list.append(el('p', 'v2-note', 'Nobody else is in the house right now.'));
+    if (!w.people.length) {
+      list.append(el('p', 'v2-note', 'Nobody else is in the house right now.'));
+      if (w.invite) {
+        const inv = el('button', 'dh-btn dh-btn--quiet');
+        inv.type = 'button';
+        inv.id = 'whos-where-invite';
+        inv.append(icon('ticket', { width: 18 }), document.createTextNode('Invite a friend as a guest'));
+        const go = w.invite;
+        inv.addEventListener('click', () => {
+          close();
+          go();
+        });
+        list.append(inv);
+      }
+    }
     for (const p of w.people) {
       const row = el('div', 'v2-item');
       row.dataset.person = p.id;
       const txt = el('span');
       txt.style.cssText = 'display:grid;gap:2px;min-width:0';
       const where = !p.zone || p.zone === 'hallway' ? 'Great Hall' : w.label(p.zone);
-      txt.append(el('span', 't', p.name || 'Someone'), el('span', 's', where + (p.talking ? ' · talking' : '')));
+      txt.append(el('span', 't', p.name || 'Someone'), el('span', 's', where + (p.talking ? ' · in a voice chat' : '')));
       const go = el('button', 'dh-btn dh-btn--quiet');
       go.type = 'button';
       go.dataset.walk = p.id;

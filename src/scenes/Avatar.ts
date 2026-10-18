@@ -355,6 +355,18 @@ export class Avatar {
       .setVisible(this.sprite.visible);
   }
 
+  // Behind tall furniture: a faint outline of yourself on top, so you never lose your character.
+  private ghost: Phaser.GameObjects.Sprite | null = null;
+  setGhost(on: boolean) {
+    if (!on) {
+      this.ghost?.setVisible(false);
+      return;
+    }
+    const s = this.sprite;
+    this.ghost ??= s.scene.add.sprite(0, 0, s.texture.key).setOrigin(0.5, 1).setAlpha(0.32).setTintFill(0xfff4e0).setDepth(DEPTH.light - 1);
+    this.ghost.setTexture(s.texture.key, s.frame.name).setPosition(s.x, s.y).setFlipX(s.flipX).setScale(s.scaleX, s.scaleY).setVisible(s.visible);
+  }
+
   // On the Disco's dance floor: a little side-to-side sway from the feet (not with reduced motion).
   setDancing(on: boolean) {
     if (on === !!this.danceTween) return;

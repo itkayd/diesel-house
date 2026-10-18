@@ -3,10 +3,11 @@ import { type RoomId } from '../config';
 import { type Dir } from '../characters';
 import { play } from '../ui/sounds';
 import { zoneLabel } from '../ui/overlay';
-import { toast } from '../ui/toasts';
+import { roomBanner } from '../ui/roomBanner';
 import { modalOpen } from '../ui/modal';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ZONE_SETTLE_MS } from './consts';
+import { toScreen } from './projection';
 
 // Every frame: your movement and facing, which zone you are in, others' movement, and the prompts underfoot.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -27,6 +28,8 @@ export function update(this: HouseScene) {
         : 'up';
   this.me.animate(moving, dir);
   this.me.sync();
+  const feet = toScreen(this.player.x, this.player.y);
+  this.me.setGhost(this.look.hides(feet.x, feet.y, this.player.depth));
   // Very quiet footsteps while you walk (Sound effects switch and Game sounds slider apply).
   if (moving && this.time.now - this.lastStep > 320) {
     this.lastStep = this.time.now;
@@ -50,8 +53,11 @@ export function update(this: HouseScene) {
     this.showPresenceStatus(this.presenceState);
     if (zone && zone !== 'hallway') this.tracker.emit('room_enter', { u: zone });
     this.askTimer(zone);
-    if (zone && zone !== 'hallway' && zone !== was && this.presence && !this.quietRooms.has(zone))
-      toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
+    if (zone && zone !== 'hallway' && zone !== was && this.presence) {
+      const others = this.countIn(zone) - 1;
+      const quiet = this.quietRooms.has(zone);
+      roomBanner(zoneLabel(zone), quiet ? 'Quiet room · people near you hear you softly' : others > 0 ? `${others} here · joining voice…` : 'Nobody else here yet');
+    }
     // (Zone rides on the move message just below; presence is kept for rare changes.)
     this.sendMove(true);
     this.updateVoice();

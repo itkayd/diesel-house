@@ -216,4 +216,32 @@ function setupSky(this: HouseScene) {
         for (const st of stars) st.setAlpha(this.skyLight.stars * (0.35 + 0.45 * Math.abs(Math.sin(t * 0.7 + (st.getData('k') as number)))));
       });
   }
+  setupNightOutside.call(this, reduce);
+}
+
+// Outside the house (the dark around it): a scatter of faint stars, a few twinkling, so the edges of the
+// screen look like night sky rather than nothing. A fixed pattern, well clear of the house.
+function setupNightOutside(this: HouseScene, reduce: boolean) {
+  const map = this.wallLayer.tilemap;
+  // (Outside is filled with the plain dark wall tile; any floor nearby, or a wall face above one, is the house.)
+  const floor = (tx: number, ty: number) => !!map.getTileAt(tx, ty, false, 'floor');
+  const clear = (tx: number, ty: number) => {
+    for (let dy = -2; dy <= 4; dy++) for (let dx = -2; dx <= 2; dx++) if (floor(tx + dx, ty + dy)) return false;
+    return true;
+  };
+  const g = this.add.graphics().setDepth(DEPTH.light + 2).setBlendMode(Phaser.BlendModes.ADD);
+  const twinkles: Phaser.GameObjects.Rectangle[] = [];
+  for (let ty = 0; ty < map.height; ty++)
+    for (let tx = 0; tx < map.width; tx++) {
+      const h = (tx * 73856093) ^ (ty * 19349663);
+      if ((h >>> 0) % 7 !== 0 || !clear(tx, ty)) continue;
+      const at = toScreen(tx * TILE + ((h >>> 4) % TILE), ty * TILE + ((h >>> 9) % TILE));
+      if ((h >>> 0) % 5 === 0 && twinkles.length < 40) twinkles.push(this.add.rectangle(at.x, at.y, 2, 2, 0xfff4e0, 0.6).setDepth(DEPTH.light + 2).setBlendMode(Phaser.BlendModes.ADD).setData('k', twinkles.length));
+      else g.fillStyle(0xd8d0ff, 0.18 + ((h >>> 13) % 4) * 0.08).fillRect(at.x, at.y, 1, 1);
+    }
+  if (reduce) return;
+  this.events.on('update', () => {
+    const t = this.time.now / 1000;
+    for (const st of twinkles) st.setAlpha(0.15 + 0.5 * Math.abs(Math.sin(t * 0.5 + (st.getData('k') as number) * 1.7)));
+  });
 }

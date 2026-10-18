@@ -354,9 +354,9 @@ html, body, #game, #overlay, #overlay * {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; white-space: nowrap; }
 .v2-tabs button svg { width: 15px; height: 15px; }
 .v2-tabs button[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
-.v2-sl { display: grid; grid-template-columns: 24px 1fr 46px 44px; gap: 10px; align-items: center; }
+.v2-sl { display: grid; grid-template-columns: 1fr 46px 44px; gap: 4px 10px; align-items: center; }
 .v2-sl svg { width: 18px; height: 18px; color: var(--muted); }
-.v2-sl .lab { grid-column: 2 / -1; font-family: var(--font-display); font-size: 14px; display: flex; justify-content: space-between; margin-bottom: -6px; }
+.v2-sl .lab { grid-column: 1 / -1; font-family: var(--font-display); font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .v2-sl .val { font-family: var(--font-display); font-size: 13px; color: var(--muted); text-align: right; }
 .v2-sl .dh-iconbtn { width: 44px; height: 44px; } .v2-sl .dh-iconbtn svg { width: 16px; height: 16px; }
 .v2-meter { height: 14px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: flex; gap: 2px; padding: 3px; }
@@ -463,6 +463,14 @@ html, body, #game, #overlay, #overlay * {
 .v2-game .gi { width: 34px; height: 34px; display: grid; place-items: center; background: var(--panel); color: var(--lamp); box-shadow: 0 0 0 2px var(--panel-edge); }
 .v2-game .gi svg { width: 20px; height: 20px; }
 .v2-game b { font-family: var(--font-display); font-size: 16px; } .v2-game span { font-size: 12px; color: var(--muted); }
+.v2-game .top { display: flex; justify-content: space-between; align-items: start; gap: 6px; }
+.v2-game .tag { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: 11px; color: var(--muted); background: var(--panel); padding: 2px 6px; box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
+.v2-game.live { box-shadow: inset 0 0 0 2px var(--ok); }
+.v2-game.live .tag { color: var(--panel-edge); background: var(--ok); box-shadow: none; animation: dh-pulse 1.4s steps(2) infinite; }
+.v2-seated { display: flex; align-items: center; gap: 10px; min-height: 32px; font-size: 13px; color: var(--muted); }
+.v2-seated .faces { display: flex; }
+.v2-seated .faces canvas, .v2-seated .faces img { margin-right: -6px; box-shadow: 0 0 0 2px var(--panel-edge); background: var(--panel); }
+.v2-seated .faces > :last-child { margin-right: 4px; }
 .v2-game.soon { opacity: .55; cursor: default; } .v2-game.soon:hover { box-shadow: inset 0 0 0 2px var(--line); }
 .v2-vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; text-align: center; }
 .v2-vs .side { display: grid; gap: 8px; justify-items: center; padding: 10px 6px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
@@ -599,6 +607,10 @@ html, body, #game, #overlay, #overlay * {
 .v2-mini { position: relative; width: 100%; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); overflow: hidden; }
 .v2-mini .zone { position: absolute; box-sizing: border-box; border: 0; padding: 0; margin: 0; font: inherit; background: var(--panel-hi); box-shadow: inset 0 0 0 2px var(--panel-edge); display: grid; place-items: center; }
 .v2-mini .zone.hall { background: #2a2232; }
+.v2-mini .zone.hall .lab { color: var(--muted); align-self: start; margin-top: 12%; }
+/* Room names sit at the top of the room, so the dots in the middle don't cover them. */
+.v2-mini button.zone { align-content: start; padding-top: 6px; }
+.v2-mini .zone .n { position: absolute; right: 4px; bottom: 4px; min-width: 16px; height: 16px; padding: 0 3px; box-sizing: border-box; font-family: var(--font-display); font-size: 10px; line-height: 16px; text-align: center; color: var(--panel-edge); background: var(--lamp); pointer-events: none; }
 .v2-mini button.zone { cursor: pointer; }
 .v2-mini button.zone:hover, .v2-mini button.zone:focus-visible { background: #4a3a58; box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
 .v2-mini .lab { font-family: var(--font-display); font-size: 10px; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 2px; }
@@ -698,3 +710,29 @@ html, body, #game, #overlay, #overlay * {
 .dh-guide-nav-r { display: flex; gap: 10px; }
 .dh-guide-nav .dh-btn { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .dh-guide-body { animation: none; } }
+
+/* Room title as you walk in (src/ui/roomBanner.ts). */
+.dh-room-banner { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; z-index: 5;
+  padding: 10px 22px 12px; background: rgba(26, 18, 32, .78); box-shadow: 0 0 0 2px var(--panel-edge), inset 0 0 0 2px var(--line); max-width: calc(100vw - 48px);
+  animation: dh-banner 2.6s ease-out both; }
+.dh-room-banner b { font-family: var(--font-display); font-size: 26px; color: var(--lamp); text-shadow: 2px 2px 0 var(--panel-edge); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dh-room-banner span { font-size: 13px; color: var(--cream); }
+@keyframes dh-banner { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+@media (prefers-reduced-motion: reduce) { .dh-room-banner { animation: none; } }
+
+/* Chat extras: empty state, one-tap lines, characters left. */
+.dh-chat-empty { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 28px 16px; color: var(--muted); }
+.dh-chat-empty svg { color: var(--faint); }
+.dh-chat-empty b { font-family: var(--font-display); color: var(--cream); font-size: 16px; }
+.dh-chat-empty span { font-size: 13px; max-width: 30ch; }
+.dh-chat-quick { display: flex; gap: 6px; overflow-x: auto; padding: 8px 12px 0; scrollbar-width: none; flex: none; }
+.dh-chat-quick::-webkit-scrollbar { display: none; }
+.dh-chip { flex: none; min-height: 32px; padding: 4px 10px; border: 0; cursor: pointer; font: inherit; font-size: 13px; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); white-space: nowrap; }
+.dh-chip:hover, .dh-chip:focus-visible { box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.dh-chip:active { transform: translateY(1px); }
+.dh-chat-left { align-self: center; font-size: 12px; color: var(--muted); min-width: 24px; text-align: right; }
+#chat-send:disabled { opacity: .5; cursor: default; }
+
+/* Settings → More: keyboard shortcuts. */
+.dh-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
+.dh-keys kbd { justify-self: start; font-family: var(--font-display); font-size: 12px; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line), inset 0 -3px 0 var(--line); padding: 3px 7px 5px; white-space: nowrap; }

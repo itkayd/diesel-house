@@ -2,7 +2,7 @@
 
 Read after `CLAUDE.md`, `FIXES.md`, `NEXT.md`, `UPDATE.md`, `LEVELS.md`. **This file wins for anything about layout, rooms, art style, skins, animals and UI.** Same working rules: plan → one phase at a time → pass "Done when" → commit + push → stop and give Diesel a short how-to-test (Windows commands, phone steps).
 
-**Do not start building until R0 is done and Diesel has picked a look in R2.** Diesel said: "do not do anything without planning."
+**Look decided (R2, 18 Oct): build in A ("Cosy LimeZu+", 16 px) now; the end goal is C (isometric).** Every phase from R3 on follows the "iso-ready" rules in §5 so the switch to isometric (Phase R6) is a new renderer and new art, not a rewrite. Diesel said: "do not do anything without planning."
 
 ---
 
@@ -56,7 +56,7 @@ Sketch: **`design/redesign/floorplan_octagon.png`**
   - **Room names** are fixed (Disco, Library …); no renaming.
   - **Game rules** per room (which games are allowed, custom Hot Takes prompts): any member can edit them from the room's noticeboard, which keeps a simple change log.
   - **Ownership in the DB** (`rooms.owner_id`, `room_passes`, knock broadcasts): stop using it in R1. Leave the columns and tables in place for one release, then drop them in a later migration (tell Diesel first).
-- Option B (true hexagon in isometric view) was rejected for now: it means a full engine rewrite and far fewer assets. The isometric packs (#8, #9) are downloaded only so R2 can show what it would look like.
+- Isometric was first rejected as too big a change. **Diesel has since made it the end goal (R2 decision, §5).** The octagon layout stays: the same `rooms.ts` polygons are drawn top-down now and isometric in R6.
 
 ### Knock-on changes to other plans
 - **Challenges (`UPDATE.md` §5):** replace "Knock on a door and get let in" with "Dance in the Disco for 2 minutes". Replace the weekly "Visit every room" with "Visit all 7 rooms".
@@ -91,6 +91,25 @@ Sketch: **`design/redesign/floorplan_octagon.png`**
    - **C. "Isometric"**: Kenney Isometric Library + lumeish, just to see it. Not expected to win.
 4. Diesel picks one. **Never mix tile sizes in one view.** If 16 px wins, 32 px packs are only used if scaled art still reads; otherwise drop them.
 
+**Done (18 Oct).** The mock-ups are at `/mockups/` (`public/mockups/`, built by `design/redesign/mockups/build_{a,b,c}.py`).
+
+### Decision: A now, C is the end goal
+- **R3 to R5 are built in A:** 16 px, LimeZu walls and floors, LimeZu + Cozy Interior 165+ + bitglow + Ninja Adventure furniture, the disco floor and ball scaled to 16 px. The 32 px packs (#4 feyza5, #5 Reading Nook, #6 Graduation Cat) are dropped from the game.
+- **The house will become isometric (C) in Phase R6** (§10a). Until then, nothing may be built in a way that only works top-down.
+- **Still open for Diesel:** move everyone to Ninja Adventure skins or keep today's characters as their own group. Ninja skins are top-down only; isometric needs new character art either way (R6.0).
+
+### Iso-ready rules (apply from R3; check them in every review)
+1. **World = tiles.** Game logic, zones, doors, collision, game spots, critters, the whisper circle and pathfinding work in tile units on the `rooms.ts` grid. Pixels only appear when drawing.
+2. **One projection module**, `src/house/projection.ts`: `toScreen(tx, ty)`, `toWorld(sx, sy)`, `tileSize`. Today it is plain top-down (× 16). Everything that turns world positions into screen positions (sprites, name tags, chat bubbles, emotes, the camera, tap-to-walk, tap-a-friend, the whisper circle) goes through it. In R6 only this module and the renderer change.
+3. **One depth rule**, `depthOf(tx, ty, layer)` in the same module: `ty` today, `tx + ty` in iso. No hand-picked `setDepth` numbers for things that stand on the floor (there are 23 `setDepth` calls today; move them over in R3).
+4. **Furniture is data**: each item in a room recipe is `{ kind, tile: [x, y], footprint: [w, h], facing }`, not pixel positions. Collision comes from the footprint. A per-look art table (`looks/topdown.ts`, later `looks/iso.ts`) says which sprite draws each `kind` facing each way, so iso art can be added item by item.
+5. **The map builder writes data, not just pictures**: floors, walls, doors and furniture as lists from `rooms.ts`; the top-down tile layers are one output. The iso renderer (R6) reads the same lists.
+6. **Network messages use world units.** `MoveMsg` sends pixels today; in R3 add tile-unit positions (keep pixels one release so old copies keep working).
+7. **Characters and animals** are loaded from one atlas format (R4) with a `facings` field: 4 now (down/up/left/right); iso uses 4 diagonal facings. Code asks the atlas for "the frame facing this way", never for fixed frame numbers.
+8. **Movement** goes through one input module that returns a world-space direction. Tap-to-walk uses the existing tile pathfinding (`scenes/pathfind.ts`), which works in both views.
+9. **UI never measures the map picture**: the mini-map and "Who's where" draw from `rooms.ts`.
+10. Walls that would hide people in iso (front walls) are marked in the data now (`wall.side`), so R6 can cut them away or fade them.
+
 **Notes from the packs already checked:**
 - *Assorted Disco* (#7) is **side-view and large** (DJ 256 × 172, jukebox 96 × 172). It doesn't match top-down. Use only `DanceFloor.png` (tile colours) and `DiscoBall.png` (scaled to 16–32 px). Redraw the DJ booth/jukebox top-down from furniture packs or in code. Skip the bottles: keep it friendly.
 - *Forest animals* (#10) are proper 16 px top-down: fox, doe, owl, squirrel, frog, with idle + run in 4 directions. CC0. They're a perfect match for the current style.
@@ -99,6 +118,7 @@ Sketch: **`design/redesign/floorplan_octagon.png`**
 ---
 
 ## 6. Phase R3 — Build the new house
+- **Look A (16 px), following the iso-ready rules in §5.** Start R3 with `src/house/projection.ts`, depth by `depthOf()`, furniture as data with footprints and tile-unit positions in `MoveMsg`, before drawing any new room.
 - Generate the octagon house from `rooms.ts` with the chosen pack(s): stepped diagonal walls, a distinct floor and wall per room, and furniture recipes per theme (section 2 table).
 - **Disco:** colour-changing floor (cycle tile tints every beat), glitter ball with rotating light specks, light sweeps, jukebox UI (a few CC0 loops; ask Diesel before adding music files), dance emote.
 - **Library:** quiet voice mode (reuse the whisper falloff from the hallway code), shelves and nooks, study timer.
@@ -110,11 +130,11 @@ Sketch: **`design/redesign/floorplan_octagon.png`**
 - Lighting pass: night tint, warm lamp pools, and rooms with people inside glow brighter from the hall (keep from NEXT.md §4.2).
 - Migration: retire `room_01..08`. Old chat history in those rooms stays readable from an "Old rooms" archive in settings for one release.
 
-**Done when:** you can walk the whole house on a phone. All 7 rooms + hall + porch look distinct and work with the right voice mode. Walls (including diagonals) block correctly. Do-not-disturb works between two accounts. "Who's where" and the map show the new shape. The e2e tests, updated for the new map, pass.
+**Done when:** you can walk the whole house on a phone. All 7 rooms + hall + porch look distinct and work with the right voice mode. Walls (including diagonals) block correctly. Do-not-disturb works between two accounts. A review against the iso-ready rules (§5) finds no new pixel positions in game logic and no hand-set floor depths. "Who's where" and the map show the new shape. The e2e tests, updated for the new map, pass.
 
 ## 7. Phase R4 — Skins and animals
 ### Skins (target **60+ choices**)
-- Sources: Ninja Adventure (**93** 16 px characters, CC0), the existing 20 (chibis + LimeZu), Cute Fantasy free (non-commercial), and Sunnyside humans (check licence). Use only the ones matching the chosen tile size.
+- Sources: Ninja Adventure (**93** 16 px characters, CC0), the existing 20 (chibis + LimeZu), Cute Fantasy free (non-commercial), and Sunnyside humans (check licence). Use only the 16 px ones (look A). These are top-down only; iso skins come in R6, so keep the atlas format able to hold diagonal facings (§5 rule 7).
 - Normalise everything to one sheet format: 4 directions × walk + idle. Build `public/assets/characters/atlas.png` + `atlas.json`, generated by a script in `scripts/`.
 - Picker redesign: categories (People, Ninja, Fantasy, Animals-as-avatars), search, a big animated preview, **favourites**, and **"locked until level X"** for some skins. This links to `LEVELS.md` §5: reward skins every 5 levels, with no gameplay advantage.
 - Store `character_key` (text) instead of `character_index` (0–19). Add a migration that maps old indexes to keys.
@@ -172,6 +192,17 @@ Not needed: `Godot Project V4.zip` and `GodotProject.zip` (Ninja Adventure's God
 
 ---
 
+## 10a. Phase R6 — Isometric house (the end goal; plan and ask before starting)
+- **R6.0 Art first.** Isometric needs characters, animals and furniture in one iso style. Today there are only lumeish furniture (CC-BY-SA, credit) and Kenney Isometric Library (CC0, scaled down). Find iso character packs with 4 diagonal facings (60+ skins is the R4 target), iso animals and more iso furniture; make contact sheets; check every licence. If no character pack is good enough, stop and tell Diesel the options (commission art, AI-free pixel artists, or fewer skins).
+- **R6.1 Renderer.** An iso version of `projection.ts` (2:1 diamonds) and a renderer that draws floors, back walls, cut-away or faded front walls, and furniture from the same data as top-down. Depth by `tx + ty`.
+- **R6.2 Controls.** Arrow keys and WASD map to screen directions (up = up the screen), the joystick the same; tap-to-walk unchanged.
+- **R6.3 Switch.** A setting to swap views during testing, then make iso the default. Keep top-down for one release.
+- The mock-up `public/mockups/c.html` and `design/redesign/mockups/build_c.py` are the reference for colours, wall heights and the disco floor.
+
+**Done when:** the whole house works in iso on a phone with the same features as top-down, and nothing in game logic, chat, voice or games had to change.
+
+---
+
 ## 10. v3 — later, ask Diesel first: "Ghoul night"
 Idea from Diesel: fighting ghouls, using the **Sunnyside World** pack (it has enemies and combat animations).
 - A friendly co-op event: on some nights, ghouls (goblins/skeletons) shuffle into the Great Hall and friends tap/attack them together for XP. No deaths or loss, just a fun scramble.
@@ -181,4 +212,4 @@ Idea from Diesel: fighting ghouls, using the **Sunnyside World** pack (it has en
 ---
 
 ## 11. Order
-R0 audit/bugs → R1 foundations → R2 choose look → R3 new house → R4 skins + animals → R5 UI/UX → (v3 ghouls, ask first). Stop after each for Diesel to test. Update the free-tier budget check (`UPDATE.md` §6) at the end of R3 and R4 (disco lights and pets must not add Realtime messages per frame).
+R0 audit/bugs → R1 foundations → R2 choose look (done: A now, C later) → R3 new house (in A, iso-ready) → R4 skins + animals → R5 UI/UX → R6 isometric (plan + ask first) → (v3 ghouls, ask first). Stop after each for Diesel to test. Update the free-tier budget check (`UPDATE.md` §6) at the end of R3 and R4 (disco lights and pets must not add Realtime messages per frame).

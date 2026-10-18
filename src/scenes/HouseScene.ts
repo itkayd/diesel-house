@@ -273,10 +273,14 @@ export class HouseScene extends Phaser.Scene {
         out.id = 'sign-out';
         out.textContent = user.guest ? 'Leave' : 'Sign out';
         out.addEventListener('click', async () => {
-          this.voice?.leave();
-          this.presence?.leave();
-          await signOut();
-          location.reload();
+          out.disabled = true;
+          try {
+            this.voice?.leave();
+            this.presence?.leave();
+            await signOut();
+          } finally {
+            location.reload(); // even offline, so you're never left stuck on a dead button (BUGS.md #2)
+          }
         });
         const credits = el('button', 'dh-btn dh-btn--quiet', 'Credits');
         credits.type = 'button';

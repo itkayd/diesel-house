@@ -64,16 +64,13 @@ export async function houseIsOpen() {
   return data === true;
 }
 
-export async function isGuest(): Promise<boolean> {
+// Still allowed in? true / false, or null when the house couldn't be reached or answered with a server
+// error. A weak signal at start-up used to read as "not a member" and signed people out (BUGS.md #3).
+export async function hasAccess(guest: boolean): Promise<boolean | null> {
   if (!supabase) return false;
-  const { data, error } = await supabase.rpc('is_guest');
-  return !error && data === true;
-}
-
-export async function isMember(): Promise<boolean> {
-  if (!supabase) return false;
-  const { data, error } = await supabase.rpc('is_member');
-  return !error && data === true;
+  const { data, error, status } = await supabase.rpc(guest ? 'is_guest' : 'is_member');
+  if (error) return status === 0 || status === 408 || status >= 500 ? null : false;
+  return data === true;
 }
 
 export async function signOut() {

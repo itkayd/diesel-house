@@ -669,3 +669,6 @@ html, body, #game, #overlay, #overlay * {
 .v2-pop { animation: v2-pop-in .35s steps(5); }
 @keyframes v2-pop-in { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .v2-shake, .v2-pop, .v2-timer i, .v2-die.roll, .v2-die.land, .v2-hand.hidden { animation: none; } .v2-fx-float { animation-duration: .7s; } }
+
+/* Start-up: the house can't be reached yet (src/main.ts accessWithRetry). */
+.dh-boot-note { position: fixed; left: 50%; bottom: calc(24px + var(--safe-b, 0px)); transform: translateX(-50%); z-index: 2000; max-width: calc(100% - 32px); padding: 10px 14px; font-family: var(--font-body); font-size: 15px; color: var(--cream); background: var(--panel); box-shadow: 0 0 0 3px var(--panel-edge); text-align: center; }

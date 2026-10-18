@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diesel House — Store mock-up</title>
+<!-- Visual + logic target for STORE.md (phase S2). Mock only: the wallet here is local; the real one is server-side (STORE.md §5).
+     Art: Ninja Adventure (CC0) facesets, walk/attack/jump sheets, gems and coin. -->
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--night:#140f1c;--panel:#2b2034;--panel-hi:#3a2c46;--panel-edge:#0d0912;--line:#4a3a57;--lamp:#f4b860;--lamp-deep:#c9822f;--cream:#fff4e0;--muted:#bcaccb;--faint:#75668a;--ok:#6fdc8c;--error:#ff8f7a;
+--common:#bcaccb;--rare:#7fb2ff;--epic:#c99bff;--limited:#f4b860;--event:#ff8f7a;
+--fd:"Pixelify Sans","Courier New",monospace;--fb:"Atkinson Hyperlegible",system-ui,sans-serif;
+--frame:0 0 0 3px var(--panel-edge),inset 0 3px 0 rgba(255,244,224,.10),inset 0 -3px 0 rgba(0,0,0,.35)}
+*{box-sizing:border-box}html,body{margin:0;background:#0b0810;color:var(--cream);font-family:var(--fb)}
+img,.px{image-rendering:pixelated}
+.wrap{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;padding:24px 16px}
+.phone{width:390px;max-width:100%;height:844px;background:var(--night);position:relative;overflow:hidden;box-shadow:0 0 0 3px var(--panel-edge),0 20px 60px #000;border-radius:28px}
+.notes{max-width:420px;font-size:14px;line-height:1.5;color:var(--muted)}.notes h2{font-family:var(--fd);color:var(--cream)}
+.notes code{color:var(--lamp)}
+/* HUD */
+.hud{position:absolute;inset:0 0 auto 0;padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;background:linear-gradient(#140f1cee,#140f1c00)}
+.pill,.btn,.chip{background:var(--panel);box-shadow:var(--frame);border:0;color:var(--cream);font-family:var(--fd)}
+.pill{display:flex;align-items:center;gap:8px;padding:8px 12px;height:44px;font-size:15px}
+.dot{width:8px;height:8px;background:var(--ok)}
+.row{display:flex;gap:8px}
+.btn{width:44px;height:44px;display:grid;place-items:center;cursor:pointer;font-size:18px}
+.btn.store{background:var(--lamp);color:var(--panel-edge)}
+.wallet{grid-column:1/-1;display:flex;gap:8px}
+.chip{display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;font-size:15px;cursor:pointer}
+.chip img{width:16px;height:16px}.chip .plus{margin-left:2px;width:20px;height:20px;background:var(--lamp);color:var(--panel-edge);display:grid;place-items:center;font-size:14px}
+.chip.xp{gap:8px}.bar{width:56px;height:8px;background:var(--panel-edge)}.bar i{display:block;height:100%;width:62%;background:var(--lamp)}
+.world{position:absolute;inset:0;background:radial-gradient(circle at 50% 55%,#3a2c46 0,#140f1c 60%)}
+.me{position:absolute;left:50%;top:52%;width:48px;height:48px;margin-left:-24px;background:url(img/walk_Boy.png) 0 0/192px 192px;animation:walk .6s steps(4) infinite}
+@keyframes walk{to{background-position:0 -192px}}
+@keyframes walk64{to{background-position:0 -256px}}
+/* sheet */
+.sheet{position:absolute;inset:auto 0 0 0;height:86%;background:var(--panel);box-shadow:0 -3px 0 var(--panel-edge);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .25s}
+.sheet.open{transform:none}
+.sheet header{display:flex;align-items:center;gap:10px;padding:14px 14px 8px}
+.sheet h1{font-family:var(--fd);font-size:22px;margin:0;flex:1}
+.tabs{display:flex;gap:4px;padding:0 10px 8px;overflow-x:auto;scrollbar-width:none}
+.tab{font-family:var(--fd);font-size:14px;padding:8px 12px;background:var(--panel-edge);color:var(--muted);border:0;cursor:pointer;white-space:nowrap;min-height:40px}
+.tab[aria-selected=true]{background:var(--panel-hi);color:var(--lamp);box-shadow:inset 0 -3px 0 var(--lamp)}
+.body{flex:1;overflow:auto;padding:4px 12px 90px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.card{background:var(--panel-edge);border:0;color:var(--cream);padding:8px 6px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;position:relative;box-shadow:inset 0 0 0 2px var(--rc,var(--line));min-height:128px}
+.card img.face{width:64px;height:64px}
+.card .nm{font-size:12px;text-align:center}
+.price{display:flex;align-items:center;gap:4px;font-family:var(--fd);font-size:14px}.price img{width:14px;height:14px}
+.tag{position:absolute;top:4px;left:4px;font-family:var(--fd);font-size:10px;padding:1px 4px;background:var(--rc);color:var(--panel-edge)}
+.own{position:absolute;inset:auto 4px 4px auto;font-size:11px;color:var(--ok);font-family:var(--fd)}
+.sect{font-family:var(--fd);color:var(--muted);font-size:13px;letter-spacing:.06em;margin:14px 2px 8px;text-transform:uppercase;display:flex;justify-content:space-between}
+.hero{display:flex;gap:12px;align-items:center;padding:12px;background:linear-gradient(90deg,#3a2c46,#2b2034);box-shadow:inset 0 0 0 2px var(--limited)}
+.anim{width:64px;height:64px;background-size:256px 256px;animation:walk64 .6s steps(4) infinite}
+.pack{display:flex;align-items:center;gap:10px;padding:12px;background:var(--panel-edge);box-shadow:inset 0 0 0 2px var(--line);margin-bottom:8px;cursor:pointer;width:100%;border:0;color:var(--cream);text-align:left}
+.pack.pop{box-shadow:inset 0 0 0 2px var(--lamp)}
+.pack .g{font-family:var(--fd);font-size:18px;flex:1;display:flex;align-items:center;gap:6px}.pack .g img{width:20px;height:20px}
+.bonus{font-size:12px;color:var(--ok);font-family:var(--fd)}
+.money{font-family:var(--fd);background:var(--lamp);color:var(--panel-edge);padding:6px 10px}
+.plus-card{padding:14px;background:linear-gradient(135deg,#4a2f63,#2b2034);box-shadow:inset 0 0 0 2px var(--epic);margin:12px 0}
+.plus-card b{font-family:var(--fd);font-size:18px}
+.plus-card ul{margin:8px 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.fine{font-size:12px;color:var(--faint);margin-top:8px}
+/* confirm */
+.dim{position:absolute;inset:0;background:#0009;display:none}.dim.on{display:block}
+.confirm{position:absolute;left:12px;right:12px;bottom:12px;background:var(--panel);box-shadow:var(--frame);padding:16px;display:none}
+.confirm.on{display:block}
+.confirm .top{display:flex;gap:14px;align-items:center}
+.stage{width:96px;height:96px;background:var(--panel-edge);display:grid;place-items:center}
+.stage div{width:64px;height:64px;background-repeat:no-repeat}
+.moves{display:flex;gap:4px;margin-top:6px}.moves button{font-size:11px;font-family:var(--fd);background:var(--panel-edge);color:var(--muted);border:0;padding:4px 6px;cursor:pointer}
+.calc{margin:14px 0;font-size:14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
+.calc .after{font-family:var(--fd);font-size:16px}.calc .neg{color:var(--error)}
+.act{display:flex;gap:8px}.act button{flex:1;min-height:48px;font-family:var(--fd);font-size:16px;border:0;cursor:pointer}
+.primary{background:var(--lamp);color:var(--panel-edge)}.secondary{background:var(--panel-edge);color:var(--cream)}
+.primary[disabled]{opacity:.6;cursor:wait}
+.toast{position:absolute;left:50%;top:110px;transform:translateX(-50%);background:var(--panel);box-shadow:var(--frame);padding:8px 14px;font-family:var(--fd);display:none;white-space:nowrap}
+.toast.on{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="phone" id="phone">
+  <div class="world"><div class="me px"></div></div>
+  <div class="hud">
+    <div class="pill"><span>⌂</span> Great Hall <span class="dot"></span></div>
+    <div class="row"><button class="btn" aria-label="Who's where">▦</button><button class="btn store" id="openStore" aria-label="Store">🛍</button><button class="btn" aria-label="Settings">⚙</button></div>
+    <div class="wallet">
+      <button class="chip xp" aria-label="Profile"><img class="px" src="img/face_Boy.png" style="width:22px;height:22px"> Lv 12 <span class="bar"><i></i></span></button>
+      <button class="chip" id="coinsChip" aria-label="Coins"><img class="px" src="img/GoldCoin.png"><span id="coins"></span></button>
+      <button class="chip" id="gemsChip" aria-label="Gems: get more"><img class="px" src="img/GemPurple.png"><span id="gems"></span><span class="plus">+</span></button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <section class="sheet" id="sheet" aria-label="Store">
+    <header><h1>Store</h1><button class="btn" id="closeStore" aria-label="Close">✕</button></header>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="body" id="body"></div>
+  </section>
+  <div class="dim" id="dim"></div>
+  <div class="confirm" id="confirm" role="dialog" aria-modal="true"></div>
+</div>
+<div class="notes">
+  <h2>Store mock-up: how to read it</h2>
+  <p>Tap the gold bag (top right) or the gem chip. Try buying characters with coins or gems. Run out of gems to see the "get more" path.</p>
+  <ul>
+    <li><b>Wallet chips</b> sit under the zone pill, next to the XP chip. Coins have no "+" (they can't be bought); gems have "+" and open the Gems tab.</li>
+    <li><b>Each item has one price</b>, in coins <i>or</i> gems.</li>
+    <li><b>The confirm sheet shows the maths</b>: balance now, minus the price, gives the balance after. Without enough funds, the button turns into the cheapest pack that covers the gap.</li>
+    <li><b>Preview moves</b>: walk, attack and jump (Ninja Adventure sheets), so people can see the "crazy moves" before buying.</li>
+    <li>Buying disables the button and sends an <code>idempotency_key</code>, so a double tap can never charge twice (STORE.md §5.2).</li>
+    <li>Here the wallet is local, for the mock only. In the game, the server's answer is the only truth.</li>
+  </ul>
+  <p class="fine">Art: Ninja Adventure by pixel-boy (CC0). Prices from STORE.md.</p>
+</div>
+</div>
+<script>
+const R = { common:'--common', rare:'--rare', epic:'--epic', limited:'--limited', event:'--event' };
+const CHARS = [
+  ['Boy','Boy','starter',null,null],['Cavegirl','Cave girl','starter',null,null],
+  ['Villager','Villager','common','coins',2000],['MaskFrog','Frog mask','common','coins',2000],['Princess','Princess','common','coins',2000],
+  ['Knight','Knight','rare','gems',400],['Samurai','Samurai','rare','gems',400],['MonkeyBoxerRed','Boxer','rare','gems',400],
+  ['NinjaFire','Fire ninja','epic','gems',800],['RobotGreen','Robot','epic','gems',800],['Tengu','Tengu','epic','gems',800],
+  ['Vampire','Vampire','limited','gems',1500],['Sultan','Sultan','event','gems',600]];
+const PACKS = [[100,'£0.99',0],[550,'£4.99',9],[1200,'£9.99',19,1],[2600,'£19.99',29],[7000,'£49.99',39]];
+const PRICE_PENCE = {100:99,550:499,1200:999,2600:1999,7000:4999};
+const S = { coins: 2350, gems: 450, owned: new Set(['Boy','Cavegirl']), wearing:'Boy', tab:'featured', busy:false };
+const $ = (s) => document.querySelector(s);
+const fmt = (n) => n.toLocaleString('en-GB');
+const ico = (c) => `<img class="px" src="img/${c==='coins'?'GoldCoin':'GemPurple'}.png" alt="">`;
+function wallet(){ $('#coins').textContent = fmt(S.coins); $('#gems').textContent = fmt(S.gems); }
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('on'),1800); }
+const TABS = [['featured','Featured'],['characters','Characters'],['pets','Pets'],['style','Style'],['gems','Gems']];
+function tabs(){ $('#tabs').innerHTML = TABS.map(([k,l])=>`<button class="tab" role="tab" aria-selected="${S.tab===k}" data-k="${k}">${l}</button>`).join(''); }
+function card(c){ const [id,name,rar,cur,price]=c; const own=S.owned.has(id);
+  return `<button class="card" style="--rc:var(${R[rar]})" data-id="${id}"><span class="tag">${rar}</span>
+  <img class="face px" src="img/face_${id}.png" alt=""><span class="nm">${name}</span>
+  ${own ? `<span class="own">${S.wearing===id?'Wearing':'Owned'}</span>` : cur ? `<span class="price">${ico(cur)}${fmt(price)}</span>` : '<span class="price">Free</span>'}</button>`; }
+function render(){
+  tabs(); wallet(); const b=$('#body');
+  if (S.tab==='featured') b.innerHTML = `<div class="sect"><span>Featured this week</span><span>ends in 3d 4h</span></div>
+    <div class="hero" data-id="Vampire"><div class="anim px" style="background-image:url(img/walk_Vampire.png)"></div><div style="flex:1"><b style="font-family:var(--fd)">Vampire</b><div class="fine">Limited · back next Halloween</div></div><span class="price">${ico('gems')}1,500</span></div>
+    <div class="sect"><span>Daily</span><span>new at midnight</span></div><div class="grid">${CHARS.filter(c=>['Knight','MaskFrog','NinjaFire'].includes(c[0])).map(card).join('')}</div>`;
+  if (S.tab==='characters') b.innerHTML = ['starter','common','rare','epic','limited','event'].map(r=>`<div class="sect"><span>${r}</span></div><div class="grid">${CHARS.filter(c=>c[2]===r).map(card).join('')}</div>`).join('');
+  if (S.tab==='pets') b.innerHTML = `<div class="grid">${[['cat','Cat','coins',3000],['dog','Dog','gems',400]].map(([id,n,cur,p])=>`<button class="card" style="--rc:var(--common)"><div class="px" style="width:64px;height:64px;background:url(img/pet_${id}.png) 0 0/128px 64px"></div><span class="nm">${n}</span><span class="price">${ico(cur)}${fmt(p)}</span></button>`).join('')}</div><p class="fine">Pets follow you around the house. Cosmetic only.</p>`;
+  if (S.tab==='style') b.innerHTML = `<p class="fine">Frames · voice effects · emotes (same card layout).</p>`;
+  if (S.tab==='gems') b.innerHTML = PACKS.map(([g,p,bonus,pop])=>`<button class="pack ${pop?'pop':''}" data-pack="${g}"><span class="g">${ico('gems')}${fmt(g)}</span>${bonus?`<span class="bonus">+${bonus}% bonus</span>`:''}${pop?'<span class="bonus" style="color:var(--lamp)">Most popular</span>':''}<span class="money">${p}</span></button>`).join('')+
+    `<div class="plus-card"><b>Diesel+</b> · £4.99/month<ul><li>400 gems every month</li><li>+25% coins</li><li>Your own house to open to the public</li><li>Host rooms of 50 · supporter badge · monthly exclusive</li></ul><button class="primary" style="width:100%;min-height:44px;border:0;font-family:var(--fd)">Try Diesel+</button></div>
+    <p class="fine">Prices include VAT. Gems never expire. Items are cosmetic and don't affect games.</p>`;
+}
+function cheapestPackFor(short){ return PACKS.find(([g])=>g>=short) || PACKS[PACKS.length-1]; }
+function openBuy(id){ const c=CHARS.find(x=>x[0]===id); if(!c) return; const [,name,rar,cur,price]=c; const own=S.owned.has(id);
+  const have = cur ? S[cur] : 0, after = cur ? have-price : 0, short = after<0 ? -after : 0;
+  const pack = short && cur==='gems' ? cheapestPackFor(short) : null;
+  $('#confirm').innerHTML = `<div class="top"><div class="stage"><div id="pv" class="px" style="background-image:url(img/walk_${id}.png);background-size:256px 256px;animation:walk64 .6s steps(4) infinite"></div></div>
+    <div><div style="font-family:var(--fd);font-size:20px">${name}</div><div class="fine" style="color:var(${R[rar]})">${rar}</div>
+    <div class="moves"><button data-m="walk">Walk</button><button data-m="attack">Attack</button><button data-m="jump">Jump</button></div></div></div>
+    ${own ? `<p>You own this.</p><div class="act"><button class="secondary" data-x>Close</button><button class="primary" data-wear="${id}">${S.wearing===id?'Wearing':'Wear'}</button></div>` :
+    !cur ? '' : `<div class="calc"><span>You have</span><span class="price">${ico(cur)}${fmt(have)}</span><span>Price</span><span class="price">− ${fmt(price)}</span>
+      <span class="after">After</span><span class="price after ${short?'neg':''}">${ico(cur)}${short? 'need '+fmt(short)+' more' : fmt(after)}</span></div>
+      <div class="act"><button class="secondary" data-x>Cancel</button>${short ? (pack ? `<button class="primary" data-pack="${pack[0]}">Get ${fmt(pack[0])} gems · ${pack[1]}</button>` : `<button class="primary" disabled>Earn ${fmt(short)} more coins</button>`)
+      : `<button class="primary" data-buy="${id}">Buy for ${fmt(price)}</button>`}</div>
+      <p class="fine">Try it on: tap Wear after buying. Cosmetic only.</p>`}`;
+  $('#dim').classList.add('on'); $('#confirm').classList.add('on');
+}
+function closeBuy(){ $('#dim').classList.remove('on'); $('#confirm').classList.remove('on'); }
+async function buy(id, btn){ if (S.busy) return; S.busy=true; btn.disabled=true; btn.textContent='Buying…';
+  const key = crypto.randomUUID(); // real game: sent to buy_item(item_id, idempotency_key)
+  await new Promise(r=>setTimeout(r,500));
+  const [, name,, cur, price] = CHARS.find(x=>x[0]===id);
+  if (S[cur] >= price && !S.owned.has(id)) { S[cur]-=price; S.owned.add(id); toast(`${name} unlocked`); } else toast('Not enough ' + cur);
+  S.busy=false; closeBuy(); render(); }
+function buyPack(g){ S.gems += g; toast(`+${fmt(g)} gems (£${(PRICE_PENCE[g]/100).toFixed(2)} test)`); closeBuy(); render(); }
+document.addEventListener('click', (e)=>{ const t=e.target.closest('button,[data-id]'); if(!t) return;
+  if (t.id==='openStore'){ $('#sheet').classList.add('open'); render(); }
+  else if (t.id==='closeStore'){ $('#sheet').classList.remove('open'); }
+  else if (t.id==='gemsChip'){ S.tab='gems'; $('#sheet').classList.add('open'); render(); }
+  else if (t.dataset.k){ S.tab=t.dataset.k; render(); }
+  else if (t.dataset.buy){ buy(t.dataset.buy, t); }
+  else if (t.dataset.pack){ buyPack(+t.dataset.pack); }
+  else if (t.dataset.wear){ S.wearing=t.dataset.wear; document.querySelector('.me').style.backgroundImage=`url(img/walk_${t.dataset.wear}.png)`; toast('Wearing it'); closeBuy(); render(); }
+  else if (t.dataset.m){ const pv=$('#pv'); const id=[...pv.style.backgroundImage.matchAll(/_(\w+)\.png/g)][0][1]; const m=t.dataset.m;
+    pv.style.backgroundImage=`url(img/${m}_${id}.png)`; pv.style.backgroundSize = m==='walk' ? '256px 256px' : '256px 64px'; pv.style.animation = m==='walk' ? 'walk64 .6s steps(4) infinite' : 'none'; }
+  else if ('x' in t.dataset){ closeBuy(); }
+  else if (t.dataset.id){ openBuy(t.dataset.id); }
+});
+$('#dim').onclick = closeBuy;
+render();
+</script>
+</body>
+</html>

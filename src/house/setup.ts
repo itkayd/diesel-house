@@ -12,6 +12,7 @@ import { addSoundSettings } from '../ui/soundSettings';
 import { savedCharacter, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
 import { el } from '../ui/modal';
 import { openCredits } from '../ui/credits';
+import { addOldRooms } from '../ui/oldRooms';
 import { icon } from '../ui/icons';
 import { setPortraitSource } from '../ui/portrait';
 import { isTouchDevice, Joystick } from '../ui/joystick';
@@ -26,7 +27,7 @@ import type { HouseScene } from '../scenes/HouseScene';
 export function create(this: HouseScene) {
   const map = this.make.tilemap({ key: 'house' });
   setPortraitSource(this.textures);
-  const tiles = map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!;
+  const tiles = [map.addTilesetImage('limezu_room_builder', 'limezu_room_builder')!, map.addTilesetImage('house_extra', 'house_extra')!];
   const floor = map.createLayer('floor', tiles)!;
   const walls = map.createLayer('walls', tiles)!;
   walls.setCollisionByExclusion([-1]);
@@ -50,9 +51,13 @@ export function create(this: HouseScene) {
   );
 
   this.spots = new GameSpots(this, map);
+  this.setupDisco();
+  this.setupRoomExtras(map);
 
   // Sprite position is the character's feet; the physics body is a small box around them.
-  const spawn = HALL.spawn;
+  const spawnObj = map.findObject('zones', (o) => o.name === 'spawn');
+  const spawn = { x: spawnObj?.x ?? 0, y: spawnObj?.y ?? 0 };
+  this.spawnAt = spawn;
   const isGuest = !!currentUser()?.guest;
   const remembered = savedCharacter();
   const saved = isGuest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered; // guests: 2 choices
@@ -71,8 +76,9 @@ export function create(this: HouseScene) {
   const doorBlocks = this.physics.add.staticGroup();
   for (const d of map.getObjectLayer('doors')?.objects ?? []) {
     const room = d.name as RoomId;
-    const north = (d.properties as { name: string; value: string }[] | undefined)?.find((p) => p.name === 'side')?.value === 'north';
-    this.doorSpots.set(room, { x: d.x! + d.width! / 2, y: north ? d.y! + d.height! + 14 : d.y! - 6, north });
+    const props = Object.fromEntries(((d.properties as { name: string; value: unknown }[] | undefined) ?? []).map((p) => [p.name, p.value]));
+    // Where to stand in the hall just outside the door (worked out by the map builder).
+    this.doorSpots.set(room, { x: Number(props.ax), y: Number(props.ay), north: props.side === 'north' });
     doorBlocks.add(this.add.rectangle(d.x!, d.y!, d.width!, d.height!).setOrigin(0).setVisible(false).setData('room', room));
   }
   doorBlocks.refresh();
@@ -153,6 +159,7 @@ export function create(this: HouseScene) {
     },
     true,
   );
+  if (!isGuest) addOldRooms();
   void this.identify(saved, name);
 
   if (import.meta.env.DEV) (window as unknown as { __house: HouseScene }).__house = this; // used by automated checks

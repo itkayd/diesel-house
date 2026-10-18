@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { HALL } from './rooms';
 import { currentUser } from '../net/profile';
 import { play } from '../ui/sounds';
 import { modalOpen } from '../ui/modal';
@@ -10,6 +9,7 @@ import { Critters, type Spawn } from '../scenes/critters';
 import { critterById, slotAt } from '../critters/critters';
 import { canCatch, caughtSlots, catchCritter as tryToCatch } from '../net/critters';
 import type { HouseScene } from '../scenes/HouseScene';
+import { DEPTH } from './projection';
 
 // Critters in the house: where they can turn up, catching them, and hearing about others' catches.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -25,7 +25,7 @@ export function setupCritters(this: HouseScene) {
   });
   for (const o of this.look.solids.getChildren() as Phaser.GameObjects.Rectangle[]) blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height });
   const grid = new WalkGrid(this.wallLayer.width, this.wallLayer.height, blocked, { hw: b.width / 2 + 4, hh: b.height / 2 + 4 });
-  const door = HALL.spawn;
+  const door = this.spawnAt;
   const avoid = [...this.spots.spots, ...(this.spots.board ? [this.spots.board] : []), door];
   const canReach = grid.reachableFrom({ x: door.x + feet.x, y: door.y + feet.y }); // from the front door
   const places = grid
@@ -100,7 +100,7 @@ export function floatWorld(this: HouseScene, x: number, y: number, text: string)
   const t = this.add
     .text(x, y, text, { fontFamily: '"Pixelify Sans", monospace', fontSize: '8px', color: '#ffd36b', stroke: '#0d0912', strokeThickness: 3, resolution: 4 })
     .setOrigin(0.5, 1)
-    .setDepth(100000);
+    .setDepth(DEPTH.tag);
   this.tweens.add({ targets: t, y: y - 18, alpha: { from: 1, to: 0 }, duration: 1100, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
 }
 

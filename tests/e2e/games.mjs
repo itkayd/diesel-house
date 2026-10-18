@@ -34,8 +34,8 @@ const click = (p, sel) => (p.phone ? p.page.tap(sel) : p.page.click(sel));
 
 const A = await player('Ann games');
 const B = await player('Ben phone', true);
-await at(A, 83, 282); // the hallway games table
-await at(B, 92, 284);
+await at(A, 723, 525); // the hall's games table
+await at(B, 732, 527);
 await sees(A, B);
 await sees(B, A);
 
@@ -48,11 +48,11 @@ await sees(B, A);
   const list = await A.page.evaluate(() => [...document.querySelectorAll('#games [data-game]')].map((b) => [b.dataset.game, b.disabled]));
   check('at the games table: "Play games · E", E opens the panel with all 6 games', { prompt, label, open, list },
     prompt && /Play games/.test(label ?? '') && open && list.length === 6 && list.every(([, d]) => !d));
-  await at(A, 300, 270);
+  await at(A, 520, 520);
   await A.page.waitForTimeout(400);
   const closed = !(await A.page.locator('#games').count()) && !(await A.page.locator('#game-prompt').count());
   check('walking away closes the panel and the prompt', { closed }, closed);
-  await at(A, 83, 282);
+  await at(A, 723, 525);
   await A.page.waitForSelector('#game-prompt', { timeout: 3000 });
 }
 
@@ -111,7 +111,7 @@ let gameSent;
 // 4. Host leaves mid-game: with C at the table too, A starts, then closes the page; B carries on.
 {
   const C = await player('Cat games');
-  await at(C, 76, 284);
+  await at(C, 716, 527);
   await sees(C, A);
   await C.page.waitForSelector('#game-prompt', { timeout: 3000 });
   await C.page.click('#game-prompt');
@@ -143,8 +143,8 @@ let gameSent;
 // 5. Rock paper scissors: B challenges D from the friend menu; D accepts; sealed picks; B wins 2-0.
 {
   const D = await player('Dan duel');
-  await at(D, 300, 270);
-  await at(B, 330, 270);
+  await at(D, 520, 520);
+  await at(B, 550, 520);
   await sees(B, D);
   await B.page.tap('#games-close').catch(() => {});
   await B.page.waitForTimeout(800);

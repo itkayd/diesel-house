@@ -36,8 +36,8 @@ const gameSent = async (...ps) => (await Promise.all(ps.map((p) => sent(p, 'game
 
 const A = await player('Ann tables');
 const B = await player('Ben phone', true);
-await at(A, 83, 282); // the hallway games table
-await at(B, 92, 284);
+await at(A, 723, 525); // the hall's games table
+await at(B, 732, 527);
 await sees(A, B);
 await sees(B, A);
 for (const p of [A, B]) {
@@ -101,7 +101,7 @@ const pick = async (game) => {
 // 3. Four in a row: Ann vs Ben, Cat watches. Each drops in their own column; first to move wins.
 {
   const C = await player('Cat watches');
-  await at(C, 76, 284);
+  await at(C, 716, 527);
   await sees(C, A);
   await pick('four');
   await C.page.waitForSelector('#game-prompt', { timeout: 5000 });

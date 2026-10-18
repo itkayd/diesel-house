@@ -44,8 +44,8 @@ const silentMic = () => {
 };
 const A = await player('Alice mic', silentMic);
 const B = await player('Bob mic');
-await tp(A, 272, 120);
-await tp(B, 272, 120);
+await tp(A, 600, 280);
+await tp(B, 620, 290);
 await B.page.waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), A.id, { timeout: 20000 });
 
 // 1. Muted: red crossed mic, green again on unmute.
@@ -65,15 +65,15 @@ check('A\'s mic gives only silence: A is told, B sees "mic not working"', { toas
 
 // 3. No mic (the browser refuses it): red crossed mic.
 await A.page.evaluate(() => (navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('refused', 'NotAllowedError'))));
-await tp(A, 300, 256);
+await tp(A, 520, 520);
 await A.page.waitForTimeout(1200);
-await tp(A, 272, 120);
+await tp(A, 600, 280);
 await waitFor(B, A.id, "a.mic === 'off'");
 const off = await look(B, A.id);
 check("A has no mic: B sees the red mic on A's tag", { off }, off?.mic === 'off');
 
 // In the hallway there's no voice, so no mic icon or note.
-await tp(A, 300, 256);
+await tp(A, 520, 520);
 await waitFor(B, A.id, 'a.mic === null', 8000);
 const hall = await look(B, A.id);
 check('in the hallway the mic icon and note go away', { hall }, hall?.mic === null && hall?.tag === 'Alice mic');

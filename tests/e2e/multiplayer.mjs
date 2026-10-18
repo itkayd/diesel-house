@@ -61,17 +61,17 @@ let lag = null; while (Date.now() - t1 < 3000) { if ((await remoteA()).x < start
 await A.page.keyboard.up('ArrowLeft');
 check('B sees A start moving quickly', { ms: lag }, lag !== null && lag < 1000);
 
-// Zone tracking: A walks into room 1
-await A.page.evaluate(() => window.__house.body.reset(96, 250));
+// Zone tracking: A walks up into the garden
+await A.page.evaluate(() => window.__house.body.reset(656, 500));
 await A.page.keyboard.down('ArrowUp');
-await A.page.waitForFunction(() => window.__house.zone === 'room_01');
+await A.page.waitForFunction(() => window.__house.zone === 'garden');
 const tz = Date.now(); let zoneLag = null;
-while (Date.now() - tz < 5000) { if ((await remoteA()).zone === 'room_01') { zoneLag = Date.now() - tz; break; } await B.page.waitForTimeout(10); }
-check('B learns A entered room 1 within 1 second', { ms: zoneLag }, zoneLag !== null && zoneLag < 1000);
+while (Date.now() - tz < 5000) { if ((await remoteA()).zone === 'garden') { zoneLag = Date.now() - tz; break; } await B.page.waitForTimeout(10); }
+check('B learns A entered the garden within 1 second', { ms: zoneLag }, zoneLag !== null && zoneLag < 1000);
 await A.page.waitForTimeout(2000); await A.page.keyboard.up('ArrowUp');
 await B.page.waitForTimeout(800);
 r = await remoteA(); const az = await A.page.evaluate(() => window.__house.zone);
-check('zone tracked: B knows A is in room_01', { aZone: az, seenByB: r.zone, onB: r }, az === 'room_01' && r.zone === 'room_01' && r.y < 90);
+check('zone tracked: B knows A is in the garden', { aZone: az, seenByB: r.zone, onB: r }, az === 'garden' && r.zone === 'garden' && r.y < 300);
 await B.page.evaluate((id) => { const s = window.__house.remotes.get(id).avatar.sprite; window.__house.body.reset(s.x, s.y + 70); }, aId);
 await B.page.waitForTimeout(400);
 await B.page.screenshot({ path: `${out}/p3_b_view.png` });
@@ -83,7 +83,7 @@ await A.page.click('button[data-character="17"]');
 await A.page.click('#picker-done');
 const tn = Date.now(); while (Date.now() - tn < 8000) { r = await remoteA(); if (r.name === 'Alice renamed' && r.character === 17) break; await B.page.waitForTimeout(100); }
 r = { ...(await remoteA()), ms: Date.now() - tn };
-check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 17 && r.zone === 'room_01');
+check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 17 && r.zone === 'garden');
 
 // A leaves
 // Look for A specifically: real visitors may come and go at the same time, so the head count alone can mislead.

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { SpotId } from '../games/table';
+import { DEPTH, depthOf } from '../house/projection';
 
 export type SpotKind = 'table' | 'sofa';
 
@@ -36,14 +37,14 @@ export class GameSpots {
       const bg = scene.add.graphics();
       bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -5, w + 2, 10);
       bg.fillStyle(LAMP, 1).fillRect(-w / 2, -4, w, 8);
-      const sign = scene.add.container(s.x, s.y - 56, [bg, text]).setDepth(90_000);
+      const sign = scene.add.container(s.x, s.y - 56, [bg, text]).setDepth(DEPTH.sign);
       if (!reduce) scene.tweens.add({ targets: sign, y: s.y - 57, duration: 800, yoyo: true, repeat: -1, ease: 'Stepped' });
     }
     // Two dice on the hallway table (11 px, from the cards pack).
     const hall = this.spots.find((s) => s.id === 'hall');
     if (hall && scene.textures.exists('cards')) {
       for (const [dx, dy, n] of [[-13, -44, 5], [1, -39, 3]] as const)
-        scene.add.image(hall.x + dx, hall.y + dy, 'cards', `die_${n}`).setOrigin(0).setScale(11 / 32).setDepth(hall.y - 10);
+        scene.add.image(hall.x + dx, hall.y + dy, 'cards', `die_${n}`).setOrigin(0).setScale(11 / 32).setDepth(depthOf(hall.x, hall.y) - 10);
     }
   }
 
@@ -70,7 +71,7 @@ export class GameSpots {
 
 // A cork board with pinned notes (design/game/v2.html .v2-board), 30 x 20 px, on the wall.
 function drawBoard(scene: Phaser.Scene, x: number, y: number) {
-  const g = scene.add.graphics().setDepth(3);
+  const g = scene.add.graphics().setDepth(DEPTH.marker);
   g.fillStyle(EDGE, 1).fillRect(x - 1, y - 1, 32, 22);
   g.fillStyle(0x6b3f22, 1).fillRect(x, y, 30, 20);
   g.fillStyle(0xa8743f, 1).fillRect(x + 2, y + 2, 26, 16);
@@ -87,5 +88,5 @@ function drawBoard(scene: Phaser.Scene, x: number, y: number) {
   const bg = scene.add.graphics();
   bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -5, w + 2, 10);
   bg.fillStyle(LAMP, 1).fillRect(-w / 2, -4, w, 8);
-  scene.add.container(x + 15, y - 9, [bg, text]).setDepth(90_000);
+  scene.add.container(x + 15, y - 9, [bg, text]).setDepth(DEPTH.sign);
 }

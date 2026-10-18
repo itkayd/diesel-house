@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 // Phase 7 room chat with two real members (same accounts as doors.mjs). Needs `npm run dev` and:
 //   DH_TEST_OWNER="Name:password"   DH_TEST_VISITOR="Name:password"
-// Uses room_02 (door open); deletes its own messages at the end.
+// Uses the garden; deletes its own messages at the end.
 const A_ = process.env.DH_TEST_OWNER?.split(':');
 const B_ = process.env.DH_TEST_VISITOR?.split(':');
 if (!A_ || !B_) {
@@ -34,7 +34,7 @@ async function signIn([name, password]) {
   return { name, page, id: await page.evaluate(() => window.__house.presence.id) };
 }
 const tp = (p, x, y) => p.page.evaluate(([x, y]) => { window.__house.body.reset(x, y); window.__house.sendMove(true); }, [x, y]);
-const ROOM2 = [272, 120];
+const ROOM2 = [600, 280]; // in the garden
 const texts = (p) => p.page.$$eval('#msgs .dh-msg .text', (els) => els.map((e) => e.textContent));
 
 const A = await signIn(A_);
@@ -78,7 +78,7 @@ const chip = await A.page.locator('#msgs .dh-react').first().getAttribute('aria-
 check('B reacts 👍 and A sees it live', { chip }, chip === '👍 1');
 
 // Late joiner: B leaves (chat hides) and comes back (history is there).
-await tp(B, 300, 256);
+await tp(B, 520, 520);
 await B.page.waitForTimeout(800);
 const hidden = { panel: await B.page.locator('#chat').count(), button: await B.page.isVisible('#chat-button') };
 await tp(B, ...ROOM2);

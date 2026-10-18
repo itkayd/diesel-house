@@ -46,7 +46,7 @@ const seen = () => B.page.evaluate((id) => {
 }, A.id);
 
 // 1. Budget: a 10 s walk (east along the hallway; the wall stops it near the end).
-await tp(A, 48, 270); // y=270 keeps clear of the hallway lamps' bases
+await tp(A, 500, 520); // y=520 keeps clear of the hall's lamps and sofas
 await A.page.waitForTimeout(600);
 let before = await sentMoves(A);
 await hold(A, 'ArrowRight', 10_000);
@@ -55,7 +55,7 @@ const walkMsgs = (await sentMoves(A)) - before;
 check('10 s walk sends at most 25 movement messages (was ~100 at 10/s)', { messages: walkMsgs, reduction: `${(100 / walkMsgs).toFixed(1)}x` }, walkMsgs <= 25 && 100 / walkMsgs >= 4);
 
 // 2. Smoothness with 200 ms lag: sample B's view of A every frame-ish while A walks west.
-await tp(A, 600, 270);
+await tp(A, 800, 520);
 await B.page.waitForTimeout(1500);
 const samples = [];
 const errs = [];
@@ -88,7 +88,7 @@ let v = await seen();
 check('after stopping, B shows A exactly where A stopped, idle', { A: a, onB: v }, Math.abs(v.x - a.x) <= 1 && Math.abs(v.y - a.y) <= 1 && v.anim === 'char16-idle-left');
 
 // 3. Walls: walking into the hallway wall (not at a door) stops on both screens at the same spot.
-await tp(A, 140, 260);
+await tp(A, 600, 480);
 await B.page.waitForTimeout(800);
 await hold(A, 'ArrowUp', 1500);
 await B.page.waitForTimeout(1200);
@@ -97,7 +97,7 @@ v = await seen();
 check('walking into a wall: B shows A stopped at the wall, not inside it', { A: a, onB: v }, Math.abs(v.y - a.y) <= 1 && Math.abs(v.x - a.x) <= 1);
 
 // 4. Turning corners keeps both screens in step.
-await tp(A, 300, 240);
+await tp(A, 560, 480);
 await B.page.waitForTimeout(800);
 await hold(A, 'ArrowRight', 700);
 await hold(A, 'ArrowDown', 500);

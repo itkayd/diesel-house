@@ -4,14 +4,15 @@ import type { RoomId } from '../config';
 import { DND_COLOUR, DND_ICON, iconDataUrl, type IconName } from '../ui/icons';
 import { roomDef } from '../house/rooms';
 import { faceTop } from '../ui/portrait';
+import { DEPTH, depthOf, toScreen } from '../house/projection';
 
 // The look of the house, after design/game/mvp.html: furniture sprites depth-sorted with people, a night
 // tint with warm light pools (and occupied rooms glowing), and a wooden nameplate over each door with
 // the room's name, a "Do not disturb" moon, and the faces of who's inside.
 
 const NIGHT = 0x8a7fae; // multiplied over everything, like the mock's #dark layer
-const LIGHT_DEPTH = 70_000; // above people (depth = feet y) and furniture, below name tags (100 000)
-const PLATE_DEPTH = 80_000;
+const LIGHT_DEPTH = DEPTH.light;
+const PLATE_DEPTH = DEPTH.plate;
 const ROOM_LIVE_ALPHA = 0.32;
 const WOOD = 0x7a4b31;
 const WOOD_HI = 0x9a6440;
@@ -19,8 +20,6 @@ const QUIET = 0x4a3a57; // the board when someone inside asked not to be disturb
 const EDGE = 0x0d0912;
 const CREAM = '#fff4e0';
 const MAX_HEADS = 4;
-// Sit-on things you can walk over; everything else (not rugs or wall hangings) blocks at its base.
-const WALK_OVER = new Set(['stool', 'chair_a', 'chair_b', 'chair_c']);
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 const prop = (o: Obj, name: string) => (o.properties as { name: string; value: unknown }[] | undefined)?.find((p) => p.name === name)?.value;
@@ -69,23 +68,22 @@ export class HouseLook {
     glowTexture(scene);
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.solids = scene.physics.add.staticGroup();
-    const sheet = scene.textures.get('limezu_interiors');
-
     for (const o of map.getObjectLayer('furniture')?.objects ?? []) {
+      // Each piece carries its art (sheet + rectangle, from src/house/art/topdown.json), its depth point and
+      // its footprint (scripts/build-map.mjs).
       const key = o.name;
+      const sheetKey = String(prop(o, 'sheet') ?? 'limezu_interiors');
+      const sheet = scene.textures.get(sheetKey);
       if (!sheet.has(key)) sheet.add(key, 0, Number(prop(o, 'sx')), Number(prop(o, 'sy')), o.width!, o.height!);
-      const x = o.x!;
-      const y = o.y!;
-      const w = o.width!;
-      const h = o.height!;
-      // Rugs under everyone; wall hangings just above the walls; the rest sorted with people by base.
-      const depth = o.type === 'rug' ? 1 : o.type === 'wall' ? 2 : y + h;
-      scene.add.image(x, y, 'limezu_interiors', key).setOrigin(0).setDepth(depth);
-      if (o.type === 'thing' && !WALK_OVER.has(key)) {
-        // Block only the base, so you can stand "behind" the top of tall things.
-        const bh = w <= 16 ? 5 : Math.max(6, Math.round(h * 0.45));
-        const block = scene.add.rectangle(x + 1, y + h - bh, w - 2, bh).setOrigin(0).setVisible(false);
-        this.solids.add(block);
+      const at = toScreen(o.x!, o.y!);
+      // Rugs under everyone; wall hangings just above the walls; the rest sorted with people.
+      const depth = o.type === 'rug' ? DEPTH.rug : o.type === 'wall' ? DEPTH.wallDecor : depthOf(Number(prop(o, 'depthX')), Number(prop(o, 'depthY')));
+      scene.add.image(at.x, at.y, sheetKey, key).setOrigin(0).setDepth(depth);
+      const foot = prop(o, 'foot');
+      if (o.type === 'thing' && foot) {
+        // Only the footprint blocks, so you can stand "behind" the top of tall things.
+        const [fx, fy, fw, fh] = String(foot).split(',').map(Number);
+        this.solids.add(scene.add.rectangle(fx, fy, fw, fh).setOrigin(0).setVisible(false));
       }
       const light = prop(o, 'light');
       if (light) this.addLight(o, String(light), reduce);
@@ -115,7 +113,7 @@ export class HouseLook {
   }
 
   private addLight(o: Obj, colour: string, reduce: boolean) {
-    const fire = o.name === 'fireplace';
+    const fire = o.name.startsWith('fireplace') || o.name === 'fire_pit';
     const fairy = o.name === 'fairy_lights';
     const r = fire ? 70 : fairy ? 26 : 46;
     const img = this.scene.add
@@ -171,10 +169,10 @@ class Nameplate {
   ) {
     const north = prop(door, 'side') === 'north';
     this.north = north;
-    const cx = door.x! + door.width! / 2;
-    // Same anchor points as the mock: on the hall's wall face just below a north room's doorway, or just
-    // above the doorway for the others.
-    this.topY = north ? door.y! + 16 + 3 : door.y! - 4;
+    // Where the map builder put it: on the hall's wall face just below a door that goes up (north), or
+    // just above the doorway for the others.
+    const cx = Number(prop(door, 'plateX'));
+    this.topY = Number(prop(door, 'plateY'));
     this.board = scene.add.graphics();
     this.text = scene.add
       .text(0, 0, '', { fontFamily: '"Pixelify Sans", monospace', fontSize: '7px', color: CREAM })

@@ -49,6 +49,7 @@ export function update(this: HouseScene) {
     this.tidyQuiet(was, zone);
     this.showPresenceStatus(this.presenceState);
     if (zone && zone !== 'hallway') this.tracker.emit('room_enter', { u: zone });
+    this.askTimer(zone);
     if (zone && zone !== 'hallway' && zone !== was && this.presence)
       toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
     // (Zone rides on the move message just below; presence is kept for rare changes.)
@@ -66,13 +67,16 @@ export function update(this: HouseScene) {
   this.games?.showPrompt(modalOpen() ? null : spot);
   this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
   if (this.canMove && !this.presence?.isReplaced) this.critters?.update(this.player);
+  this.updateDancing(this.game.loop.delta);
+  this.updateRoomExtras();
   if (this.games?.openSpot && !spot) this.games.close();
   // The walkie button follows where you are every frame, so it can never be left hidden in the hallway
   // (a missed zone update or a setup hiccup used to leave it off until you walked into a room and back).
   this.walkie?.setVisible(this.zone === 'hallway' && !!this.voice && !this.presence?.isReplaced);
-  if (this.hallway && this.zone === 'hallway' && this.time.now - this.hallShown > 100) {
+  const whisperZone = this.zone === 'hallway' || (!!this.zone && this.quietRooms.has(this.zone));
+  if (this.hallway && whisperZone && this.time.now - this.hallShown > 100) {
     this.hallShown = this.time.now;
     this.showHallway();
-    this.noticeHallway();
+    if (this.zone === 'hallway') this.noticeHallway();
   }
 }

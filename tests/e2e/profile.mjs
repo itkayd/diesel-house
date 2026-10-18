@@ -47,18 +47,17 @@ await A.page.click('#xp-chip');
 await A.page.waitForSelector('#profile-body .v2-facts');
 const about = await A.page.$eval('#profile-body', (b) => b.textContent);
 const fits = await A.page.$eval('#profile .dh-panel', (p) => p.scrollWidth <= p.clientWidth + 1);
-check('Profile from the HUD: owned room, "Joined with an invite from Diesel on …", fits a 360 px phone', { about: about.slice(0, 120), fits },
-  about.includes(`Owns ${A_[0]}'s room`) && /Joined with an invite from Diesel on \d/.test(about) && fits);
+check('Profile from the HUD: "Joined with an invite from Diesel on …", no owned room (rooms are shared), fits a 360 px phone', { about: about.slice(0, 120), fits },
+  !/Owns /.test(about) && /Joined with an invite from Diesel on \d/.test(about) && fits);
 
 // Rename: friends see it; then put it back.
 await A.page.fill('#profile-name', `${A_[0]} Renamed`);
 await A.page.press('#profile-name', 'Enter');
 const seen = await B.page.waitForFunction(([id, n]) => window.__house.remotes.get(id)?.info.name === n, [A.id, `${A_[0]} Renamed`], { timeout: 10000 }).then(() => true, () => false);
-const plate = await B.page.waitForFunction((n) => window.__house.look.plate('room_01').label === `${n}'s room`, `${A_[0]} Renamed`, { timeout: 5000 }).then(() => true, () => false);
 await A.page.fill('#profile-name', A_[0]);
 await A.page.press('#profile-name', 'Enter');
 await B.page.waitForFunction(([id, n]) => window.__house.remotes.get(id)?.info.name === n, [A.id, A_[0]], { timeout: 10000 }).catch(() => {});
-check('renaming in Profile: friends see the new name (and on your door sign)', { seen, plate }, seen && plate);
+check('renaming in Profile: friends see the new name', { seen }, seen);
 
 // Guest code tab: format, copy, switch.
 await A.page.click('#profile-tab-code');
@@ -88,7 +87,7 @@ const medals = await A.page.evaluate(() => ({
 await A.page.click('.v2-badges [data-badge="first_knock"]');
 const info = await A.page.textContent('#badge-info');
 check('Badges tab: 6 rank medals (Visitor earned) and 10 badges; tapping one says how to earn it', { ...medals, info },
-  medals.ranks === 6 && medals.visitor && medals.badges === 10 && /First knock/.test(info) && /Coming back soon/.test(info));
+  medals.ranks === 6 && medals.visitor && medals.badges === 10 && /Dance machine/.test(info) && /Disco floor/.test(info));
 
 // Portrait → character picker.
 await A.page.click('#profile-face');

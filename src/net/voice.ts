@@ -82,7 +82,8 @@ export type VoiceStatus =
   | { state: 'joining' }
   | { state: 'in-room'; space: Space; connected: number; total: number; mic: 'on' | 'blocked'; turn: boolean; problem: MicProblemKind; silent: boolean };
 
-// The hallway's rules (src/scenes/hallway.ts), asked every HALL_EVERY ms.
+// The rules for a space where you're heard by distance, not by everyone (src/scenes/hallway.ts): the
+// hallway, and quiet rooms like the Library (REDESIGN.md §2). Asked every HALL_EVERY ms.
 export type HallPolicy = {
   // Should we be connected to this person? (connected: we are now, so use the far edge of the range.)
   wants(id: string, connected: boolean): boolean;
@@ -110,8 +111,9 @@ type Handlers = {
   // Explain the mic before the browser asks. Resolves false to join listening only. (The hallway only
   // uses the mic if it was allowed before, so walking in doesn't pop up a question.)
   askMic: (cancelled: Promise<void>, space: Space) => Promise<boolean>;
-  // Hallway rules and walkie-talkie messages (only used in the hallway).
-  hall?: HallPolicy;
+  // Distance rules for a space (the hallway, quiet rooms), or null for a room where everyone hears
+  // everyone; and walkie-talkie messages (only in the hallway).
+  policyFor?: (space: Space) => HallPolicy | null;
   onWalkie?: (m: WalkieMsg) => void;
   // How loud this person should be for us (0..1), when their audio starts.
   volumeFor: (id: string) => number;
@@ -151,6 +153,8 @@ class Meter {
 
 export class Voice {
   space: Space | null = null;
+  // This space's distance rules (hallway, quiet rooms), or null: everyone hears everyone.
+  private policy: HallPolicy | null = null;
   // The room we're in (null in the hallway or nowhere).
   get room(): RoomId | null {
     return this.space && this.space !== 'hallway' ? this.space : null;
@@ -201,6 +205,7 @@ export class Voice {
     if (this.space === space) return;
     this.leave();
     this.space = space;
+    this.policy = this.h.policyFor?.(space) ?? null;
     const room = space;
     const token = ++this.joinToken;
     this.h.onStatus({ state: 'joining' });
@@ -267,8 +272,8 @@ export class Voice {
         return;
       }
       joinedBefore = true;
-      // The hallway connects by distance (hallTick), not to everyone: no hello to all.
-      if (space === 'hallway') return;
+      // The hallway and quiet rooms connect by distance (hallTick), not to everyone: no hello to all.
+      if (this.policy) return;
       // Say hello now and once more shortly after, in case the first one raced someone else's join.
       this.send({ kind: 'hello', from: this.myId, to: '*' });
       setTimeout(() => token === this.joinToken && this.send({ kind: 'hello', from: this.myId, to: '*', retry: true }), 1500);
@@ -277,7 +282,7 @@ export class Voice {
     this.levelTimer = window.setInterval(() => this.checkLevels(), LEVEL_EVERY);
     this.maintainTimer = window.setInterval(() => this.maintain(), MAINTAIN_EVERY);
     this.statsTimer = window.setInterval(() => void this.callStats(), STATS_EVERY);
-    if (space === 'hallway') this.hallTimer = window.setInterval(() => this.hallTick(), HALL_EVERY);
+    if (this.policy) this.hallTimer = window.setInterval(() => this.hallTick(), HALL_EVERY);
     this.report();
     if (audioLocked()) this.h.onAudioLocked();
   }
@@ -310,6 +315,7 @@ export class Voice {
     this.speaking.clear();
     this.loudUntil.clear();
     this.space = null;
+    this.policy = null;
     this.h.onStatus({ state: 'off' });
   }
 
@@ -395,7 +401,7 @@ export class Voice {
   private applyVolume(id: string) {
     const p = this.peers.get(id);
     const a = p?.audio;
-    if (!p || !a || this.space === 'hallway') return;
+    if (!p || !a || this.policy) return;
     const person = this.volumes.get(id) ?? this.h.volumeFor(id);
     // Through Web Audio once sound is unlocked (the sliders are the bus gains); until then the element plays.
     const web = !!p.room && this.ctx?.state === 'running';
@@ -459,10 +465,10 @@ export class Voice {
     return this.micLive && this.micOpen;
   }
   private get micOpen() {
-    return this.space !== 'hallway' || (this.h.hall?.micOpen() ?? false);
+    return !this.policy || this.policy.micOpen();
   }
   private sendsTo(id: string) {
-    return this.space !== 'hallway' || (this.h.hall?.sendsTo(id) ?? false);
+    return !this.policy || this.policy.sendsTo(id);
   }
 
   private applyMute() {
@@ -529,7 +535,7 @@ export class Voice {
 
     if (s.kind === 'hello') {
       // Hallway: only people within range (the wider, already-connected edge, as positions differ a bit).
-      if (this.space === 'hallway' && !this.wanted(s.from, true)) return;
+      if (this.policy && !this.wanted(s.from, true)) return;
       // A fresh hello from someone we think we're connected to means they've lost us (rejoined, or
       // dropped their side): start over. Retry hellos only fill gaps.
       const existing = this.peers.get(s.from);
@@ -621,14 +627,14 @@ export class Voice {
   }
 
   private wanted(id: string, connected: boolean) {
-    return this.space !== 'hallway' || (this.h.hall?.wants(id, connected) ?? false);
+    return !this.policy || this.policy.wants(id, connected);
   }
 
   // Hallway: connect to the people the rules want (and drop the rest), gate our mic per person, open or
   // close the mic, and set how loud / which effect each person gets. All local: no messages unless a
   // connection starts or ends.
   private hallTick() {
-    const hall = this.h.hall;
+    const hall = this.policy;
     if (!hall || !this.channel) return;
     const now = Date.now();
     const here = Object.keys(this.channel.presenceState()).filter((id) => id !== this.myId);
@@ -773,7 +779,7 @@ export class Voice {
         document.body.appendChild(peer.audio);
       }
       peer.audio.srcObject = stream;
-      if (this.space === 'hallway') {
+      if (this.policy) {
         // Heard through Web Audio effects instead; the muted element keeps the stream flowing (Chrome).
         peer.audio.muted = true;
         peer.fx?.src.disconnect();

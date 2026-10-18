@@ -171,5 +171,10 @@ Even at 10 table games a night, every night: ~40k billed messages a month, under
 - Which critter and where is worked out from the clock on every device: **no messages** to show one.
 - A catch is one database call, and everyone in the house gets one Realtime change message for it (at most ~22 critters an hour, so ~22 × people online). Even 8 friends for 4 hours a night: ~700 a night, ~21k a month.
 
+### Measured: R3 octagon house (18 Oct 2026)
+- Disco lights, the glitter ball, people swaying on the dance floor and the outdoor sky are all worked out on each device: **no messages**. Dance minutes go with the other events in `record_events()` (HTTP, not Realtime).
+- Library: quiet voice reuses the hallway's whisper rules, so it only connects people standing near each other (less TURN than a full room).
+- Study timer: 1 message to start or stop, plus 1 "ask" and at most 1 answer each time someone walks into the Library. A few dozen a night.
+
 ## 7. Order
 Phase 9 assets → 10 hallway voice → 11 emotes → 12 quick games → 13 table games → 14 challenges/XP. Stop after each phase for Diesel to test.

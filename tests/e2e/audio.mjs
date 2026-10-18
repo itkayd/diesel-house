@@ -68,7 +68,7 @@ const tp = (p, x, y) => p.page.evaluate(([x, y]) => window.__house.body.reset(x,
 const visible = (p, sel) => p.page.locator(sel).isVisible().catch(() => false);
 const ctxState = (p) => p.page.evaluate(() => window.__house.voice.ctx?.state ?? 'none');
 const voiceState = (p) => p.page.evaluate(() => ({ room: window.__house.voice.room, hasMic: !!window.__house.voice.stream, peers: window.__house.voice.debug().map((d) => d.state) }));
-const ROOM3 = [448, 120], HALL = [448, 256];
+const ROOM3 = [600, 280], HALL = [600, 520]; // in the garden, and in the hall below its door (octagon house)
 
 // 1. First time in a room, mic not yet allowed: the explainer shows before any browser prompt.
 const A = await player('Asker', 16);
@@ -115,7 +115,7 @@ const joy = await P.page.evaluate(() => {
   const r = document.getElementById('joystick').getBoundingClientRect();
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 });
-await tp(P, 448, 250); // just outside room 3's door
+await tp(P, 656, 500); // just below the garden's door
 await touch('touchStart', joy.x, joy.y);
 await touch('touchMove', joy.x, joy.y - 60);
 await P.page.waitForTimeout(2500);
@@ -133,7 +133,7 @@ const heard = await P.page.evaluate(async () => {
   return { zone: window.__house.zone, audio: window.__house.voice.ctx?.state, peers: out };
 });
 check('joystick-only phone player: sound on, voices playing, no banner', { ...heard, banner: await visible(P, '#sound-banner') },
-  heard.zone === 'room_03' && heard.audio === 'running' && heard.peers.length >= 2 && heard.peers.some((p) => p.playing && p.level > 0) && !(await visible(P, '#sound-banner')));
+  heard.zone === 'garden' && heard.audio === 'running' && heard.peers.length >= 2 && heard.peers.some((p) => p.playing && p.level > 0) && !(await visible(P, '#sound-banner')));
 
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');

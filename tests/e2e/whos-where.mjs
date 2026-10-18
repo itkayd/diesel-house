@@ -21,14 +21,16 @@ const clearCards = () => page.evaluate(() => document.querySelectorAll('.dh-scri
 
 await page.tap('#map-button');
 const map = await page.evaluate(() => ({ rooms: document.querySelectorAll('#whos-where-map [data-go]').length, me: !!document.querySelector('#whos-where-map .dot.me') }));
-check('the map button opens Who’s where: 8 rooms to tap and you on the map', map, map.rooms === 8 && map.me);
+check('the map button opens Who’s where: 7 rooms to tap and you on the map', map, map.rooms === 7 && map.me);
 
-for (const room of ['room_06', 'room_03', 'room_08', 'room_01']) {
+// Every room, so every door is walked through (the diagonal ones too). Headless runs at about 20 fps,
+// so walking takes a while.
+for (const room of ['library', 'disco', 'gaming', 'cafe', 'lounge', 'rooftop', 'garden']) {
   await clearCards();
   if (!(await page.locator('#whos-where').count())) await page.tap('#map-button');
   await page.tap(`#whos-where-map [data-go="${room}"]`);
   let p;
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 150; i++) {
     await page.waitForTimeout(400);
     await clearCards();
     p = await pos();
@@ -38,7 +40,7 @@ for (const room of ['room_06', 'room_03', 'room_08', 'room_01']) {
 }
 
 await page.tap('#map-button');
-await page.tap('#whos-where-map [data-go="room_05"]');
+await page.tap('#whos-where-map [data-go="cafe"]');
 await page.waitForTimeout(500);
 const walking = (await pos()).walking;
 await page.keyboard.down('ArrowUp');

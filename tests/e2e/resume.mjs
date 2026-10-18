@@ -45,7 +45,7 @@ await A.page.evaluate(async () => {
   window.__setHidden(true);
   (await import('/src/net/supabase.ts')).supabase.realtime.disconnect();
 });
-await B.page.evaluate(() => { window.__house.body.reset(400, 270); window.__house.sendMove(true); });
+await B.page.evaluate(() => { window.__house.body.reset(560, 520); window.__house.sendMove(true); });
 await A.page.waitForTimeout(12000); // asleep long enough to count as stale
 const before = await A.page.evaluate(() => window.__house.msgStats.reconnects);
 const woke = Date.now();

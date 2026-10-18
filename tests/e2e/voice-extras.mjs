@@ -41,7 +41,7 @@ async function player(name, character) {
 }
 // Teleport (test only) and tell everyone, as a real move would.
 const tp = (p, x, y) => p.page.evaluate(([x, y]) => { window.__house.body.reset(x, y); window.__house.sendMove(true); }, [x, y]);
-const ROOM4 = [624, 120], HALL = [624, 256];
+const ROOM4 = [880, 800], HALL = [520, 520]; // gaming room, hall (octagon house)
 const connectedTo = (p, other) =>
   p.page.waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), other.id, { timeout: 20000 }).then(() => true, () => false);
 // Loudest incoming level over ~2 s. (DTX sends nothing in the gaps between the fake mic's beeps, so a
@@ -63,7 +63,7 @@ const B = await player('Ben test', 17);
 await tp(A, ...ROOM4);
 await tp(B, ...ROOM4);
 const linked = (await connectedTo(A, B)) && (await connectedTo(B, A));
-check('A and B connect in room 4', { linked }, linked);
+check('A and B connect in the gaming room', { linked }, linked);
 await A.page.waitForTimeout(1500);
 
 // 1. Opus settings are in both sides' descriptions.

@@ -10,6 +10,9 @@ export class PreloadScene extends Phaser.Scene {
   preload() {
     this.load.image('limezu_room_builder', 'assets/tiles/limezu_room_builder.png');
     this.load.image('limezu_interiors', 'assets/furniture/limezu_interiors.png');
+    // R3: the octagon house's extra tiles (grass, deck, hedge, skyline) and furniture (scripts/art/build_house_art.py).
+    this.load.image('house_extra', 'assets/tiles/house_extra.png');
+    this.load.image('house_v3', 'assets/furniture/house_v3.png');
     this.load.tilemapTiledJSON('house', JSON.parse(houseMap));
     loadCharacterSheets(this.load);
     // v2 packs (UPDATE.md Phase 9, built by scripts/build-v2-assets.mjs): cards + dice, emotes, key/tap

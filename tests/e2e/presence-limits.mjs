@@ -32,7 +32,7 @@ await A.page.waitForTimeout(2500);
 const before = A.tracks.n;
 await A.page.evaluate(async () => {
   for (let i = 0; i < 50; i++) {
-    window.__house.presence.update({ zone: i % 2 ? 'room_02' : 'hallway' });
+    window.__house.presence.update({ zone: i % 2 ? 'garden' : 'hallway' });
     await new Promise((r) => setTimeout(r, 100));
   }
   window.__house.presence.update({ zone: 'hallway' });

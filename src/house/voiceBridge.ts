@@ -1,8 +1,9 @@
 import { type RoomId } from '../config';
+import { roomDef } from './rooms';
 import type { Space } from '../net/voice';
 import { toast } from '../ui/toasts';
 import { askForMic, resetMicDecline, showMicHelp } from '../ui/micPrompt';
-import { WHISPER } from '../scenes/hallway';
+import { WHISPER, type Hallway } from '../scenes/hallway';
 import type { HouseScene } from '../scenes/HouseScene';
 import { JOIN_VOICE_AFTER } from './consts';
 
@@ -60,6 +61,8 @@ export async function pressWalkie(this: HouseScene) {
 
 // Walkie button, on-air strip, icons over heads, whisper "…" and our whisper ring.
 export function showHallway(this: HouseScene) {
+  const quiet = this.zone ? this.quietRooms.get(this.zone) : undefined;
+  if (quiet) return showQuietRoom.call(this, quiet);
   const hall = this.hallway;
   if (!hall) return;
   const talker = hall.talkerId;
@@ -72,6 +75,18 @@ export function showHallway(this: HouseScene) {
     const there = inHall && r.active && r.info.zone === 'hallway';
     r.avatar.setRadio(there && talker === r.info.id);
     r.avatar.setWhispering(there && talker !== r.info.id && r.avatar.speaking && hall.route(r.info.id).mode === 'whisper');
+  }
+}
+
+// A quiet room (the Library): our whisper ring when someone's near enough to hear us, and "…" over people
+// we can hear whispering. No walkie.
+function showQuietRoom(this: HouseScene, quiet: Hallway) {
+  const here = this.voice?.space === this.zone;
+  this.me.setRadio(false);
+  this.me.setWhisperRing(here && quiet.whisperOn && quiet.someoneNear && !!this.voice?.micStream ? WHISPER : null);
+  for (const r of this.remotes.values()) {
+    r.avatar.setRadio(false);
+    r.avatar.setWhispering(here && r.active && r.info.zone === this.zone && r.avatar.speaking && quiet.route(r.info.id).mode === 'whisper');
   }
 }
 
@@ -97,6 +112,8 @@ export function updateVoice(this: HouseScene) {
   // A room, the hallway (whisper + walkie), or nowhere. Rooms and the hallway never hear each other.
   const space: Space | null = this.zone === 'hallway' ? 'hallway' : this.zone ? (this.zone as RoomId) : null;
   if (space !== 'hallway') this.hallway?.leftHallway();
+  if (space && this.quietRooms.has(space) && this.voice.space !== space)
+    toast({ icon: 'book-open', id: 'quiet-room', who: `${roomDef(space)?.name ?? 'This room'} is a quiet room`, what: 'People hear you only up close, like whispering.', small: true, ttl: 3200 });
   if (space === 'hallway' && this.voice.room)
     toast({ icon: 'volume-x', id: 'back-in-hallway', who: 'Back in the hallway', what: 'Room voice off. Get close to someone to whisper.', small: true, ttl: 2200 });
   this.walkie?.setVisible(space === 'hallway');

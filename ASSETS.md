@@ -8,6 +8,19 @@ All art is free. Three packs are merged into one pixel-art style (16×16 tiles, 
 | 16-Char Sprite Collection (Modern Chibis, Asset Alliance) by finalbossblues | `alliance_chibis_character_collection.zip` | https://finalbossblues.itch.io/16-char-sprite-collection-modern-chibis-asset-alliance | 16 player characters with 4-direction walk cycles (16×32 frames) | Free. Artist asks: don't redistribute directly (link back instead) and don't feed to AI. |
 | Roguelike Indoors by Kenney | `kenney_roguelike-indoors.zip` | https://kenney.nl/assets/roguelike-indoors | Extra furniture and props | CC0 (public domain) |
 
+## The octagon house (R3, REDESIGN.md §8)
+Raw packs live in `assets/raw/redesign-packs/` (gitignored). `scripts/art/build_house_art.py` cuts the pieces used into `public/assets/furniture/house_v3.png` and `public/assets/tiles/house_extra.png`, and writes the art table `src/house/art/topdown.json` (which pack each piece came from).
+
+| Pack | By | Used for | Licence | Commercial |
+|---|---|---|---|---|
+| Pixel Interior LRK | bitglow | Bookcases, sofas, armchairs, fireplaces, tables, chairs, rugs, lamps, plants, pictures | Personal + commercial, no resale or standalone redistribution | yes |
+| Cozy Interior 165+ | Sleepless Poetry (Lionnel) | Café counter, coffee maker, fridges, TV, speakers, clock, desk | Commercial OK, no resale/redistribution | yes |
+| Ninja Adventure | pixel-boy | Garden: grass, trees, bushes, pond, fire pit, picnic blanket, lantern, log bench | CC0 | yes |
+| Assorted Disco | Michael Muirden (OpenGameArt) | The glitter ball (scaled to 16 px) | CC0 | yes |
+| Drawn in code | Diesel House | Arcade cabinets, beanbags, jukebox, DJ booth, deck chair, telescope, stairs, decking, hedge and skyline wall faces | ours | yes |
+
+The 32 px packs (feyza5, Reading Nook, Graduation Cat) and the isometric packs were only used for the R2 mock-ups (`public/mockups/`).
+
 ## Code-installed (no download)
 
 | Package | Used for | Licence |

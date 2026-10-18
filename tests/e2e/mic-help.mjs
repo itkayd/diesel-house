@@ -21,7 +21,7 @@ await page.fill('#si-name', A_[0]);
 await page.fill('#si-pass', A_[1]);
 await page.click('#signin .knock');
 await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 });
-await page.evaluate(() => { window.__house.body.reset(272, 120); window.__house.sendMove(true); });
+await page.evaluate(() => { window.__house.body.reset(600, 280); window.__house.sendMove(true); });
 
 await page.waitForSelector('#mic-toast', { timeout: 15000 }).catch(() => {});
 const toastText = await page.locator('#mic-toast .who').textContent().catch(() => null);

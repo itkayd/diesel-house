@@ -20,7 +20,8 @@ check('joystick shown on phone', box, box.w > 100);
 // Touch elsewhere: should not move
 let a = await pos(); await touch('touchStart', 300, 200); await page.waitForTimeout(1000); await touch('touchEnd'); let b = await pos();
 check('touching the map does not move you', b, a.x === b.x && a.y === b.y);
-// Drag joystick right
+// Drag joystick right (from an open part of the hall)
+await page.evaluate(() => window.__house.body.reset(560, 520)); await page.waitForTimeout(300); a = await pos();
 await touch('touchStart', box.x, box.y); await touch('touchMove', box.x + 25, box.y); await touch('touchMove', box.x + 50, box.y);
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/joystick.png` });
@@ -31,10 +32,10 @@ check('releasing stops you', d, c.x === d.x && c.y === d.y);
 await touch('touchStart', box.x, box.y); await touch('touchMove', box.x - 15, box.y);
 await page.waitForTimeout(1000); await touch('touchEnd'); const e = await pos();
 check('small push walks slowly left', e, e.x < d.x && d.x - e.x < 50);
-// Up through a door into room 1
-await page.evaluate(() => window.__house.body.reset(96, 240));
+// Up through the door into the garden
+await page.evaluate(() => window.__house.body.reset(656, 500));
 await touch('touchStart', box.x, box.y); await touch('touchMove', box.x, box.y - 60); await page.waitForTimeout(3500); await touch('touchEnd');
-const f = await pos(); check('joystick walks into room 1 and walls still block', f, f.zone === 'room_01' && f.y === 82); // stopped by the sofa
+const f = await pos(); check('joystick walks into the garden and walls still block', f, f.zone === 'garden' && f.y === 230); // stopped by the back hedge
 // Desktop: no joystick
 const dp = await browser.newPage({ viewport: { width: 1366, height: 768 } }); await dp.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
 await dp.goto('http://localhost:5173/?test'); await dp.waitForFunction(() => window.__house?.player);

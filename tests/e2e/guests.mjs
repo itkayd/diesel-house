@@ -38,7 +38,7 @@ async function signIn([name, password]) {
   return { name, page, id: await page.evaluate(() => window.__house.presence.id) };
 }
 const tp = (p, x, y) => p.page.evaluate(([x, y]) => { window.__house.body.reset(x, y); window.__house.sendMove(true); }, [x, y]);
-const ROOM2 = [272, 120];
+const ROOM2 = [600, 280]; // the garden
 
 // Tester's guest code: new format, and switched on.
 const A = await signIn(A_);
@@ -100,7 +100,7 @@ const canInvite = await G.page.evaluate(() => window.__guestCanInvite);
 check('guests have no invite code to share (they cannot invite anyone)', { canInvite }, canInvite === false);
 check("the guest's own settings say whose friend they are", { settingsLine }, settingsLine === `Visiting as ${A_[0]}'s friend (${G.name})`);
 
-// Guest and Visitor in room 2 (open door): they can talk.
+// Guest and Visitor in the garden: they can talk.
 await tp(G, ...ROOM2);
 await tp(B, ...ROOM2);
 const talking = await B.page

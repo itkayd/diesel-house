@@ -7,6 +7,7 @@ import { WalkGrid, type Rect } from '../scenes/pathfind';
 import { critterById } from '../critters/critters';
 import type { HouseScene } from '../scenes/HouseScene';
 import { SPEED, SLOW, Remote } from './consts';
+import { toWorld } from './projection';
 
 // Moving: keys, joystick and tap-to-walk, walking somewhere by itself (Who's where), and the camera.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -61,8 +62,9 @@ export function manualVelocity(this: HouseScene) {
   const p = this.input.activePointer;
   if (!p.isDown) this.tappedAvatar = false;
   if (!vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !friendMenuOpen()) {
-    const dx = p.worldX - this.player.x;
-    const dy = p.worldY - (this.player.y - 8);
+    const tap = toWorld(p.worldX, p.worldY);
+    const dx = tap.x - this.player.x;
+    const dy = tap.y - (this.player.y - 8);
     if (Math.hypot(dx, dy) > 4) return eightWay(dx, dy).scale(SPEED);
   }
   const v = new Phaser.Math.Vector2(vx, vy);
@@ -105,7 +107,7 @@ export function walkToRoom(this: HouseScene, room: RoomId) {
   if (!c) return;
   if (this.quietDoor(room)) {
     const d = this.doorSpots.get(room);
-    if (d && this.walkTo(d.x, d.y + (d.north ? 6 : -6))) this.autoDoor = room;
+    if (d && this.walkTo(d.x, d.y)) this.autoDoor = room;
     return;
   }
   this.walkTo(c.x, c.y);

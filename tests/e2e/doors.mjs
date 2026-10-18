@@ -2,7 +2,7 @@ import { chromium } from 'playwright-core';
 // Doors with two real members (REDESIGN.md R1: no owners; "Do not disturb" instead of knock and lock),
 // signing in through the login page. Needs `npm run dev` and two test accounts, given as environment
 // variables (never commit them):
-//   DH_TEST_OWNER="Name:password"     (any member: sits in Room 1 and asks for quiet)
+//   DH_TEST_OWNER="Name:password"     (any member: sits in the garden and asks for quiet)
 //   DH_TEST_VISITOR="Name:password"   (any member: walks up to the door)
 // Turns do not disturb off again at the end.
 const OWNER = process.env.DH_TEST_OWNER?.split(':');
@@ -57,20 +57,20 @@ async function setQuiet(p, on) {
 }
 
 const O = await signIn(OWNER);
-const plate = await O.page.evaluate(() => window.__house.look.plate('room_01').label);
-check('a member signs in through the login page; room 1 has its fixed name', { plate }, plate === 'Room 1');
+const plate = await O.page.evaluate(() => window.__house.look.plate('garden').label);
+check('a member signs in through the login page; the garden has its fixed name', { plate }, plate === 'Garden');
 
-// One member sits in Room 1 and asks for quiet.
-await tp(O, 96, 120);
-await O.page.waitForFunction(() => window.__house.zone === 'room_01', null, { timeout: 5000 }).catch(() => {});
+// One member sits in the garden and asks for quiet.
+await tp(O, 600, 280);
+await O.page.waitForFunction(() => window.__house.zone === 'garden', null, { timeout: 5000 }).catch(() => {});
 await setQuiet(O, true);
 const V = await signIn(VISITOR);
 await V.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, O.id, { timeout: 15000 });
-const sign = await V.page.waitForFunction(() => window.__house.look.plate('room_01').dnd, null, { timeout: 8000 }).then(() => true, () => false);
-check('the other member sees "Do not disturb" on Room 1\'s door, live', { sign }, sign);
+const sign = await V.page.waitForFunction(() => window.__house.look.plate('garden').dnd, null, { timeout: 8000 }).then(() => true, () => false);
+check('the other member sees "Do not disturb" on the garden\'s door, live', { sign }, sign);
 
 // The visitor walks into the door: stopped and asked, no lock.
-await tp(V, 96, 250);
+await tp(V, 656, 500);
 await V.page.waitForTimeout(600);
 await holdUp(V, 1500);
 const stopped = await where(V);
@@ -79,24 +79,24 @@ check('walking into a quiet room\'s door asks "Go in anyway?" first', { stopped,
 
 // "Go in": walks in and joins the room's voice (the server lets anyone in the house in).
 await V.page.click('#quiet-go-in');
-await V.page.waitForFunction(() => window.__house.zone === 'room_01', null, { timeout: 15000 }).catch(() => {});
+await V.page.waitForFunction(() => window.__house.zone === 'garden', null, { timeout: 15000 }).catch(() => {});
 const inside = await where(V);
 const voiceUp = await V.page
   .waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), O.id, { timeout: 20000 })
   .then(() => true, () => false);
-check('"Go in": the visitor walks in and is connected to the room\'s voice', { inside, voiceUp }, inside.zone === 'room_01' && voiceUp);
+check('"Go in": the visitor walks in and is connected to the room\'s voice', { inside, voiceUp }, inside.zone === 'garden' && voiceUp);
 
 // Both leave: the last one out clears do not disturb.
-await tp(V, 96, 250);
+await tp(V, 656, 500);
 await V.page.waitForTimeout(800);
-await tp(O, 140, 250);
+await tp(O, 720, 520);
 const cleared = await O.page
-  .waitForFunction(() => window.__house.rooms.get('room_01')?.dnd === false, null, { timeout: 10000 })
+  .waitForFunction(() => window.__house.rooms.get('garden')?.dnd === false, null, { timeout: 10000 })
   .then(() => true, () => false);
 check('when the room empties, do not disturb goes away by itself', { cleared }, cleared);
 
 // Tidy up, in case.
-await O.page.evaluate(async () => (await import('/src/net/rooms.ts')).setDnd('room_01', false));
+await O.page.evaluate(async () => (await import('/src/net/rooms.ts')).setDnd('garden', false));
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

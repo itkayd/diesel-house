@@ -31,7 +31,7 @@ for (const h of [780, 844, 760, 844, 800]) {
 check('address bar in/out: zoom never changes', { seen: [...seen] }, seen.size === 1);
 
 // Chat keyboard: walk into a room, focus the chat box, the visible area halves.
-await page.evaluate(() => { window.__house.body.reset(272, 120); window.__house.sendMove(true); });
+await page.evaluate(() => { window.__house.body.reset(600, 280); window.__house.sendMove(true); });
 await page.waitForSelector('#chat-button:not([hidden])', { timeout: 8000 });
 await page.click('#chat-button');
 await page.focus('#chat-input');

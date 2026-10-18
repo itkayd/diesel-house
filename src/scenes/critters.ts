@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ART_SIZE, paintCritter } from '../critters/art';
 import { critterAt, CRITTERS, countFor, placesFor, slotAt, SLOT_MS, type CritterId } from '../critters/critters';
 import type { Pt } from './pathfind';
+import { depthOf, toScreen } from '../house/projection';
 
 // Critters in the world: the ones for this 2-minute slot (src/critters/critters.ts) hop about on their
 // spots until someone walks into them or the slot ends. How many depends on how many people are in the
@@ -106,11 +107,12 @@ export class Critters {
   }
 
   private show(s: Spawn) {
-    const shadow = this.scene.add.ellipse(s.x, s.y, 10, 3, 0x0d0912, 0.35).setDepth(s.y - 1);
-    const img = this.scene.add.image(s.x, s.y, `critter-${s.id}`).setOrigin(0.5, 1).setDepth(s.y);
+    const at = toScreen(s.x, s.y);
+    const shadow = this.scene.add.ellipse(at.x, at.y, 10, 3, 0x0d0912, 0.35).setDepth(depthOf(s.x, s.y) - 1);
+    const img = this.scene.add.image(at.x, at.y, `critter-${s.id}`).setOrigin(0.5, 1).setDepth(depthOf(s.x, s.y));
     const hop = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       ? null
-      : this.scene.tweens.add({ targets: img, y: s.y - 3, duration: 180, yoyo: true, repeat: -1, repeatDelay: 700 + s.idx * 130, ease: 'Stepped' });
+      : this.scene.tweens.add({ targets: img, y: at.y - 3, duration: 180, yoyo: true, repeat: -1, repeatDelay: 700 + s.idx * 130, ease: 'Stepped' });
     this.shown.set(s.idx, { spawn: s, img, shadow, hop });
   }
 
@@ -127,7 +129,7 @@ export class Critters {
     const cols = [0xffd36b, 0xf4b860, 0x6fdc8c, 0x9ec9ff, 0xff9fb2];
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2;
-      const bit = this.scene.add.rectangle(sh.spawn.x, sh.spawn.y - 6, 2, 2, cols[i % cols.length]).setDepth(sh.spawn.y + 50);
+      const bit = this.scene.add.rectangle(sh.spawn.x, sh.spawn.y - 6, 2, 2, cols[i % cols.length]).setDepth(depthOf(sh.spawn.x, sh.spawn.y) + 50);
       this.scene.tweens.add({
         targets: bit,
         x: sh.spawn.x + Math.cos(a) * 16,

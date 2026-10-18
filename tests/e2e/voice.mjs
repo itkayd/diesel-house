@@ -36,7 +36,7 @@ async function player(name, character, { mic = true, query = '' } = {}) {
   return { name, ctx, page, id };
 }
 const goto = (p, x, y) => p.page.evaluate(([x, y]) => window.__house.body.reset(x, y), [x, y]);
-const ROOM1 = [96, 120], ROOM2 = [272, 120], HALL = [300, 256];
+const ROOM1 = [240, 560], ROOM2 = [600, 280], HALL = [520, 520]; // lounge, garden, hall (octagon house)
 
 const peers = (p) =>
   p.page.evaluate(async () => {
@@ -95,12 +95,12 @@ await A.page.waitForTimeout(1500);
 // (Standing together at the front door they may whisper to each other: that's hallway voice, not a room.)
 check('in the hallway: no room voice, mic button hidden (hallway has the walkie instead)', { A: await status(A), room: await A.page.evaluate(() => window.__house.voice.room) }, (await status(A)) === '(hidden)' && (await A.page.evaluate(() => window.__house.voice.room)) === null);
 
-// Both into room 1
+// Both into the lounge
 await goto(A, ...ROOM1);
 await goto(B, ...ROOM1);
 const tc = await waitConnected(A, 1);
 await waitConnected(B, 1);
-check('A and B in room 1 connect', { ms: tc, A: await status(A), B: await status(B) }, tc !== null && (await status(A)).includes('1/1 connected'));
+check('A and B in the lounge connect', { ms: tc, A: await status(A), B: await status(B) }, tc !== null && (await status(A)).includes('1/1 connected'));
 await A.page.waitForTimeout(2000);
 let pa = await peers(A), pb = await peers(B);
 check('audio flows both ways (Opus)', { A: pa, B: pb }, pa[0]?.bytes > 1000 && pb[0]?.bytes > 1000 && pa[0]?.codec === 'audio/opus');
@@ -157,9 +157,9 @@ check('B walks out: audio stops within 1 s on both sides', { B_ms: bGone, A_ms: 
 // Different rooms don't connect
 await goto(B, ...ROOM2);
 await B.page.waitForTimeout(4000);
-check('B in room 2, A in room 1: no connection', { A: (await peers(A)).length, B: (await peers(B)).length }, (await peers(A)).length === 0 && (await peers(B)).length === 0);
+check('B in the garden, A in the lounge: no connection', { A: (await peers(A)).length, B: (await peers(B)).length }, (await peers(A)).length === 0 && (await peers(B)).length === 0);
 
-// Three in room 1; C has no mic (listen only)
+// Three in the lounge; C has no mic (listen only)
 const C = await player('Cara test', 18, { mic: false });
 await goto(B, ...ROOM1);
 await goto(C, ...ROOM1);

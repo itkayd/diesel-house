@@ -43,8 +43,8 @@ const sent = (p) => p.page.evaluate(() => window.__house.msgStats.totals['sent:e
 
 const A = await player('Ann emote');
 const B = await player('Ben emote');
-await at(A, 300, 270);
-await at(B, 330, 270);
+await at(A, 520, 520);
+await at(B, 550, 520);
 await sees(A, B);
 await sees(B, A);
 
@@ -127,7 +127,7 @@ await sees(B, A);
   const open = await A.page.waitForSelector('#friend-menu', { timeout: 2000 }).then(() => true, () => false);
   const name = await A.page.evaluate(() => document.getElementById('friend-menu')?.getAttribute('aria-label'));
   await A.page.mouse.click(20, 600);
-  await at(A, 120, 270);
+  await at(A, 500, 520);
   await A.page.waitForTimeout(300);
   await A.page.keyboard.press('q');
   await A.page.waitForTimeout(400);
@@ -138,7 +138,7 @@ await sees(B, A);
 // 6. On a phone: the emote button opens the bar, which fits on screen; a tap sends it.
 {
   const P = await player('Pia phone', true);
-  await at(P, 140, 270);
+  await at(P, 520, 520);
   await sees(A, P);
   await P.page.waitForTimeout(500);
   await P.page.tap('#emote-button');
@@ -156,7 +156,7 @@ await sees(B, A);
   check('phone: emote button opens the bar on screen (big enough buttons); a tap shows it to others', { bar, ...box, ms: got && got - t, closed },
     bar && box.left >= 0 && box.right <= box.w && box.top >= 0 && box.btn >= 36 && got !== null && got - t < 600 && closed);
   // Tapping someone on a touch screen opens the menu too.
-  await at(P, 300, 290);
+  await at(P, 600, 540);
   await P.page.waitForTimeout(1000); // the camera glides after a teleport
   const spot = await P.page.evaluate((id) => {
     const h = window.__house;

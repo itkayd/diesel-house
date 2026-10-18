@@ -23,6 +23,7 @@ import { net } from '../net/netQuality';
 import { reloadForUpdate, watchForNewVersion } from '../ui/update';
 import { addWhosWhereButton } from '../ui/whosWhere';
 import type { HouseScene } from '../scenes/HouseScene';
+import { ROOMS } from './rooms';
 
 // Going online: presence, voice, chat, games, settings and the HUD buttons, once you have picked a character.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -66,6 +67,7 @@ export async function start(this: HouseScene) {
       onCatch: (c) => this.someoneCaught(c),
       onEmote: (m) => this.receiveEmote(m),
       onDice: (m) => this.receiveDice(m),
+      onTimer: (m) => this.receiveTimer(m),
       onDuel: (m) => this.receiveDuel(m),
       onChat: (e) => {
         this.chat?.event(e);
@@ -96,18 +98,25 @@ export async function start(this: HouseScene) {
   });
 
   const forceRelay = import.meta.env.DEV && new URLSearchParams(location.search).has('relay'); // test TURN on its own
-  const hall = new Hallway({
-    myId: () => this.presence!.id,
-    me: () => ({ x: this.player.x, y: this.player.y, inHall: this.zone === 'hallway' }),
-    peer: (id) => {
-      const r = this.remotes.get(id);
-      return r?.active ? { x: r.avatar.sprite.x, y: r.avatar.sprite.y, inHall: r.info.zone === 'hallway', mic: r.info.mic === 'on' || r.info.mic === 'silent' } : null;
-    },
-    myMic: () => !!this.voice?.micStream,
-    send: (m) => this.voice?.sendWalkie(m),
-    onChange: () => this.showHallway(),
-  });
-  hall.idsInHall = () => [...this.remotes.values()].filter((r) => r.active && r.info.zone === 'hallway').map((r) => r.info.id);
+  // Spaces where you're heard by distance: the hallway (whisper + walkie) and quiet rooms (whisper only,
+  // REDESIGN.md §2: the Library).
+  const whisperSpace = (zone: string) => {
+    const space = new Hallway({
+      myId: () => this.presence!.id,
+      me: () => ({ x: this.player.x, y: this.player.y, inHall: this.zone === zone }),
+      peer: (id) => {
+        const r = this.remotes.get(id);
+        return r?.active ? { x: r.avatar.sprite.x, y: r.avatar.sprite.y, inHall: r.info.zone === zone, mic: r.info.mic === 'on' || r.info.mic === 'silent' } : null;
+      },
+      myMic: () => !!this.voice?.micStream,
+      send: (m) => zone === 'hallway' && this.voice?.sendWalkie(m),
+      onChange: () => this.showHallway(),
+    });
+    space.idsInHall = () => [...this.remotes.values()].filter((r) => r.active && r.info.zone === zone).map((r) => r.info.id);
+    return space;
+  };
+  const hall = whisperSpace('hallway');
+  for (const r of ROOMS) if (r.voice === 'quiet') this.quietRooms.set(r.id, whisperSpace(r.id));
   this.hallway = hall;
   this.voice = new Voice(
     this.presence.id,
@@ -128,7 +137,7 @@ export async function start(this: HouseScene) {
       onAudioLocked: showSoundBanner,
       // The hallway only uses the mic if it was allowed before (no question just for walking in).
       askMic: (cancelled, space) => (space === 'hallway' ? micAlreadyAllowed() : askForMic(cancelled)),
-      hall,
+      policyFor: (space) => (space === 'hallway' ? hall : (this.quietRooms.get(space) ?? null)),
       onWalkie: (m) => hall.onMessage(m),
       volumeFor: (id) => savedVolume(id),
       onMicState: (s) => {

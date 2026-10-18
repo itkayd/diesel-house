@@ -1,4 +1,5 @@
--- REDESIGN.md R1 checks (20261030_shared_rooms.sql) on a local Postgres (supabase/tests/run.sh).
+-- REDESIGN.md R1 checks (20261030_shared_rooms.sql) on a local Postgres (supabase/tests/run.sh). Runs after
+-- every migration, so the old room_0N rooms are already retired (R3): the checks use the new rooms.
 \set ON_ERROR_STOP 1
 set client_min_messages = warning;
 create or replace function pg_temp.ok(cond boolean, what text) returns void language plpgsql as $$
@@ -30,7 +31,6 @@ grant insert on realtime.messages to authenticated;
 grant usage on sequence realtime.messages_id_seq to authenticated;
 
 select pg_temp.ok((select count(*) = 7 from public.rooms where id in ('garden', 'rooftop', 'library', 'disco', 'gaming', 'cafe', 'lounge')), 'the 7 themed rooms are seeded');
-select pg_temp.ok((select title = 'Visit 2 different rooms' and kind = 'room_enter' and goal = 2 and uniq from public.challenge_defs where id = 'd_knock'), 'the knock challenge is now "Visit 2 different rooms"');
 do $$ begin
   insert into public.rooms (id, name) values ('Bad Room!', 'x');
   raise exception 'FAIL: odd room id accepted';
@@ -39,28 +39,28 @@ end $$;
 
 set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000a1', 'r1a@members.diesel-house.invalid');
-select pg_temp.ok(public.can_enter_room('room_01') and public.can_enter_room('garden') and public.can_enter_room('test_room'), 'a member can enter old rooms, new rooms and a room added later');
+select pg_temp.ok(public.can_enter_room('library') and public.can_enter_room('garden') and public.can_enter_room('test_room'), 'a member can enter the rooms and a room added later');
 select pg_temp.ok(not public.can_enter_room('nowhere'), 'a room that isn''t in the table can''t be entered');
 select pg_temp.ok(pg_temp.can_send('voice:test_room') and pg_temp.can_send('game:garden') and pg_temp.can_send('house') and pg_temp.can_send('voice:hallway'), 'Realtime: voice / game channels for any room in the table, plus house and hallway');
-select pg_temp.ok(not pg_temp.can_send('voice:nowhere') and not pg_temp.can_send('chat:room_01'), 'Realtime: unknown rooms and other topics are refused');
+select pg_temp.ok(not pg_temp.can_send('voice:nowhere') and not pg_temp.can_send('chat:garden'), 'Realtime: unknown rooms and other topics are refused');
 
 -- Do not disturb
-select public.set_dnd('room_02', true);
-select pg_temp.ok((select dnd and dnd_set_by = auth.uid() and dnd_at is not null from public.rooms where id = 'room_02'), 'a member can turn on do not disturb');
-select public.set_dnd('room_02', false);
-select pg_temp.ok((select not dnd and dnd_set_by is null from public.rooms where id = 'room_02'), 'and off again');
+select public.set_dnd('lounge', true);
+select pg_temp.ok((select dnd and dnd_set_by = auth.uid() and dnd_at is not null from public.rooms where id = 'lounge'), 'a member can turn on do not disturb');
+select public.set_dnd('lounge', false);
+select pg_temp.ok((select not dnd and dnd_set_by is null from public.rooms where id = 'lounge'), 'and off again');
 do $$ begin
-  update public.rooms set name = 'Mine now' where id = 'room_03';
+  update public.rooms set name = 'Mine now' where id = 'gaming';
   if found then raise exception 'FAIL: renamed a room directly'; end if;
   raise notice 'PASS: rooms can''t be renamed directly (no owners)';
 end $$;
 
 -- Room rules
-select public.set_room_rules('room_03', array['dice', 'wyr'], array['Tea|Coffee']);
-select pg_temp.ok((select games = array['dice', 'wyr'] and prompts = array['Tea|Coffee'] from public.rooms where id = 'room_03'), 'any member can set a room''s games and prompts');
-select pg_temp.ok((select count(*) = 1 and bool_and(user_id = auth.uid()) from public.room_changes where room_id = 'room_03'), 'the change is logged with who made it');
+select public.set_room_rules('gaming', array['dice', 'wyr'], array['Tea|Coffee']);
+select pg_temp.ok((select games = array['dice', 'wyr'] and prompts = array['Tea|Coffee'] from public.rooms where id = 'gaming'), 'any member can set a room''s games and prompts');
+select pg_temp.ok((select count(*) = 1 and bool_and(user_id = auth.uid()) from public.room_changes where room_id = 'gaming'), 'the change is logged with who made it');
 do $$ begin
-  perform public.set_room_rules('room_03', array['chess'], null);
+  perform public.set_room_rules('gaming', array['chess'], null);
   raise exception 'FAIL: unknown game accepted';
 exception when check_violation then raise notice 'PASS: unknown games are refused';
 end $$;
@@ -83,16 +83,16 @@ select pg_temp.ok((select count(*) = 20 from public.client_errors where user_id 
 -- Guests and strangers
 set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000a3', null, true);
-select pg_temp.ok(public.can_enter_room('room_01'), 'a guest can enter rooms');
+select pg_temp.ok(public.can_enter_room('disco'), 'a guest can enter rooms');
 do $$ begin
-  perform public.set_room_rules('room_03', null, null);
+  perform public.set_room_rules('gaming', null, null);
   raise exception 'FAIL: a guest changed the rules';
 exception when raise_exception then raise notice 'PASS: guests can''t change room rules';
 end $$;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000a2', 'stranger@example.invalid');
-select pg_temp.ok(not public.can_enter_room('room_01') and not pg_temp.can_send('voice:room_01') and not pg_temp.can_send('house'), 'someone not in the house can''t enter a room or use any channel');
+select pg_temp.ok(not public.can_enter_room('disco') and not pg_temp.can_send('voice:disco') and not pg_temp.can_send('house'), 'someone not in the house can''t enter a room or use any channel');
 do $$ begin
-  perform public.set_dnd('room_01', true);
+  perform public.set_dnd('disco', true);
   raise exception 'FAIL: a stranger set do not disturb';
 exception when raise_exception then raise notice 'PASS: strangers can''t set do not disturb';
 end $$;

@@ -3,6 +3,7 @@ import { animKey, type Dir } from '../characters';
 import type { NetQuality } from '../net/netQuality';
 import { rankOf } from '../challenges/levels';
 import { makeTagIcons, micKey, netKey, type MicIcon } from './tagIcons';
+import { DEPTH, depthOf } from '../house/projection';
 
 const PANEL = 0x2b2034;
 const EDGE = 0x0d0912;
@@ -53,6 +54,7 @@ export class Avatar {
   private bubble: Phaser.GameObjects.Container | null = null;
   private bubbleTimer: Phaser.Time.TimerEvent | null = null;
   facing: Dir = 'down';
+  private danceTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string, isMe = false) {
     this.character = character;
@@ -85,7 +87,7 @@ export class Avatar {
     this.lvText = scene.add.text(0, 0, '', { ...small, color: '#0d0912' }).setOrigin(0, 1).setResolution(8).setVisible(false);
     this.stText = scene.add.text(0, 0, '', { ...small, color: '#ffae6b' }).setOrigin(0, 1).setResolution(8).setVisible(false);
     this.flameImg = scene.add.image(0, 0, 'tag-flame').setOrigin(0, 1).setVisible(false);
-    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.lvText, this.flameImg, this.stText, this.micImg, this.netImg]).setDepth(100000);
+    this.tag = scene.add.container(x, y - TAG_GAP, [this.tagBg, this.tagText, this.lvText, this.flameImg, this.stText, this.micImg, this.netImg]).setDepth(DEPTH.tag);
     this.drawTagBg();
     this.animate(false);
   }
@@ -180,7 +182,7 @@ export class Avatar {
   // On the walkie-talkie: a little radio with a green LED above the name tag.
   setRadio(on: boolean) {
     if (on === !!this.radioImg) return;
-    if (on) this.radioImg = this.sprite.scene.add.image(0, 0, 'tag-radio').setOrigin(0.5, 1).setDepth(100002);
+    if (on) this.radioImg = this.sprite.scene.add.image(0, 0, 'tag-radio').setOrigin(0.5, 1).setDepth(DEPTH.badge);
     else {
       this.radioImg?.destroy();
       this.radioImg = null;
@@ -192,7 +194,7 @@ export class Avatar {
   setWhispering(on: boolean) {
     const scene = this.sprite.scene;
     if (on === !!this.whisperImg || (on && !scene.textures.exists('emotes'))) return;
-    if (on) this.whisperImg = scene.add.image(0, 0, 'emotes', 'dots3').setOrigin(0.5, 1).setDepth(100002);
+    if (on) this.whisperImg = scene.add.image(0, 0, 'emotes', 'dots3').setOrigin(0.5, 1).setDepth(DEPTH.badge);
     else {
       this.whisperImg?.destroy();
       this.whisperImg = null;
@@ -265,7 +267,7 @@ export class Avatar {
     bg.fillStyle(EDGE, 1).fillRect(-w / 2 - 1, -h - 1, w + 2, h + 2);
     bg.fillStyle(0xfff4e0, 1).fillRect(-w / 2, -h, w, h);
     t.setPosition(0, -2);
-    this.bubble = scene.add.container(this.sprite.x, this.sprite.y - TAG_GAP - 12, [bg, t]).setDepth(100001);
+    this.bubble = scene.add.container(this.sprite.x, this.sprite.y - TAG_GAP - 12, [bg, t]).setDepth(DEPTH.bubble);
     this.bubbleTimer = scene.time.delayedCall(4000, () => {
       this.bubble?.destroy();
       this.bubble = null;
@@ -279,7 +281,7 @@ export class Avatar {
     this.emoteTimer?.remove();
     this.emoteImg?.destroy();
     this.emote = frame;
-    this.emoteImg = scene.add.image(0, 0, 'emotes', frame).setOrigin(0.5, 1).setDepth(100003).setScale(0.2);
+    this.emoteImg = scene.add.image(0, 0, 'emotes', frame).setOrigin(0.5, 1).setDepth(DEPTH.emote).setScale(0.2);
     this.sync();
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
       scene.tweens.add({ targets: this.emoteImg, scale: 1, duration: 220, ease: 'Back.Out' });
@@ -299,7 +301,7 @@ export class Avatar {
     this.diceImgs = [];
     this.dice = values;
     if (sides === 6 && values.length <= 3 && scene.textures.exists('cards')) {
-      this.diceImgs = values.map((v) => scene.add.image(0, 0, 'cards', `die_${v}`).setOrigin(0.5, 1).setScale(11 / 32).setDepth(100003));
+      this.diceImgs = values.map((v) => scene.add.image(0, 0, 'cards', `die_${v}`).setOrigin(0.5, 1).setScale(11 / 32).setDepth(DEPTH.emote));
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
         for (const d of this.diceImgs) scene.tweens.add({ targets: d, angle: { from: -40, to: 0 }, duration: 260, ease: 'Back.Out' });
     } else this.say(`rolled ${values.reduce((a, b) => a + b, 0)}`);
@@ -323,7 +325,7 @@ export class Avatar {
       g.destroy();
     }
     this.crownTimer?.remove();
-    this.crownImg ??= scene.add.image(0, 0, 'tag-crown').setOrigin(0.5, 1).setDepth(100002);
+    this.crownImg ??= scene.add.image(0, 0, 'tag-crown').setOrigin(0.5, 1).setDepth(DEPTH.badge);
     this.sync();
     this.crownTimer = scene.time.delayedCall(ms, () => {
       this.crownImg?.destroy();
@@ -336,13 +338,14 @@ export class Avatar {
 
   // Keeps depth sorting, the ring and the name tag in step with the sprite.
   sync() {
-    this.sprite.setDepth(this.sprite.y);
-    this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(this.sprite.y - 0.5);
+    const depth = depthOf(this.sprite.x, this.sprite.y);
+    this.sprite.setDepth(depth);
+    this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(depth - 0.5);
     this.tag.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP));
     this.bubble?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 12));
     this.radioImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
     this.whisperImg?.setPosition(Math.round(this.sprite.x + (this.radioImg ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - 11)).setVisible(this.sprite.visible);
-    this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(this.sprite.y - 1);
+    this.whisperRing?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - 1)).setDepth(depth - 1);
     const top = Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11));
     this.diceImgs.forEach((d, i) => d.setPosition(Math.round(this.sprite.x + (i - (this.diceImgs.length - 1) / 2) * 12), top).setVisible(this.sprite.visible));
     this.crownImg?.setPosition(Math.round(this.sprite.x), Math.round(this.sprite.y - TAG_GAP - 10)).setVisible(this.sprite.visible && !this.radioImg);
@@ -350,6 +353,23 @@ export class Avatar {
     this.emoteImg
       ?.setPosition(Math.round(this.sprite.x - (this.radioImg && !this.bubble ? 10 : 0)), Math.round(this.sprite.y - TAG_GAP - (this.bubble ? 28 : 11)))
       .setVisible(this.sprite.visible);
+  }
+
+  // On the Disco's dance floor: a little side-to-side sway from the feet (not with reduced motion).
+  setDancing(on: boolean) {
+    if (on === !!this.danceTween) return;
+    if (!on) {
+      this.danceTween?.remove();
+      this.danceTween = null;
+      this.sprite.setAngle(0);
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    this.sprite.setAngle(-6);
+    this.danceTween = this.sprite.scene.tweens.add({ targets: this.sprite, angle: 6, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  get dancing() {
+    return !!this.danceTween;
   }
 
   animate(moving: boolean, dir: Dir = this.facing) {
@@ -374,6 +394,7 @@ export class Avatar {
   }
 
   destroy() {
+    this.danceTween?.remove();
     this.pulse.remove();
     this.sprite.destroy();
     this.tag.destroy();

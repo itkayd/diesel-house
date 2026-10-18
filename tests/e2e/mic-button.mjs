@@ -27,7 +27,7 @@ async function phone(name, mic) {
   page.on('pageerror', (e) => errors.push(name + ': ' + e.message));
   await page.goto('http://localhost:5173/?test&silentms=3000');
   await page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined');
-  await page.evaluate(() => { window.__house.body.reset(272, 120); window.__house.sendMove(true); });
+  await page.evaluate(() => { window.__house.body.reset(600, 280); window.__house.sendMove(true); });
   await page.waitForSelector('#mic-caption', { state: 'visible', timeout: 15000 });
   return { ctx, page };
 }

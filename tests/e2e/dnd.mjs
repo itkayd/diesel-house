@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
 // REDESIGN.md R1: rooms have no owners; "Do not disturb" replaces knock and lock. Runs in dev test mode
-// (no Supabase): a pretend friend sits in Room 2 and the room is marked quiet, as the database would
+// (no Supabase): a pretend friend sits in the Garden and the room is marked quiet, as the database would
 // tell us. Checks the dark sign on the door (only while someone is inside), the soft "Go in anyway?"
 // question, that the door holds until you say yes, walking in after "Go in", and the Room settings tab.
 // Set DH_CHROMIUM to use a Chromium instead of Edge.
@@ -19,23 +19,23 @@ page.on('pageerror', (e) => errors.push(e.message));
 await page.goto('http://localhost:5173/?test');
 await page.waitForFunction(() => !!window.__house?.player && !document.getElementById('picker'), null, { timeout: 20000 });
 const zone = () => page.evaluate(() => window.__house.zone);
-const plate = () => page.evaluate(() => ({ dnd: window.__house.look.plate('room_02').dnd, label: window.__house.look.plate('room_02').label }));
+const plate = () => page.evaluate(() => ({ dnd: window.__house.look.plate('garden').dnd, label: window.__house.look.plate('garden').label }));
 
-// Room 2 is quiet, but empty: no sign (it clears when someone finds it empty).
-await page.evaluate(() => window.__house.roomChanged({ id: 'room_02', active: true, dnd: true, dnd_set_by: 'x', games: null, prompts: null }));
+// The Garden is quiet, but empty: no sign (it clears when someone finds it empty).
+await page.evaluate(() => window.__house.roomChanged({ id: 'garden', active: true, dnd: true, dnd_set_by: 'x', games: null, prompts: null }));
 const empty = await plate();
 // A friend is in there.
 await page.evaluate(() => {
   const h = window.__house;
-  h.addRemote({ id: 'friend', name: 'Sam', character: 5, zone: 'room_02' });
-  h.receiveMove({ id: 'friend', x: 270, y: 120, vx: 0, vy: 0, dir: 'down', zone: 'room_02', t: Date.now() });
+  h.addRemote({ id: 'friend', name: 'Sam', character: 5, zone: 'garden' });
+  h.receiveMove({ id: 'friend', x: 640, y: 288, vx: 0, vy: 0, dir: 'down', zone: 'garden', t: Date.now() });
 });
 await page.waitForTimeout(200);
 const occupied = await plate();
-check('the door sign shows "Do not disturb" only while someone is inside', { empty, occupied }, !empty.dnd && occupied.dnd && occupied.label === 'Room 2');
+check('the door sign shows "Do not disturb" only while someone is inside', { empty, occupied }, !empty.dnd && occupied.dnd && occupied.label === 'Garden');
 
-// Walk to Room 2: you stop at the door and are asked first.
-await page.evaluate(() => window.__house.walkToRoom('room_02'));
+// Walk to the Garden: you stop at the door and are asked first.
+await page.evaluate(() => window.__house.walkToRoom('garden'));
 await page.waitForSelector('#quiet-toast', { timeout: 30000 });
 await page.waitForTimeout(600);
 const asked = { zone: await zone(), text: await page.locator('#quiet-toast').textContent() };
@@ -48,9 +48,9 @@ await page.keyboard.up('ArrowUp');
 const held = await zone();
 // "Go in": you walk in.
 await page.click('#quiet-go-in');
-await page.waitForFunction(() => window.__house.zone === 'room_02', null, { timeout: 30000 }).catch(() => {});
+await page.waitForFunction(() => window.__house.zone === 'garden', null, { timeout: 30000 }).catch(() => {});
 const inside = await zone();
-check('the door holds until you choose "Go in", then you walk in', { held, inside }, held === 'hallway' && inside === 'room_02');
+check('the door holds until you choose "Go in", then you walk in', { held, inside }, held === 'hallway' && inside === 'garden');
 
 // Settings → Room: the room you're in, with the do-not-disturb switch on (no rename, door or mood).
 await page.click('#settings-button');
@@ -61,7 +61,7 @@ const tab = await page.evaluate(() => ({
   dnd: document.getElementById('room-dnd')?.checked,
   old: ['room-name', 'door-knock', 'door-locked', 'mood-chill'].filter((id) => document.getElementById(id)),
 }));
-check('the Room tab is for the room you are in: do not disturb on, nothing to own or rename', tab, tab.title === 'Room 2' && tab.dnd === true && tab.old.length === 0);
+check('the Room tab is for the room you are in: do not disturb on, nothing to own or rename', tab, tab.title === 'Garden' && tab.dnd === true && tab.old.length === 0);
 
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');

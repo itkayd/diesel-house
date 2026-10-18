@@ -32,6 +32,8 @@ import * as progress from '../house/progress';
 import * as critterHunt from '../house/critterHunt';
 import * as setup from '../house/setup';
 import * as frame from '../house/frame';
+import * as disco from '../house/disco';
+import * as extras from '../house/roomExtras';
 import type { Remote, Sent } from '../house/consts';
 
 // The house: one Phaser scene. It holds the state (you, the people around you, rooms, voice, games…);
@@ -70,6 +72,17 @@ export class HouseScene extends Phaser.Scene {
   voiceTimer: Phaser.Time.TimerEvent | null = null;
   // Hallway voice: whisper + walkie-talkie rules, and the walkie button (UPDATE.md Phase 10).
   hallway: Hallway | null = null;
+  danceFloors: disco.DanceFloor[] = [];
+  danceMs = 0; // time on the dance floor towards the next dance minute
+  // Room extras (src/house/roomExtras.ts): the café special, the study timer, the outdoor sky.
+  specialAt: { room: string; x: number; y: number; w: number; h: number } | null = null;
+  specialShown = false;
+  timerAt: { room: string; x: number; y: number; w: number; h: number } | null = null;
+  timerText: Phaser.GameObjects.Text | null = null;
+  timerPrompt: HTMLDivElement | null = null;
+  timerEnds = 0; // our clock, ms
+  skyLight: { wash: number; alpha: number; stars: number } | null = null;
+  quietRooms = new Map<string, Hallway>(); // rooms heard by distance (the Library), same rules as whispering
   walkie: WalkieButton | null = null;
   lastEmote = 0; // when we last sent one
   lastEmoteFrom = new Map<string, number>(); // when each person's last emote was shown
@@ -103,6 +116,7 @@ export class HouseScene extends Phaser.Scene {
   replacedToast: (() => void) | null = null;
   // Doors: where each doorway is, and quiet rooms you've said you'll go into anyway (until when).
   doorSpots = new Map<RoomId, { x: number; y: number; north: boolean }>();
+  spawnAt = { x: 0, y: 0 }; // the front porch (world px)
   quietOk = new Map<RoomId, number>();
   lastDoorNote = 0;
   chat: ChatPanel | null = null;
@@ -186,6 +200,13 @@ export class HouseScene extends Phaser.Scene {
   catchCritter = critterHunt.catchCritter;
   floatWorld = critterHunt.floatWorld;
   someoneCaught = critterHunt.someoneCaught;
+  setupDisco = disco.setupDisco;
+  onDanceFloor = disco.onDanceFloor;
+  updateDancing = disco.updateDancing;
+  setupRoomExtras = extras.setupRoomExtras;
+  updateRoomExtras = extras.updateRoomExtras;
+  receiveTimer = extras.receiveTimer;
+  askTimer = extras.askTimer;
 
   create() {
     setup.create.call(this);

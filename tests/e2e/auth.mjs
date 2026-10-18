@@ -97,7 +97,7 @@ async function tryJoin(topic) {
   });
 }
 const house = await tryJoin('house');
-const voice = await tryJoin('voice:room_01');
+const voice = await tryJoin('voice:garden');
 check('no login: refused on the private "house" channel', house, house.status !== 'SUBSCRIBED');
 check('no login: refused on a private voice room channel', voice, voice.status !== 'SUBSCRIBED');
 await anon.removeAllChannels();

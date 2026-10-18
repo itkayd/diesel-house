@@ -40,22 +40,22 @@ check('idle faces down using chibi sheet A, character 6 middle frame', b, b.tex 
 // Walk directions → animations + frames on the right row
 const rows = { down: 4, left: 5, right: 6, up: 7 };
 for (const [key, dir] of [['ArrowRight', 'right'], ['ArrowDown', 'down'], ['ArrowLeft', 'left'], ['ArrowUp', 'up']]) {
-  await tp(300, 256);
+  await tp(1040, 600); // the Disco's dance floor: open in every direction
   const frames = new Set();
   await page.keyboard.down(key);
-  for (let i = 0; i < 8; i++) { await page.waitForTimeout(70); frames.add((await st()).frame); }
+  for (let i = 0; i < 12; i++) { await page.waitForTimeout(110); frames.add((await st()).frame); } // (headless runs at ~20 fps)
   await page.keyboard.up(key); await page.waitForTimeout(150);
   const after = await st();
   const okRow = [...frames].every((f) => Math.floor(f / 12) === rows[dir] && f % 12 >= 3 && f % 12 <= 5);
   check(`walking ${dir}: walk anim cycles frames on the ${dir} row, then idles facing ${dir}`, { frames: [...frames], after: after.anim }, okRow && frames.size >= 2 && after.anim === `char5-idle-${dir}`);
 }
 
-// Collision with feet-based body
-await tp(48, 256);
-let r = await hold('ArrowUp'); check('hallway wall blocks (feet stop below the wall)', r.after, r.after.y === 230 && r.after.zone === 'hallway');
-await tp(96, 250); r = await hold('ArrowUp', 3500); check('door into room 1, stops at the sofa (furniture blocks)', r.after, r.after.zone === 'room_01' && r.after.y === 82);
-r = await hold('ArrowRight', 3000); check('room 1 side wall blocks', r.after, r.after.x === 171);
-await tp(120, 380); r = await hold('ArrowDown', 2500); check('room 5 (clear column), stops at bottom wall', r.after, r.after.zone === 'room_05' && r.after.y === 480);
+// Collision with feet-based body (the octagon house, REDESIGN.md R3)
+await tp(600, 520);
+let r = await hold('ArrowUp'); check('hall wall blocks (feet stop below the wall face)', r.after, r.after.y === 454 && r.after.zone === 'hallway');
+await tp(656, 500); r = await hold('ArrowUp', 3500); check('through the door into the garden, stops at the back hedge', r.after, r.after.zone === 'garden' && r.after.y === 230);
+r = await hold('ArrowRight', 3000); check('a tree blocks on the way along the hedge (furniture blocks)', r.after, r.after.x === 729);
+await tp(368, 900); r = await hold('ArrowDown', 2500); check('café (clear column), stops at the bottom wall', r.after, r.after.zone === 'cafe' && r.after.y === 1008);
 
 // Reload: remembered, no picker
 await page.reload(); await page.waitForFunction(() => window.__house?.player);

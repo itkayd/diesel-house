@@ -32,7 +32,7 @@ const levels = (p) => p.page.evaluate(async () => {
 
 const A = await player('Alice snd');
 const B = await player('Bob snd');
-for (const p of [A, B]) await p.page.evaluate(() => { window.__house.body.reset(272, 120); window.__house.sendMove(true); });
+for (const p of [A, B]) await p.page.evaluate(() => { window.__house.body.reset(600, 280); window.__house.sendMove(true); });
 await A.page.waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), B.id, { timeout: 20000 });
 await A.page.waitForSelector('audio[data-peer]', { state: 'attached', timeout: 10000 });
 
@@ -72,7 +72,7 @@ const kept = await levels(A);
 check('settings are saved on this device (survive a reload)', { game: kept.game, music: kept.music, voices: kept.voices, chimes: kept.chimes }, kept.game === 0.25 && kept.music === 0 && kept.voices === 0.5 && kept.chimes === false);
 
 // Mic tab: the meter moves (the test mic plays a tone), and the mic test records then plays back.
-await A.page.evaluate(() => { window.__house.body.reset(272, 120); window.__house.sendMove(true); });
+await A.page.evaluate(() => { window.__house.body.reset(600, 280); window.__house.sendMove(true); });
 await A.page.waitForFunction(() => !!window.__house.voice.micStream, null, { timeout: 15000 });
 await A.page.click('#settings-button');
 await A.page.click('#settings-tab-mic');

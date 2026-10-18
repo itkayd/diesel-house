@@ -44,8 +44,8 @@ const bSeesA = await seen(B, A.id, 'net');
 check('your connection shows in the HUD, and others see your bars on your tag', { hud, aRating, bSeesA }, !!hud.q && ['Poor', 'Strong', 'Super strong'].includes(hud.text) && bSeesA === aRating);
 
 // 2. Mic icon in a room: green when on, red when muted, gone in the hallway.
-await goto(A, 272, 120);
-await goto(B, 272, 120);
+await goto(A, 600, 280);
+await goto(B, 620, 290);
 await B.page.waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), A.id, { timeout: 20000 });
 await waitSeen(B, A.id, 'mic', 'on');
 const on = await seen(B, A.id, 'mic');
@@ -57,7 +57,7 @@ await A.page.click('#mic-button');
 await waitSeen(B, A.id, 'mic', 'on');
 const back = await seen(B, A.id, 'mic');
 check('in a room everyone sees your mic: on, muted (red), on again', { on, muted, ownMuted, back }, on === 'on' && muted === 'off' && ownMuted === 'off' && back === 'on');
-await goto(A, 300, 256);
+await goto(A, 520, 520);
 await waitSeen(B, A.id, 'mic', null);
 check('in the hallway the mic icon is hidden (no voice there)', { mic: await seen(B, A.id, 'mic') }, (await seen(B, A.id, 'mic')) === null);
 

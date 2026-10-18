@@ -26,6 +26,8 @@ export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DE
 export type EmoteMsg = { from: string; e: string; to?: string; cheer?: boolean };
 // Games (UPDATE.md Phase 12): a dice roll over someone's head, and rock-paper-scissors duel messages.
 export type DiceMsg = { from: string; v: number[]; s: number };
+// A room's shared study timer (REDESIGN.md R3, the Library): set (ms left), stop, or ask who has one.
+export type TimerMsg = { from: string; room: string; k: 'set' | 'stop' | 'ask'; left?: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
 
@@ -45,6 +47,7 @@ type Handlers = {
   onEmote: (m: EmoteMsg) => void;
   onDice: (m: DiceMsg) => void;
   onDuel: (m: DuelMsg) => void;
+  onTimer?: (m: TimerMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
   // this person may see.
   onChat: (e: ChatChange) => void;
@@ -123,6 +126,10 @@ export class Presence {
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => {
       countMessage('received', 'emote');
       if (!this.replaced) this.h.onEmote(payload as EmoteMsg);
+    });
+    ch.on('broadcast', { event: 'timer' }, ({ payload }) => {
+      countMessage('received', 'timer');
+      if (!this.replaced) this.h.onTimer?.(payload as TimerMsg);
     });
     ch.on('presence', { event: 'sync' }, () => {
       this.lastHeard = Date.now();
@@ -305,6 +312,12 @@ export class Presence {
     if (this.replaced || this.channel?.state !== 'joined') return;
     countMessage('sent', 'duel');
     void this.channel.send({ type: 'broadcast', event: 'duel', payload: m });
+  }
+
+  sendTimer(m: Omit<TimerMsg, 'from'>) {
+    if (this.replaced || this.channel?.state !== 'joined') return;
+    countMessage('sent', 'timer');
+    void this.channel.send({ type: 'broadcast', event: 'timer', payload: { ...m, from: this.id } });
   }
 
   sendEmote(m: Omit<EmoteMsg, 'from'>) {

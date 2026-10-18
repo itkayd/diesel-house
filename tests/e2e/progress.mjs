@@ -112,7 +112,7 @@ check('profile: Lv 100 Legend ★★, all 6 rank medals, Legend shows ★★, 10
 await page.tap('#profile-close');
 
 // 7. Noticeboard: standing in front of it offers it; the board lists the week with ranks.
-await page.evaluate(() => window.__house.body.reset(175, 240));
+await page.evaluate(() => window.__house.body.reset(598, 467));
 const prompt = await page.waitForSelector('#board-prompt', { timeout: 3000 }).then(() => true, () => false);
 await page.waitForTimeout(300);
 const clear = await page.evaluate(() => {

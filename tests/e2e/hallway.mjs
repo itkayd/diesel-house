@@ -39,9 +39,9 @@ const C = await player('Cara room');
 await C.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, A.id, { timeout: 15000 });
 
 // 1. Next to each other in the hallway: whisper.
-await at(A, 300, 270);
-await at(B, 316, 270);
-await at(C, 272, 120); // in room 2
+await at(A, 520, 520);
+await at(B, 536, 520);
+await at(C, 600, 280); // in the garden
 await A.page.waitForFunction(() => window.__house.voice.space === 'hallway', null, { timeout: 8000 });
 const near = await waitLink(B, A, "d && d.state === 'connected' && d.hear && d.hear.whisper > 0.2");
 await B.page.waitForTimeout(1500); // the whisper volume eases in
@@ -55,13 +55,13 @@ check('next to each other in the hallway: connected, A whispers to B, B hears it
   near && gap0 < 40 && aToB?.sending && Math.abs(bHears.hear.whisper - expect0) < 0.03 && bHears.hear.radio === 0 && ui.walkie && ui.mic === 'none');
 
 // 2. Step away: fades, then nothing at ~4 tiles.
-await at(B, 340, 270); // about 3 tiles (furniture can nudge people, so measure the real distance)
+await at(B, 560, 520); // about 3 tiles (furniture can nudge people, so measure the real distance)
 await B.page.waitForTimeout(800);
 const mid = (await link(B, A))?.hear?.whisper ?? null;
 const gap = await B.page.evaluate((id) => { const h = window.__house; const s = h.remotes.get(id).avatar.sprite; return Math.hypot(s.x - h.player.x, s.y - h.player.y); }, A.id);
 // Expected: half volume up to 24 px, easing to nothing at 64 px (src/scenes/hallway.ts).
 const expect = gap <= 24 ? 0.5 : gap >= 64 ? 0 : 0.25 * (1 + Math.cos((Math.PI * (gap - 24)) / 40));
-await at(B, 372, 270); // 72 px: out of whisper range, still connected (drops past 128)
+await at(B, 592, 520); // 72 px: out of whisper range, still connected (drops past 128)
 await B.page.waitForTimeout(800);
 const far = await link(B, A);
 const aSends = (await link(A, B))?.sending;
@@ -79,7 +79,7 @@ check('out of whisper range: A sends B no audio at all', { bytesOut1500ms: sentO
 check('stepping away: quieter at 3 tiles, silent past 4 tiles (and A sends B nothing)', { gap: Math.round(gap), mid, expect, far: far?.hear?.whisper, aSends }, gap > 30 && gap < 64 && Math.abs(mid - expect) < 0.03 && mid < 0.45 && far?.hear?.whisper < 0.01 && aSends === false);
 
 // 3. Far apart: the walkie-talkie reaches the whole hallway.
-await at(B, 650, 270);
+await at(B, 820, 520);
 const dropped = await waitLink(B, A, 'd === null', 8000);
 await A.page.keyboard.down('t');
 const radio = await waitLink(B, A, "d && d.state === 'connected' && d.hear && d.hear.radio > 0.9", 15000);
@@ -108,7 +108,7 @@ const cSpace = await space(C);
 const cLinks = await C.page.evaluate(() => window.__house.voice.debug().length);
 const cStrip = await C.page.evaluate(() => document.getElementById('walkie-strip').hidden);
 const aToC = await link(A, C);
-check('someone in a room is not connected to the hallway and hears nothing from it', { cSpace, cLinks, cStripHidden: cStrip, aToC }, cSpace === 'room_02' && cLinks === 0 && cStrip && aToC === null);
+check('someone in a room is not connected to the hallway and hears nothing from it', { cSpace, cLinks, cStripHidden: cStrip, aToC }, cSpace === 'garden' && cLinks === 0 && cStrip && aToC === null);
 
 // 5. Two people press at once: only one goes on air, the same on every screen.
 await B.page.waitForTimeout(500);
@@ -121,7 +121,7 @@ const states = talkers.map((t) => t.button).sort();
 check('two people press together: one is on air, the other sees Channel busy', { talkers, one }, one && states[0] === 'busy' && states[1] === 'talking');
 
 // 6. Standing still costs no Realtime messages (whisper and walkie ride on positions already shared).
-await at(B, 316, 270);
+await at(B, 536, 520);
 await waitLink(B, A, "d && d.state === 'connected'", 10000);
 await B.page.waitForTimeout(3000);
 const count = () => A.page.evaluate(() => Object.entries(window.__house.msgStats.totals).filter(([k]) => k.startsWith('sent:')).reduce((n, [, v]) => n + v, 0));

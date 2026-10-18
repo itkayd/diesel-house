@@ -2,10 +2,9 @@ import Phaser from 'phaser';
 import { type RoomId } from '../config';
 import { currentUser } from '../net/profile';
 import { setDnd, setRoomRules } from '../net/rooms';
-import { Games, gamesFor, type GameId } from '../games/controller';
+import { gamesFor, type GameId } from '../games/catalog';
 import { parseRoll, roll } from '../games/dice';
 import { recordGame } from '../net/games';
-import { ChatPanel } from '../ui/chat';
 import { savedVolume } from '../prefs';
 import { setNetBadge, showWhere, zoneLabel } from '../ui/overlay';
 import { addRoomSettings } from '../ui/roomSettings';
@@ -36,14 +35,14 @@ export async function start(this: HouseScene) {
   showWhere(this.zone, 'Connecting…', 'warn');
   let modules;
   try {
-    modules = await Promise.all([import('../net/presence'), import('../net/voice')]);
+    modules = await Promise.all([import('../net/presence'), import('../net/voice'), import('../games/controller'), import('../ui/chat')]);
   } catch (e) {
     // Usually an old copy of the game after an update (its files are gone): load the new one.
     console.warn('Could not load the game files', e);
     if (!reloadForUpdate()) showWhere(this.zone, 'Offline · reload the page', 'off');
     return;
   }
-  const [{ Presence }, { Voice }] = modules;
+  const [{ Presence }, { Voice }, { Games }, { ChatPanel }] = modules;
   this.presence = new Presence(
     currentUser()?.id ?? crypto.randomUUID(),
     { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest, ...this.rankInfo() },

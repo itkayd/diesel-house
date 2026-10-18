@@ -1,4 +1,3 @@
-import Phaser from 'phaser';
 import '@fontsource/pixelify-sans/500.css';
 import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/atkinson-hyperlegible/400.css';
@@ -9,16 +8,18 @@ import { setUser } from './net/profile';
 import { devTest } from './net/mode';
 import { supabase } from './net/supabase';
 import { hideLogin, loginDone, showLogin } from './ui/login';
-import { PreloadScene } from './scenes/PreloadScene';
-import { HouseScene } from './scenes/HouseScene';
-import { installUpdateReload } from './ui/update';
+import { installUpdateReload, reloadForUpdate } from './ui/update';
 import { installNoSelect, installNoZoom } from './ui/noZoom';
+import { errorReportsReady, installErrorReports } from './net/errors';
 
+installErrorReports();
 installUpdateReload();
 installNoZoom();
 installNoSelect();
 
-export const NIGHT = '#140f1c';
+// The game (Phaser and the house) downloads while the login screen is up; it runs once you're in.
+const game = import('./game');
+game.catch(() => {}); // (handled below, once it's needed)
 
 // Phaser draws text onto canvases, so the pixel font must be loaded before any text is created.
 async function fontsReady() {
@@ -76,40 +77,20 @@ async function signIn() {
     signedInAt: session.user.last_sign_in_at,
   });
   await authoriseRealtime();
-}
-
-// Phaser only asks for the next frame after the current one finishes, so a single error in any frame
-// (a bad network message, a tween on a destroyed sprite…) used to freeze the whole game until a reload.
-// Skip that frame instead, and log each different error once. (BUGS.md #1)
-const frameErrors = new Set<string>();
-function keepLooping(game: Phaser.Game) {
-  const step = game.step;
-  game.step = function (time: number, delta: number) {
-    try {
-      step.call(this, time, delta);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (frameErrors.size < 50 && !frameErrors.has(msg)) {
-        frameErrors.add(msg);
-        console.error('Frame skipped after an error:', e);
-      }
-    }
-  };
+  errorReportsReady();
 }
 
 void fontsReady()
   .then(signIn)
-  .then(
-    () =>
-      new Phaser.Game({
-        type: Phaser.AUTO,
-        parent: 'game',
-        backgroundColor: NIGHT,
-        pixelArt: true,
-        roundPixels: true,
-        scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-        physics: { default: 'arcade', arcade: { debug: false } },
-        scene: [PreloadScene, HouseScene],
-        callbacks: { postBoot: keepLooping },
-      }),
-  );
+  .then(async () => {
+    let g: typeof import('./game');
+    try {
+      g = await game;
+    } catch (e) {
+      // Usually an old copy of the page after an update (its files are gone): load the new one.
+      console.warn('Could not load the game', e);
+      reloadForUpdate();
+      return;
+    }
+    g.startGame();
+  });

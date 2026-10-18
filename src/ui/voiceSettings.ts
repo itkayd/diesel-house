@@ -1,4 +1,4 @@
-import { Voice } from '../net/voice';
+import type { Voice } from '../net/voice'; // (type only: voice.ts loads later, after the picker)
 import { savedMicDevice, savedSpeaker } from '../prefs';
 import { icon } from './icons';
 import { el } from './modal';
@@ -127,7 +127,7 @@ export function addVoiceSettings(voice: Voice, controls: VoiceControls, onFix: (
       box.append(test);
 
       // Speaker (where the browser lets us choose).
-      if (Voice.speakerChoice) {
+      if ((voice.constructor as typeof Voice).speakerChoice) {
         const speakers = await voice.listSpeakers();
         if (speakers.length > 1) {
           const out = el('select', 'dh-input');

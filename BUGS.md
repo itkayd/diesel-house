@@ -25,19 +25,24 @@ broken, with a workaround · **Low** = rough edge.
 | 2 | **Sign out could get stuck** on a weak connection: the button did nothing and the page never reloaded. | Medium | Settings → Sign out with the phone offline. | `HouseScene` sign-out: the button disables and the page always reloads, even if signing out fails. |
 | 3 | **A weak signal at start-up signed you out** and said "That account isn't part of this house any more". The membership check failed, and a failure was read as "no". | High | Open the site on bad 4G / lift Wi-Fi so the `is_member` call fails. | `net/auth.ts` `hasAccess` returns "unknown" on a network or server error. `main.ts` keeps trying (1, 2, 4, 8 s…) with "Can't reach the house… trying again" on screen, and only signs out on a real "no". |
 
+## Fixed in R1
+| # | Bug | Severity | Fix |
+|---|---|---|---|
+| 4 | **Phones kept old pictures for up to a day** after an update (Vercel cached all of `/assets/*` for 24 h; this caused the wrong Visitor medal). | Medium | `vercel.json`: Vite's own files (with a fingerprint in the name) are cached for a year; pictures and sounds in `/assets/<folder>/` are checked again on each visit (a tiny "not changed" reply when they haven't). |
+| 5 | **Big download:** `main.js` was 1.46 MB (401 kB zipped); `voice.ts` couldn't load separately. | Medium | The login screen's file is now about 6 kB zipped. The game (`src/game.ts`) downloads while you sign in; Phaser is in a file of its own that phones keep between updates; voice, the games and chat load after the picker. |
+| 6 | **`HouseScene.ts` was about 1,700 lines.** | Medium (risk) | Split into `src/house/*.ts` (one file per part, none over about 240 lines), moved word for word. The scene file is now about 200 lines. |
+| 7 | **Rooms were hard-coded** (`room_01..08`) in the code, the map builder, a database check and every Realtime rule. | Medium | `src/house/rooms.ts` lists the rooms; the map builder, zones, door signs, voice, chat and games all read it. Database: any short room id, channel access looks the room up in `rooms` (`20261030_shared_rooms.sql`). Checked by adding a test room (with a diagonal wall) in `rooms.ts` alone: it had walls, a door, its name, voice, chat, the map and a games spot. |
+| 8 | **Zones were rectangles.** | Medium | Polygons in `rooms.ts`, looked up per tile (`src/house/zones.ts`). |
+| 13 | **No way to see errors on friends' phones.** | Medium | `src/net/errors.ts` sends uncaught errors and skipped frames to the `client_errors` table (each message once per visit, at most 20 an hour each). Diesel: Supabase dashboard → Table Editor → `client_errors`. |
+
 ## Open
 | # | Bug | Severity | Steps to reproduce | Phase |
 |---|---|---|---|---|
-| 4 | **Phones keep old pictures for up to a day** after an update. Vercel caches `/assets/*` for 24 h and most picture files keep the same name, so a changed sheet shows the old one with the new layout (this caused the wrong Visitor medal). Medals are fixed with `?v=`; the rest aren't. | Medium | Change a sheet in `public/assets/`, deploy, open on a phone that visited the day before. | R1 (give every picture a version or a hashed name, from the manifest) |
-| 5 | **Big download:** `main.js` is 1.46 MB (401 kB zipped). Vite warns that `voice.ts` is imported both statically (`ui/voiceSettings.ts`) and lazily, so lazy loading does nothing. Slower first load on 4G. | Medium | `npm run build` and read the size and warning. | R1 (target < 250 kB zipped) |
-| 6 | **`HouseScene.ts` is about 1,700 lines.** Every feature touches it, so a fix in one place often breaks another. | Medium (risk) | — | R1 (split into `house/*` modules, no behaviour change) |
-| 7 | **Rooms are hard-coded** as `room_01..08` in `config.ts`, the map builder, a database check and every Realtime policy regex. The new themed rooms can't be added cleanly. | Medium (blocks R3) | — | R1 (rooms as data, new migration) |
-| 8 | **Zones are rectangles**, so the octagon house's diagonal rooms can't be described. | Medium (blocks R3) | — | R1 (polygon zones + lookup grid) |
 | 9 | **Daily progress rows are never tidied.** `tidy_progress(date)` (in `20261027_challenges_xp.sql`) was not applied to the live database because the connector can't run deletes. Tables grow slowly; nothing breaks. | Low | `select count(*) from challenge_progress;` grows every day. | Diesel applies it in claude.ai (it asks to confirm the delete) |
 | 10 | **Most automated tests can't run in the cloud.** 30 of 36 test files sign in to the real house, and most hard-code Edge. | Low (process) | Run `tests/e2e/run-all.mjs` in a Claude Code cloud session. | R1 (every test takes `DH_CHROMIUM`; split "offline" and "live" tests) |
 | 11 | **Old `catches` table** is no longer used (catches moved to `critter_catches`) but is still there, with an unindexed foreign key. | Low | Supabase performance advisor. | Later migration (drop it; tell Diesel first) |
 | 12 | **Leaked-password protection is off** in Supabase Auth. Members sign in with a name and password, so this is worth switching on. | Low | Supabase security advisor. | Diesel: Supabase dashboard → Authentication → Passwords |
-| 13 | **No way to see errors on friends' phones.** If something breaks on someone's phone, nobody finds out unless they tell Diesel. | Medium | — | R1 (`client_errors` table + small error catcher) |
+| 15 | **Old owner leftovers in the database** (`rooms.owner_id`, `door_state`, `mood`, the `room_passes` table and the "owner updates own room" rule). Nothing uses them since R1; kept one release so older copies of the game don't break. | Low | Supabase table editor. | After R3, a migration drops them (ask Diesel first) |
 | 14 | **Diesel's laptop copy is behind GitHub** and has old, unsaved Phase 13 drafts (`src/games/four.ts`, `higherLower.ts`, `prompts.json`, `20261026_room_prompts.sql`, an edit to `table.ts`). These were replaced by what's on GitHub. | Medium (confusing) | `git status` in `%USERPROFILE%\diesel-house`. | R0, Diesel (see below) |
 
 ### #14: bring the laptop up to date (Windows PowerShell)

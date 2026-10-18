@@ -10,6 +10,7 @@ import { HigherLowerHost, HigherLowerView } from './higherLower';
 import { HotTakesHost, HotTakesView } from './hotTakes';
 import { topScorers } from './kit';
 import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
+import { ALL_GAMES, gamesFor, type GameId } from './catalog';
 import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type Table, type TableHost, type TableView } from './table';
 
 // The games corner (west end of the hallway) and room tables (UPDATE.md Phase 12): walking onto a spot
@@ -18,20 +19,7 @@ import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type 
 // Draw, and Phase 13's Higher or lower, Would you rather and Four in a row) run on the spot's table:
 // a lobby of everyone sitting there, then the game, with anyone not playing watching.
 
-export type GameId = 'dice' | 'rps' | 'quickdraw' | 'higherlower' | 'wyr' | 'four';
-export const ALL_GAMES: GameId[] = ['dice', 'rps', 'quickdraw', 'higherlower', 'wyr', 'four'];
-// What a room owner can switch off in "Your room" settings (a sofa corner: only SOFA_GAMES).
-export const TABLE_GAMES: { id: GameId; label: string }[] = [
-  { id: 'dice', label: 'Dice' },
-  { id: 'rps', label: 'Rock paper scissors' },
-  { id: 'quickdraw', label: 'Quick Draw' },
-  { id: 'higherlower', label: 'Higher or lower' },
-  { id: 'wyr', label: 'Would you rather' },
-  { id: 'four', label: 'Four in a row' },
-];
-// Games that need no table, for rooms with a sofa corner instead.
-export const SOFA_GAMES: GameId[] = ['dice', 'rps', 'wyr'];
-export const gamesFor = (kind: 'table' | 'sofa' | null) => (kind === 'sofa' ? TABLE_GAMES.filter((g) => SOFA_GAMES.includes(g.id)) : TABLE_GAMES);
+export { ALL_GAMES, gamesFor, SOFA_GAMES, TABLE_GAMES, type GameId } from './catalog';
 const GAMES: Record<GameId, { icon: IconName; title: string; sub: string }> = {
   dice: { icon: 'dice-5', title: 'Dice', sub: 'Roll two dice. Everyone sees it.' },
   rps: { icon: 'swords', title: 'Rock paper scissors', sub: 'Best of three. Picks are locked in first.' },

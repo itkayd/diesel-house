@@ -53,8 +53,15 @@ export default defineConfig(({ mode }) => {
     server: { host: true }, // reachable from a phone on the same Wi-Fi
     // `npm run build && npx vite preview` serves the built site with the same security headers as Vercel.
     preview: { headers: Object.fromEntries(vercel.headers[0].headers.map((h) => [h.key, h.value])) },
-    // Phaser (~1.2 MB) plus the Supabase client the login needs can't be split; voice loads separately after the picker.
-    // Two pages: the game, and Diesel's door list (admin.html).
-    build: { chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', admin: 'admin.html' } } },
+    // Two pages: the game, and Diesel's door list (admin.html). The login screen (main) loads first and small;
+    // the game (src/game.ts) follows while you sign in, with Phaser (~1.2 MB) in a file of its own that
+    // rarely changes, so phones keep it between updates. Voice loads after the picker.
+    build: {
+      chunkSizeWarningLimit: 1300,
+      rollupOptions: {
+        input: { main: 'index.html', admin: 'admin.html' },
+        output: { manualChunks: (id: string) => (id.includes('/node_modules/phaser/') ? 'phaser' : undefined) },
+      },
+    },
   };
 });

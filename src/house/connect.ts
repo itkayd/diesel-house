@@ -24,6 +24,7 @@ import { reloadForUpdate, watchForNewVersion } from '../ui/update';
 import { addWhosWhereButton } from '../ui/whosWhere';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ROOMS } from './rooms';
+import { setupGuide } from '../ui/guide';
 
 // Going online: presence, voice, chat, games, settings and the HUD buttons, once you have picked a character.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -31,6 +32,7 @@ import { ROOMS } from './rooms';
 // Joins the house once we know who we are.
 export async function start(this: HouseScene) {
   this.canMove = true;
+  setupGuide(true); // the ? button, and the guide itself on a first visit
   if (this.starting) return;
   this.starting = true;
   showWhere(this.zone, 'Connecting…', 'warn');

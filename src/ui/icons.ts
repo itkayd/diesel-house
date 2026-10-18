@@ -1,6 +1,8 @@
 import {
   BookOpen,
   Check,
+  CircleHelp,
+  ScrollText,
   Coffee,
   createElement,
   DoorOpen,
@@ -66,7 +68,7 @@ import {
 
 // Lucide icons used in the HUD (no emoji in the HUD, per NEXT.md).
 const ICONS = {
-  'book-open': BookOpen, coffee: Coffee, check: Check, 'door-open': DoorOpen, 'gamepad-2': Gamepad2, hand: Hand, headphones: Headphones,
+  'book-open': BookOpen, 'circle-help': CircleHelp, 'scroll-text': ScrollText, coffee: Coffee, check: Check, 'door-open': DoorOpen, 'gamepad-2': Gamepad2, hand: Hand, headphones: Headphones,
   house: House, lock: Lock, 'log-out': LogOut, 'message-circle-heart': MessageCircleHeart, 'message-square': MessageSquare,
   mic: Mic, 'mic-off': MicOff, moon: Moon, music: Music, send: Send, settings: Settings, sofa: Sofa, 'user-round': UserRound,
   'volume-1': Volume1, 'volume-2': Volume2, 'volume-x': VolumeX, x: X,

@@ -130,7 +130,7 @@ Sketch: **`design/redesign/floorplan_octagon.png`**
 
 ## 8. Packs — all downloaded (18 Oct 2026)
 
-All 13 packs are downloaded. They're in **`assets/raw/redesign-packs/`** on Diesel's laptop (gitignored) and in the handoff zip `DieselHouse_v3_handoff.zip` → `packs/`. Unzip each into its own subfolder. Copy only what you use into `public/assets/`, and add it to `assets/manifest.json` (with a `commercial` flag), `ASSETS.md` and the Credits screen.
+All 13 packs are downloaded. They're in **`assets/raw/redesign-packs/`** on Diesel's laptop (gitignored) and in the handoff zips: `DieselHouse_v3_handoff.zip` (118 MB, original zips) and **`DieselHouse_v3_lite.zip`** (20 MB: packs already unzipped, with audio, preview GIFs and engine projects removed but every image kept; use this one to upload to a chat). Unzip each into its own subfolder. Copy only what you use into `public/assets/`, and add it to `assets/manifest.json` (with a `commercial` flag), `ASSETS.md` and the Credits screen.
 
 Every pack has a contact sheet in `design/redesign/contact_*.png`. **Look at those first**; don't open hundreds of PNGs one by one.
 

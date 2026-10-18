@@ -33,6 +33,7 @@ broken, with a workaround · **Low** = rough edge.
 | 6 | **`HouseScene.ts` was about 1,700 lines.** | Medium (risk) | Split into `src/house/*.ts` (one file per part, none over about 240 lines), moved word for word. The scene file is now about 200 lines. |
 | 7 | **Rooms were hard-coded** (`room_01..08`) in the code, the map builder, a database check and every Realtime rule. | Medium | `src/house/rooms.ts` lists the rooms; the map builder, zones, door signs, voice, chat and games all read it. Database: any short room id, channel access looks the room up in `rooms` (`20261030_shared_rooms.sql`). Checked by adding a test room (with a diagonal wall) in `rooms.ts` alone: it had walls, a door, its name, voice, chat, the map and a games spot. |
 | 8 | **Zones were rectangles.** | Medium | Polygons in `rooms.ts`, looked up per tile (`src/house/zones.ts`). |
+| 14 | **Diesel's laptop copy was behind GitHub** with old Phase 13 drafts. | Medium | Diesel stashed the drafts (`git stash list` to see them) and pulled. |
 | 13 | **No way to see errors on friends' phones.** | Medium | `src/net/errors.ts` sends uncaught errors and skipped frames to the `client_errors` table (each message once per visit, at most 20 an hour each). Diesel: Supabase dashboard → Table Editor → `client_errors`. |
 
 ## Open
@@ -43,13 +44,4 @@ broken, with a workaround · **Low** = rough edge.
 | 11 | **Old `catches` table** is no longer used (catches moved to `critter_catches`) but is still there, with an unindexed foreign key. | Low | Supabase performance advisor. | Later migration (drop it; tell Diesel first) |
 | 12 | **Leaked-password protection is off** in Supabase Auth. Members sign in with a name and password, so this is worth switching on. | Low | Supabase security advisor. | Diesel: Supabase dashboard → Authentication → Passwords |
 | 15 | **Old owner leftovers in the database** (`rooms.owner_id`, `door_state`, `mood`, the `room_passes` table and the "owner updates own room" rule). Nothing uses them since R1; kept one release so older copies of the game don't break. | Low | Supabase table editor. | After R3, a migration drops them (ask Diesel first) |
-| 14 | **Diesel's laptop copy is behind GitHub** and has old, unsaved Phase 13 drafts (`src/games/four.ts`, `higherLower.ts`, `prompts.json`, `20261026_room_prompts.sql`, an edit to `table.ts`). These were replaced by what's on GitHub. | Medium (confusing) | `git status` in `%USERPROFILE%\diesel-house`. | R0, Diesel (see below) |
 
-### #14: bring the laptop up to date (Windows PowerShell)
-Only after Diesel says the old drafts can go. `stash` keeps a copy you can get back later.
-```powershell
-cd $env:USERPROFILE\diesel-house
-git stash push -u -m "old Phase 13 drafts"
-git pull
-```
-To get the drafts back later: `git stash list`, then `git stash apply stash@{0}`.

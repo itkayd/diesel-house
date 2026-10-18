@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pick a Look</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="mock.css">
+<style>
+  html, body { height: auto; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-family: "Pixelify Sans", monospace; font-weight: 500; font-size: 32px; margin: 0 0 8px; color: var(--lamp); }
+  .lead { color: var(--muted); margin: 0 0 24px; max-width: 64ch; line-height: 1.5; }
+  .looks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .look { background: var(--panel); box-shadow: 0 0 0 3px var(--edge); display: flex; flex-direction: column; }
+  .look img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; image-rendering: pixelated; background: var(--edge); display: block; }
+  .look .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .look h2 { font-family: "Pixelify Sans", monospace; font-weight: 500; font-size: 22px; margin: 0; }
+  .look h2 small { font-size: 14px; color: var(--muted); margin-left: 6px; }
+  .look ul { margin: 0; padding-left: 18px; line-height: 1.45; font-size: 15px; }
+  .look .good li::marker { content: "+  "; color: #8fe0a0; }
+  .look .bad li::marker { content: "–  "; color: #ff9fb2; }
+  .look .packs { font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .look .packs b { color: var(--cream); font-weight: 400; }
+  .flag { color: #ffd36b; }
+  .play { margin-top: auto; text-align: center; display: block; background: var(--lamp); color: var(--edge); font-size: 18px; padding: 12px; }
+  .ask { margin-top: 28px; background: var(--panel); box-shadow: 0 0 0 3px var(--edge); padding: 16px 18px; line-height: 1.5; }
+  .ask h2 { font-family: "Pixelify Sans", monospace; font-weight: 500; margin: 0 0 8px; font-size: 22px; color: var(--lamp); }
+  .ask ol { margin: 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pick a look</h1>
+  <p class="lead">Three ways the new house could look. Each one shows the Great Hall, the Disco and a corner of the Library, at night, with a character you can walk. Open each one on your phone, walk around, then tell Claude <b>A</b>, <b>B</b> or <b>C</b>. Only the look is being chosen here: the room layout, games and voice stay the same whichever you pick.</p>
+
+  <div class="looks">
+    <section class="look">
+      <img src="a/scene.png" alt="Look A: small 16 pixel rooms with a checked hall, a library and a disco">
+      <div class="body">
+        <h2>A · Cosy LimeZu+<small>16 px</small></h2>
+        <ul class="good">
+          <li>Closest to the house you have now: same walls, floors and people.</li>
+          <li>Biggest choice of furniture, animals and skins (93 Ninja skins all match).</li>
+          <li>Smallest files, so the fastest on phones.</li>
+        </ul>
+        <ul class="bad">
+          <li>Least change: it will feel like a refit, not a new house.</li>
+        </ul>
+        <p class="packs"><b>Packs:</b> LimeZu Modern Interiors (in the game now), Pixel Interior LRK, Ninja Adventure (CC0), disco floor and ball (CC0).</p>
+        <a class="chip play" href="a.html">Walk around A</a>
+      </div>
+    </section>
+
+    <section class="look">
+      <img src="b/scene.png" alt="Look B: chunky 32 pixel rooms with wood floors, a round rug and big sofas">
+      <div class="body">
+        <h2>B · Warm 32<small>32 px</small></h2>
+        <ul class="good">
+          <li>Chunkier and more detailed, warm wood and red sofas.</li>
+          <li>You see fewer tiles at once, so rooms feel bigger and cosier.</li>
+        </ul>
+        <ul class="bad">
+          <li>No 32 px people packs yet: the Ninja skins here are just drawn twice the size. Today's characters look tiny (try "Swap character").</li>
+          <li>Fewer furniture packs at this size, so more drawing by hand.</li>
+        </ul>
+        <p class="packs"><b>Packs:</b> House Interior 32x32 LITE, Cozy Reading Nook <span class="flag">(licence unclear: mock-up only)</span>, disco floor and ball (CC0), Ninja Adventure (CC0).</p>
+        <a class="chip play" href="b.html">Walk around B</a>
+      </div>
+    </section>
+
+    <section class="look">
+      <img src="c/scene.png" alt="Look C: an angled isometric view of the hall, library and disco">
+      <div class="body">
+        <h2>C · Isometric<small>angled view</small></h2>
+        <ul class="good">
+          <li>Looks like a little doll's house: you see the walls and furniture from the side.</li>
+        </ul>
+        <ul class="bad">
+          <li>Walking with arrow keys feels odd (doors are on the diagonals).</li>
+          <li>Hardly any iso people or animal packs: the skins don't match.</li>
+          <li>The map, walls, doors and game spots would all need rebuilding: by far the most work.</li>
+        </ul>
+        <p class="packs"><b>Packs:</b> Tiny Interior Decoration by lumeish (CC-BY-SA: credit needed), Kenney Isometric Library (CC0), disco floor and ball (CC0).</p>
+        <a class="chip play" href="c.html">Walk around C</a>
+      </div>
+    </section>
+  </div>
+
+  <section class="ask">
+    <h2>Two questions for Diesel</h2>
+    <ol>
+      <li><b>Which look: A, B or C?</b> Claude's pick is <b>A</b>: it's the only one where furniture, people and animals all come in the same size, so the house won't look patched together.</li>
+      <li><b>People:</b> move everyone to the Ninja Adventure style (one consistent look, 93 skins), or keep today's characters as their own group in the picker? Everyone keeps the character they have now either way.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

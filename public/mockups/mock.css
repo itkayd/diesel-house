@@ -1,0 +1,11 @@
+@font-face { font-family: "Pixelify Sans"; src: url(fonts/pixelify-500.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: "Atkinson Hyperlegible"; src: url(fonts/atkinson-400.woff2) format("woff2"); }
+:root { --night: #140f1c; --panel: #2b2034; --edge: #0d0912; --cream: #fff4e0; --lamp: #f4b860; --muted: #b8aec4; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--night); color: var(--cream); font-family: "Atkinson Hyperlegible", system-ui, sans-serif; }
+#view { position: fixed; inset: 0; width: 100vw; height: 100vh; touch-action: none; image-rendering: pixelated; }
+.bar { position: fixed; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
+.chip { pointer-events: auto; background: var(--panel); box-shadow: 0 0 0 3px var(--edge); padding: 8px 12px; font-family: "Pixelify Sans", monospace; font-size: 16px; color: var(--cream); text-decoration: none; border: 0; }
+button.chip { cursor: pointer; background: var(--lamp); color: var(--edge); }
+.chip small { display: block; font-family: "Atkinson Hyperlegible", sans-serif; font-size: 12px; color: var(--muted); }
+.hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: rgba(13, 9, 18, .8); padding: 6px 12px; font-size: 14px; color: var(--muted); pointer-events: none; text-align: center; max-width: calc(100% - 32px); }

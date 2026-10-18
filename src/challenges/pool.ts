@@ -12,7 +12,7 @@ export const CHALLENGE_ICONS: Record<string, IconName> = {
   d_emotes: 'smile-plus',
   d_react: 'message-circle-heart',
   d_first: 'house',
-  d_knock: 'hand',
+  d_knock: 'footprints', // was the knock challenge; now "Visit 2 different rooms" (20261030_shared_rooms.sql)
   d_game: 'dice-5',
   d_whisper: 'audio-lines',
   w_rooms: 'door-open',
@@ -31,15 +31,17 @@ export const CHALLENGE_ICONS: Record<string, IconName> = {
 // public/assets/ui/medals.png (cells 8 and 9, the old level badges, are spare for later).
 export type Medal = { id: string; name: string; how: string; xp: number; cell: number; rank?: number };
 export const ACHIEVEMENTS: Medal[] = [
-  { id: 'decor', name: 'Home maker', how: 'Name your room.', xp: 25, cell: 10 },
-  { id: 'first_knock', name: 'First knock', how: "Knock on a friend's door.", xp: 25, cell: 0 },
+  // Rooms have no owners or doors to knock on any more: these two come back with new rules in the new
+  // house (REDESIGN.md §2: House tour, Dance machine). Anyone who has them keeps them.
+  { id: 'decor', name: 'Home maker', how: 'Coming back soon with the new house.', xp: 25, cell: 10 },
+  { id: 'first_knock', name: 'First knock', how: 'Coming back soon with the new house.', xp: 25, cell: 0 },
   { id: 'social', name: 'Social butterfly', how: 'Send emotes to 3 different friends.', xp: 50, cell: 11 },
   { id: 'over_out', name: 'Over and out', how: 'Use the walkie 3 times.', xp: 50, cell: 5 },
   { id: 'night_owl', name: 'Night owl', how: 'Be in the house after midnight.', xp: 50, cell: 1 },
   { id: 'high_roller', name: 'High roller', how: 'Roll a double six.', xp: 75, cell: 2 },
   { id: 'fast_hand', name: 'Fastest hand', how: 'Win a round of Quick Draw.', xp: 75, cell: 4 },
   { id: 'duelist', name: 'Duelist', how: 'Win 3 rock-paper-scissors duels.', xp: 100, cell: 3 },
-  { id: 'host', name: 'Party host', how: 'Have 4 people in your room at once.', xp: 150, cell: 7 },
+  { id: 'host', name: 'Party host', how: 'Be in a room when it reaches 4 people.', xp: 150, cell: 7 },
   { id: 'steady', name: 'Slow & steady', how: 'Keep a 7-day streak.', xp: 200, cell: 6 },
 ];
 export const RANK_MEDALS: Medal[] = [

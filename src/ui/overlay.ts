@@ -1,6 +1,7 @@
 import type { Zone } from '../config';
 import { NET_LABEL, type NetQuality } from '../net/netQuality';
-import { icon, MOODS, type Mood } from './icons';
+import { DND_ICON, icon } from './icons';
+import { roomDef } from '../house/rooms';
 
 // HUD, as in design/game/mvp.html:
 //   top-left:  [house  Hallway  ● 4 in the house]   or   [door  Sami's room  (Chill)  2 here]
@@ -46,9 +47,9 @@ export const hudBottomRight = () => build().br;
 export const hudBottomLeft = () => build().bl;
 export const hudToasts = () => build().tc;
 
-// Room names and moods for the HUD and nameplates; Phase 5 fills these from the rooms table.
-type RoomInfo = { name: string; mood: Mood | null };
-let roomInfo = (zone: Zone): RoomInfo => ({ name: zone === 'hallway' ? 'Hallway' : `Room ${Number(zone.slice(-2))}`, mood: null });
+// Room names (src/house/rooms.ts) and "Do not disturb" (live, from the rooms table) for the HUD.
+type RoomInfo = { name: string; dnd: boolean };
+let roomInfo = (zone: Zone): RoomInfo => ({ name: zone === 'hallway' ? 'Hallway' : (roomDef(zone)?.name ?? zone), dnd: false });
 export function setRoomInfo(f: (zone: Zone) => RoomInfo) {
   roomInfo = f;
 }
@@ -97,7 +98,7 @@ export function setNetBadge(q: NetQuality) {
 export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' | 'off') {
   const { pill } = build();
   const inRoom = !!zone && zone !== 'hallway';
-  const info = zone ? roomInfo(zone) : { name: '', mood: null };
+  const info = zone ? roomInfo(zone) : { name: '', dnd: false };
   const place = document.createElement('span');
   place.id = 'where-zone';
   place.textContent = info.name || 'Diesel House';
@@ -105,12 +106,12 @@ export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' |
   status.className = 'dh-sub';
   status.id = 'status';
   const parts: Node[] = [icon(inRoom ? 'door-open' : 'house'), place];
-  if (inRoom && info.mood) {
-    const [ic, label] = MOODS[info.mood];
+  if (inRoom && info.dnd) {
     const badge = document.createElement('span');
     badge.className = 'dh-mood';
-    badge.dataset.mood = info.mood;
-    badge.append(icon(ic), label);
+    badge.id = 'where-dnd';
+    badge.dataset.mood = 'dnd';
+    badge.append(icon(DND_ICON), 'Do not disturb');
     parts.push(badge);
   }
   if (!inRoom || state !== 'ok') {

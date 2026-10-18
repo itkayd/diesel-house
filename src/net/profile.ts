@@ -23,12 +23,3 @@ export async function saveProfile(id: string, name: string, character: number) {
   const { error } = await supabase.from('profiles').upsert({ id, display_name: name, character_index: character, picked: true });
   if (error) console.warn('Could not save your profile', error.message);
 }
-
-// Display names for a set of people (room owners).
-export async function loadNames(ids: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  if (!supabase || !ids.length) return out;
-  const { data } = await supabase.from('profiles').select('id, display_name').in('id', ids);
-  for (const p of data ?? []) out.set(p.id, p.display_name);
-  return out;
-}

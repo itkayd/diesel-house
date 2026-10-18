@@ -19,7 +19,6 @@ import { levelChip, medalEl } from './progressUi';
 export type ProfileContext = {
   name: string;
   character: number;
-  ownedRoom: string | null; // label of the room you own
   host: string | null; // guests: the member who invited you (if known already)
   changeCharacter: () => void;
   rename: (name: string) => Promise<void> | void;
@@ -162,7 +161,6 @@ function about(body: HTMLElement, ctx: ProfileContext) {
   const user = currentUser()!;
   const facts = el('div', 'v2-facts');
   facts.append(
-    ctx.ownedRoom ? fact('door-open', 'Owns ', bold(ctx.ownedRoom)) : fact('door-open', 'No room of your own yet'),
     fact('calendar', 'Joined with an invite from Diesel on ', bold(day(user.joinedAt))),
     fact('clock', 'Signed in ', bold(time(user.signedInAt))),
     fact('award', bold(String(ACHIEVEMENTS.filter((m) => earned(ctx.progress, m)).length)), ` of ${ACHIEVEMENTS.length} badges`),

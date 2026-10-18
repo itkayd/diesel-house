@@ -3,7 +3,7 @@ import { el, openModal } from './modal';
 import { hudButtons } from './overlay';
 
 // Settings: a gear button (top-right) opening a card with tabs (design/game/v2.html `showSettings`):
-// Sound, Mic, Room (only for room owners), More. Each feature adds its own section with
+// Sound, Mic, Room (while you are in a room), More. Each feature adds its own section with
 // addSettingsSection(order, render, divider, tab); a tab's sections render fresh each time it's shown,
 // in `order`. A tab whose sections render nothing is hidden.
 export type SettingsTab = 'sound' | 'mic' | 'room' | 'more';
@@ -58,7 +58,7 @@ async function renderTab(tab: SettingsTab, into: HTMLElement) {
   }
 }
 
-// Which tabs have something to show (e.g. Room only for an owner).
+// Which tabs have something to show (e.g. Room only while you are in one).
 async function nonEmptyTabs() {
   const out: SettingsTab[] = [];
   for (const [t] of TABS) {

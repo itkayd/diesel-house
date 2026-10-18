@@ -78,24 +78,9 @@ export type IconName = keyof typeof ICONS;
 
 export const icon = (name: IconName, attrs: Record<string, string | number> = {}) => createElement(ICONS[name], attrs);
 
-// Room moods (rooms.mood) and door states (rooms.door_state), as in design/game/mvp.html.
-export const MOODS = {
-  gaming: ['gamepad-2', 'Gaming'],
-  deeptalk: ['message-circle-heart', 'Deep talk'],
-  music: ['music', 'Music'],
-  study: ['book-open', 'Study'],
-  chill: ['sofa', 'Chill'],
-  dnd: ['moon', 'Do not disturb'],
-} as const satisfies Record<string, [IconName, string]>;
-export type Mood = keyof typeof MOODS;
-export const MOOD_COLOURS: Record<Mood, string> = {
-  gaming: '#7fb2ff', deeptalk: '#ff9fb2', music: '#c99bff', study: '#9be0a8', chill: '#7fd8d0', dnd: '#ff8f7a',
-};
-export const DOORS = { open: ['door-open', 'Open'], knock: ['hand', 'Knock'], locked: ['lock', 'Locked'] } as const satisfies Record<
-  string,
-  [IconName, string]
->;
-export type DoorState = keyof typeof DOORS;
+// "Do not disturb" on a room (rooms.dnd, REDESIGN.md R1): the icon and colour on the door sign and pill.
+export const DND_ICON: IconName = 'moon';
+export const DND_COLOUR = '#ff8f7a';
 
 // An SVG icon as an <img>-loadable data URL (for drawing icons inside the Phaser world).
 export function iconDataUrl(name: IconName, colour: string, size = 48) {

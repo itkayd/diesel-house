@@ -88,7 +88,7 @@ const medals = await A.page.evaluate(() => ({
 await A.page.click('.v2-badges [data-badge="first_knock"]');
 const info = await A.page.textContent('#badge-info');
 check('Badges tab: 6 rank medals (Visitor earned) and 10 badges; tapping one says how to earn it', { ...medals, info },
-  medals.ranks === 6 && medals.visitor && medals.badges === 10 && /First knock/.test(info) && /Knock on a friend/.test(info));
+  medals.ranks === 6 && medals.visitor && medals.badges === 10 && /First knock/.test(info) && /Coming back soon/.test(info));
 
 // Portrait → character picker.
 await A.page.click('#profile-face');

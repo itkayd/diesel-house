@@ -1,80 +1,39 @@
 import type { Room } from '../net/rooms';
-import { DOORS, icon, MOODS, type DoorState, type Mood } from './icons';
+import { DND_ICON, icon } from './icons';
 import { el } from './modal';
 import { addSettingsSection, sectionLabel, switchRow } from './settings';
 
-// "Your room" in settings (design/game/mvp.html): name, door, mood. Only shown to a room's owner.
-// `myRoom()` is read each time settings opens, so it follows live changes and ownership.
-// `tableGames`: for rooms with a game table, the games the owner can switch on and off (UPDATE.md Phase 12).
-// The owner's own Would you rather prompts, one per line "option A | option B" (Phase 13, rooms.prompts).
+// The Room tab in settings (REDESIGN.md R1: nobody owns a room). Shown while you're in a room:
+// - "Do not disturb": anyone inside can ask for quiet. The door gets a dark sign and people outside are
+//   asked "Go in anyway?" (no hard lock). It goes away when the room empties.
+// - The room's table: which games it offers (UPDATE.md Phase 12) and its own Would you rather prompts
+//   (Phase 13), one per line "option A | option B". Any member can change these; the database logs who
+//   did (room_changes). Guests see the switch but not the rules.
+// `here()` is read each time settings opens, so it follows you around the house.
+export type RoomHere = { room: Room; name: string; member: boolean };
 export function addRoomSettings(
-  myRoom: () => Room | null,
-  save: (change: Partial<Pick<Room, 'name' | 'door_state' | 'mood' | 'games' | 'prompts'>>) => Promise<string | null>,
+  here: () => RoomHere | null,
+  setQuiet: (room: Room, quiet: boolean) => Promise<string | null>,
+  saveRules: (room: Room, games: string[] | null, prompts: string[] | null) => Promise<string | null>,
   tableGames: (room: Room) => { id: string; label: string }[] = () => [],
 ) {
   addSettingsSection(
     50,
     (box) => {
-      const room = myRoom();
-      if (!room) return;
-      const title = el('div', 'dh-title', 'Your room');
+      const h = here();
+      if (!h) return;
+      const { room } = h;
+      const title = el('div', 'dh-title', h.name);
+      title.id = 'room-settings-title';
       title.style.fontSize = '17px';
       const status = el('small', 'dh-lede');
       status.id = 'room-save-status';
       status.setAttribute('aria-live', 'polite');
-      const saved = async (change: Parameters<typeof save>[0]) => {
+      const saved = async (save: () => Promise<string | null>) => {
         status.textContent = 'Saving…';
-        const err = await save(change);
+        const err = await save();
         status.textContent = err ? `Couldn't save: ${err}` : 'Saved';
       };
-
-      const name = el('input', 'dh-input');
-      name.id = 'room-name';
-      name.maxLength = 32;
-      name.value = room.name;
-      name.placeholder = 'Name your room';
-      const commit = () => {
-        const v = name.value.trim().slice(0, 32);
-        if (v && v !== myRoom()?.name) void saved({ name: v });
-      };
-      name.addEventListener('change', commit);
-      name.addEventListener('keydown', (e) => e.key === 'Enter' && name.blur());
-
-      const door = el('div', 'seg');
-      door.setAttribute('role', 'group');
-      door.setAttribute('aria-label', 'Door');
-      for (const [k, [ic, label]] of Object.entries(DOORS) as [DoorState, [Parameters<typeof icon>[0], string]][]) {
-        const b = el('button');
-        b.type = 'button';
-        b.id = `door-${k}`;
-        b.setAttribute('aria-pressed', String(room.door_state === k));
-        b.append(icon(ic), label);
-        b.addEventListener('click', () => {
-          door.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-          void saved({ door_state: k });
-        });
-        door.append(b);
-      }
-
-      const moods = el('div', 'moods');
-      moods.setAttribute('role', 'group');
-      moods.setAttribute('aria-label', 'Mood');
-      for (const [k, [ic, label]] of Object.entries(MOODS) as [Mood, [Parameters<typeof icon>[0], string]][]) {
-        const b = el('button', 'dh-mood');
-        b.type = 'button';
-        b.id = `mood-${k}`;
-        b.dataset.mood = k;
-        b.setAttribute('aria-pressed', String(room.mood === k));
-        b.append(icon(ic), label);
-        b.addEventListener('click', () => {
-          // Tap the current mood again to clear it.
-          const next = b.getAttribute('aria-pressed') === 'true' ? null : k;
-          moods.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b && next !== null)));
-          void saved({ mood: next });
-        });
-        moods.append(b);
-      }
-
       const field = (label: HTMLElement, control: HTMLElement) => {
         const f = el('div');
         f.style.cssText = 'display:grid;gap:6px';
@@ -82,31 +41,41 @@ export function addRoomSettings(
         return f;
       };
       box.style.gap = '12px';
-      box.append(
-        title,
-        field(sectionLabel('Room name', 'room-name'), name),
-        field(el('span', 'dh-label', 'Door'), door),
-        field(el('span', 'dh-label', 'Mood'), moods),
-      );
-      const games = tableGames(room);
-      if (games.length) {
+      const quiet = switchRow('room-dnd', 'Do not disturb', 'Asks people outside before they come in', room.dnd, (on) => void saved(() => setQuiet(room, on)));
+      quiet.querySelector('.txt')?.prepend(icon(DND_ICON, { width: 16 }));
+      box.append(title, quiet);
+      if (!h.member) return box.append(status);
+
+      let games = room.games ?? null;
+      let prompts = room.prompts ?? null;
+      const table = tableGames(room);
+      if (table.length) {
         const list = el('div');
         list.id = 'room-games';
         list.style.cssText = 'display:grid;gap:4px';
-        const on = new Set(room.games ?? games.map((g) => g.id));
-        for (const g of games)
+        const on = new Set(games ?? table.map((g) => g.id));
+        for (const g of table)
           list.append(
             switchRow(`room-game-${g.id}`, g.label, '', on.has(g.id), (yes) => {
               if (yes) on.add(g.id);
               else on.delete(g.id);
               // All on is saved as null ("everything", including games added later).
-              void saved({ games: games.every((x) => on.has(x.id)) ? null : games.map((x) => x.id).filter((id) => on.has(id)) });
+              games = table.every((x) => on.has(x.id)) ? null : table.map((x) => x.id).filter((id) => on.has(id));
+              void saved(() => saveRules(room, games, prompts));
             }),
           );
-        box.append(field(el('span', 'dh-label', 'Games at your table'), list));
+        box.append(field(el('span', 'dh-label', 'Games at this room’s table'), list));
       }
-      box.append(field(sectionLabel('Your Would you rather prompts', 'room-prompts'), promptsEditor(room.prompts ?? [], status, (prompts) => saved({ prompts }))));
-      box.append(status);
+      box.append(
+        field(
+          sectionLabel('This room’s Would you rather prompts', 'room-prompts'),
+          promptsEditor(prompts ?? [], status, (p) => {
+            prompts = p;
+            return saved(() => saveRules(room, games, prompts));
+          }),
+        ),
+      );
+      box.append(el('small', 'dh-lede', 'Anyone in the house can change these. Changes are saved with your name.'), status);
     },
     false,
     'room',
@@ -139,7 +108,7 @@ function promptsEditor(current: string[], status: HTMLElement, save: (prompts: s
   area.rows = 4;
   area.placeholder = 'Pancakes every morning | waffles every night';
   area.value = current.map((p) => p.replace('|', ' | ')).join('\n');
-  const hint = el('small', 'dh-lede', 'One per line: option A | option B. They come up in Would you rather at your room’s games spot.');
+  const hint = el('small', 'dh-lede', 'One per line: option A | option B. They come up in Would you rather at this room’s games spot.');
   let last = area.value;
   area.addEventListener('change', () => {
     if (area.value === last) return;

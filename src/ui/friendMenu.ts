@@ -17,7 +17,6 @@ export type FriendMenu = {
   // Rock-paper-scissors (UPDATE.md Phase 12). Without it the button says why not.
   duel?: () => void;
   duelOff?: string;
-  remove?: { label: string; id: string; onClick: () => void };
 };
 
 // Tap a friend (or press Q next to them), UPDATE.md Phase 11 / design/game/v2.html `friendMenu`:
@@ -86,17 +85,6 @@ export function showFriendMenu(m: FriendMenu) {
     });
   acts.append(duel);
   pop.append(acts);
-  if (m.remove) {
-    const r = m.remove;
-    const b = el('button', 'dh-btn dh-btn--danger', r.label);
-    b.type = 'button';
-    b.id = r.id;
-    b.addEventListener('click', () => {
-      closeFriendMenu();
-      r.onClick();
-    });
-    pop.append(b);
-  }
   overlay().appendChild(pop);
   // Close on the next tap outside the card (after this tap has finished).
   setTimeout(() => window.addEventListener('pointerdown', outside, true), 0);

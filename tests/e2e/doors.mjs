@@ -1,9 +1,10 @@
 import { chromium } from 'playwright-core';
-// Phase 6 doors with two real members, signing in through the login page. Needs `npm run dev` and two test
-// accounts, given as environment variables (never commit them):
-//   DH_TEST_OWNER="Name:password"     (owns room_01)
-//   DH_TEST_VISITOR="Name:password"
-// Leaves room_01's door open and removes the visitor's pass at the end.
+// Doors with two real members (REDESIGN.md R1: no owners; "Do not disturb" instead of knock and lock),
+// signing in through the login page. Needs `npm run dev` and two test accounts, given as environment
+// variables (never commit them):
+//   DH_TEST_OWNER="Name:password"     (any member: sits in Room 1 and asks for quiet)
+//   DH_TEST_VISITOR="Name:password"   (any member: walks up to the door)
+// Turns do not disturb off again at the end.
 const OWNER = process.env.DH_TEST_OWNER?.split(':');
 const VISITOR = process.env.DH_TEST_VISITOR?.split(':');
 if (!OWNER || !VISITOR) {
@@ -11,7 +12,7 @@ if (!OWNER || !VISITOR) {
   process.exit(0);
 }
 const browser = await chromium.launch({
-  channel: 'msedge',
+  ...(process.env.DH_CHROMIUM ? { executablePath: process.env.DH_CHROMIUM } : { channel: 'msedge' }),
   headless: true,
   args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
 });
@@ -46,78 +47,56 @@ const holdUp = async (p, ms) => {
   await p.page.waitForTimeout(ms);
   await p.page.keyboard.up('ArrowUp');
 };
-async function setDoor(p, state) {
+async function setQuiet(p, on) {
   await p.page.click('#settings-button');
   await p.page.click('#settings-tab-room');
-  await p.page.waitForSelector(`#door-${state}`);
-  await p.page.click(`#door-${state}`);
+  await p.page.waitForSelector('#room-dnd');
+  if ((await p.page.locator('#room-dnd').isChecked()) !== on) await p.page.click('label[for="room-dnd"]');
   await p.page.waitForFunction(() => document.getElementById('room-save-status')?.textContent === 'Saved', null, { timeout: 8000 }).catch(() => {});
   await p.page.click('#settings-close');
 }
 
 const O = await signIn(OWNER);
-await O.page.waitForFunction((n) => window.__house.look.plate('room_01').label === `${n}'s room`, OWNER[0], { timeout: 10000 }).catch(() => {});
 const plate = await O.page.evaluate(() => window.__house.look.plate('room_01').label);
-check('owner signs in through the login page; room 1 is labelled with their name', { plate }, plate === `${OWNER[0]}'s room`);
+check('a member signs in through the login page; room 1 has its fixed name', { plate }, plate === 'Room 1');
 
-// Owner sits in their room; door set to knock-first.
+// One member sits in Room 1 and asks for quiet.
 await tp(O, 96, 120);
-await setDoor(O, 'knock');
+await O.page.waitForFunction(() => window.__house.zone === 'room_01', null, { timeout: 5000 }).catch(() => {});
+await setQuiet(O, true);
 const V = await signIn(VISITOR);
 await V.page.waitForFunction((id) => window.__house.remotes.get(id)?.active, O.id, { timeout: 15000 });
-await V.page.waitForFunction(() => window.__house.look.plate('room_01').door === 'knock', null, { timeout: 8000 }).catch(() => {});
+const sign = await V.page.waitForFunction(() => window.__house.look.plate('room_01').dnd, null, { timeout: 8000 }).then(() => true, () => false);
+check('the other member sees "Do not disturb" on Room 1\'s door, live', { sign }, sign);
 
-// Visitor walks into the knock door: stopped, and the owner hears a knock.
+// The visitor walks into the door: stopped and asked, no lock.
 await tp(V, 96, 250);
 await V.page.waitForTimeout(600);
 await holdUp(V, 1500);
-const blocked = await where(V);
-await O.page.waitForSelector('#knock-toast', { timeout: 8000 }).catch(() => {});
-const knockToast = await O.page.locator('#knock-toast .who').textContent().catch(() => null);
-check('knock-first door stops the visitor and the owner sees "… is knocking"', { blocked, knockToast }, blocked.zone === 'hallway' && knockToast === `${VISITOR[0]} is knocking`);
+const stopped = await where(V);
+const asked = await V.page.waitForSelector('#quiet-toast', { timeout: 5000 }).then(() => true, () => false);
+check('walking into a quiet room\'s door asks "Go in anyway?" first', { stopped, asked }, stopped.zone === 'hallway' && asked);
 
-// Owner lets them in; visitor walks in and joins the room's voice.
-await O.page.click('#let-in');
-await V.page.waitForFunction(() => window.__house.passes.has('room_01'), null, { timeout: 8000 }).catch(() => {});
-await holdUp(V, 2500);
+// "Go in": walks in and joins the room's voice (the server lets anyone in the house in).
+await V.page.click('#quiet-go-in');
+await V.page.waitForFunction(() => window.__house.zone === 'room_01', null, { timeout: 15000 }).catch(() => {});
 const inside = await where(V);
 const voiceUp = await V.page
   .waitForFunction((id) => window.__house.voice.debug().some((d) => d.id === id && d.state === 'connected'), O.id, { timeout: 20000 })
   .then(() => true, () => false);
-check('"Let in": the visitor walks in and is connected to the owner\'s voice', { inside, voiceUp }, inside.zone === 'room_01' && voiceUp);
+check('"Go in": the visitor walks in and is connected to the room\'s voice', { inside, voiceUp }, inside.zone === 'room_01' && voiceUp);
 
-// Owner locks up and removes the visitor.
-await setDoor(O, 'locked');
-await O.page.waitForFunction((id) => window.__house.remotes.get(id)?.info.zone === 'room_01', V.id, { timeout: 8000 }).catch(() => {});
-const spot = await O.page.evaluate((id) => {
-  const h = window.__house;
-  const s = h.remotes.get(id).avatar.sprite;
-  const cam = h.cameras.main;
-  const c = h.game.canvas.getBoundingClientRect();
-  return { x: c.left + (s.x - cam.worldView.x) * cam.zoom, y: c.top + (s.y - 12 - cam.worldView.y) * cam.zoom };
-}, V.id);
-await O.page.mouse.click(spot.x, spot.y);
-await O.page.waitForSelector('#remove-guest', { timeout: 5000 }).catch(() => {});
-const hasRemove = (await O.page.locator('#remove-guest').count()) === 1;
-if (hasRemove) await O.page.click('#remove-guest');
-await V.page.waitForFunction(() => window.__house.zone === 'hallway', null, { timeout: 8000 }).catch(() => {});
-const out = await where(V);
-const voiceGone = await V.page.evaluate(() => window.__house.voice.room === null);
-check('owner removes the visitor: moved to the hallway, voice cut', { hasRemove, out, voiceGone }, hasRemove && out.zone === 'hallway' && voiceGone);
+// Both leave: the last one out clears do not disturb.
+await tp(V, 96, 250);
+await V.page.waitForTimeout(800);
+await tp(O, 140, 250);
+const cleared = await O.page
+  .waitForFunction(() => window.__house.rooms.get('room_01')?.dnd === false, null, { timeout: 10000 })
+  .then(() => true, () => false);
+check('when the room empties, do not disturb goes away by itself', { cleared }, cleared);
 
-// Locked: walking in is refused, and the database refuses the voice channel too.
-await V.page.waitForTimeout(3600); // past the door-message cooldown
-await holdUp(V, 1500);
-const lockedOut = await where(V);
-const lockToast = await V.page.locator('#toasts .who', { hasText: 'is locked' }).count();
-await V.page.evaluate(() => window.__house.voice.join('room_01'));
-await V.page.waitForTimeout(4000);
-const sneak = await V.page.evaluate(() => ({ channel: window.__house.voice.channel?.state ?? 'none', peers: window.__house.voice.debug().length }));
-check('locked door: walking in refused, and voice refused by the server', { lockedOut, lockToast, sneak }, lockedOut.zone === 'hallway' && lockToast > 0 && sneak.channel !== 'joined' && sneak.peers === 0);
-await V.page.evaluate(() => window.__house.voice.leave());
-
-// Tidy up: door open again.
-await setDoor(O, 'open');
+// Tidy up, in case.
+await O.page.evaluate(async () => (await import('/src/net/rooms.ts')).setDnd('room_01', false));
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');
 await browser.close();

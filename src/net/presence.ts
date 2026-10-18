@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { Dir } from '../characters';
-import type { RoomId, Zone } from '../config';
+import type { Zone } from '../config';
 import type { Room } from './rooms';
 import type { DuelMsg } from '../games/rps';
 import { devTest } from './mode';
@@ -20,15 +20,12 @@ export type PlayerInfo = { id: string; name: string; character: number; zone: Zo
 // presence updates take a few seconds to spread, and voice needs to know within a second.
 // `t` is the sender's clock (ms) when the position was taken.
 export type MoveMsg = { id: string; x: number; y: number; vx: number; vy: number; dir: Dir; zone: Zone | null; t: number; mic?: PlayerInfo['mic']; net?: NetQuality };
-// Door messages, addressed to one person: a knock (to the owner), let in / not now (to the visitor), or
-// being asked to leave. The database (room passes) is what actually opens a door; these just tell people.
 export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DELETE'; row: Record<string, unknown> };
 // An emote (UPDATE.md Phase 11): `e` is an EmoteId; `to` when sent from the tap-a-friend menu.
 // cheer: a challenge done or a level up (friends in the same room see confetti).
 export type EmoteMsg = { from: string; e: string; to?: string; cheer?: boolean };
 // Games (UPDATE.md Phase 12): a dice roll over someone's head, and rock-paper-scissors duel messages.
 export type DiceMsg = { from: string; v: number[]; s: number };
-export type DoorMsg = { kind: 'knock' | 'let-in' | 'not-now' | 'kick'; room: RoomId; from: string; to: string; name: string; character: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
 
@@ -45,7 +42,6 @@ type Handlers = {
   onRoomChange: (room: Room) => void;
   // Someone caught a critter (supabase/migrations/20261028_critters.sql).
   onCatch?: (c: { slot: number; idx: number; user_id: string; critter: string; xp: number }) => void;
-  onDoor: (m: DoorMsg) => void;
   onEmote: (m: EmoteMsg) => void;
   onDice: (m: DiceMsg) => void;
   onDuel: (m: DuelMsg) => void;
@@ -114,11 +110,6 @@ export class Presence {
       // Dev-only: ?lag=200 delays incoming movement (with jitter) to check smoothing on slow links.
       if (this.opts.lagMs) setTimeout(() => this.h.onMove(m), this.opts.lagMs * (0.75 + Math.random() * 0.5));
       else this.h.onMove(m);
-    });
-    ch.on('broadcast', { event: 'door' }, ({ payload }) => {
-      countMessage('received', 'door');
-      const m = payload as DoorMsg;
-      if (m.to === this.id && !this.replaced) this.h.onDoor(m);
     });
     ch.on('broadcast', { event: 'dice' }, ({ payload }) => {
       countMessage('received', 'dice');
@@ -302,12 +293,6 @@ export class Presence {
     if (this.replaced || this.channel?.state !== 'joined' || !supabase?.realtime.isConnected()) return;
     countMessage('sent', 'move');
     void this.channel.send({ type: 'broadcast', event: 'move', payload: { ...m, id: this.id, t: Date.now() } });
-  }
-
-  sendDoor(m: Omit<DoorMsg, 'from'>) {
-    if (this.channel?.state !== 'joined') return;
-    countMessage('sent', 'door');
-    void this.channel.send({ type: 'broadcast', event: 'door', payload: { ...m, from: this.id } });
   }
 
   sendDice(m: Omit<DiceMsg, 'from'>) {

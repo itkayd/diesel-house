@@ -1,6 +1,7 @@
 import type { VoiceStatus } from '../net/voice';
 import { icon } from './icons';
 import { hudBottomRight } from './overlay';
+import { keysBlocked, notGameKey } from './modal';
 
 type Callbacks = {
   onMute: (muted: boolean) => void;
@@ -222,5 +223,5 @@ export class VoiceControls {
   }
 }
 
-const isTyping = (e: KeyboardEvent) =>
-  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+// Space is for the page while typing, in a window, or on a focused button (it presses it).
+const isTyping = (e: KeyboardEvent) => notGameKey(e) || keysBlocked() || e.target instanceof HTMLButtonElement;

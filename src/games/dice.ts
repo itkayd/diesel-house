@@ -138,7 +138,7 @@ export function diceView(onRoll: (r: Roll) => void) {
         f.style.animationDelay = '';
         kick(f, 'land');
       });
-      play('dice_throw', 0.8);
+      // (the throw sound plays once, when the roll is shared: src/house/social.ts rollDice)
       const name = rollName(r.values);
       result.textContent = name ? `${r.total} · ${name}` : String(r.total);
       result.className = 'v2-result' + (name ? ' win' : '');

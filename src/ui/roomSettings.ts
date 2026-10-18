@@ -66,6 +66,8 @@ export function addRoomSettings(
           );
         box.append(field(el('span', 'dh-label', 'Games at this room’s table'), list));
       }
+      // A room with no games spot has no rules to set.
+      if (!table.length) return box.append(status);
       box.append(
         field(
           sectionLabel('This room’s Would you rather prompts', 'room-prompts'),
@@ -75,7 +77,7 @@ export function addRoomSettings(
           }),
         ),
       );
-      box.append(el('small', 'dh-lede', 'Anyone in the house can change these. Changes are saved with your name.'), status);
+      box.append(el('small', 'dh-lede', 'Any member can change these. Changes are saved with your name.'), status);
     },
     false,
     'room',

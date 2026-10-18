@@ -50,7 +50,7 @@ export function update(this: HouseScene) {
     this.showPresenceStatus(this.presenceState);
     if (zone && zone !== 'hallway') this.tracker.emit('room_enter', { u: zone });
     this.askTimer(zone);
-    if (zone && zone !== 'hallway' && zone !== was && this.presence)
+    if (zone && zone !== 'hallway' && zone !== was && this.presence && !this.quietRooms.has(zone))
       toast({ icon: 'door-open', who: zoneLabel(zone), what: this.countIn(zone) > 1 ? 'Joining voice…' : 'Nobody else here yet', small: true, ttl: 2200 });
     // (Zone rides on the move message just below; presence is kept for rare changes.)
     this.sendMove(true);
@@ -64,7 +64,7 @@ export function update(this: HouseScene) {
   // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
   // Standing at a game spot: "Play games · E". Walk off and an open games panel closes.
   const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
-  this.games?.showPrompt(modalOpen() ? null : spot);
+  this.games?.showPrompt(spot, modalOpen());
   this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
   if (this.canMove && !this.presence?.isReplaced) this.critters?.update(this.player);
   this.updateDancing(this.game.loop.delta);

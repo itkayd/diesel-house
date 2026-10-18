@@ -9,7 +9,7 @@ import { play, type Sfx } from './sounds';
 const SLIDERS: [keyof Levels, IconName, string, Sfx | null][] = [
   ['master', 'volume-2', 'Master', 'confirm'],
   ['voices', 'users', 'Voices', null],
-  ['game', 'gamepad-2', 'Game sounds', 'knock'],
+  ['game', 'gamepad-2', 'Game sounds', 'coin'],
   ['music', 'music', 'Music & jingles', 'levelup'],
   ['radio', 'radio', 'Walkie & whisper', null],
 ];
@@ -55,8 +55,8 @@ export function addSoundSettings() {
       const s = mixer.levels;
       box.append(
         switchRow('sfx-on', 'Sound effects', 'Clicks, doors, game sounds', s.sfx, (on) => mixer.set('sfx', on)),
-        switchRow('sfx-doors', 'Door and knock sounds', '', s.doors, (on) => mixer.set('doors', on)),
-        switchRow('sfx-chimes', 'Join and leave chimes', 'When someone comes into or leaves your room', s.chimes, (on) => mixer.set('chimes', on)),
+        switchRow('sfx-doors', 'Door sounds', '', s.doors, (on) => mixer.set('doors', on)),
+        switchRow('sfx-chimes', 'Join and leave chimes', 'When someone comes into or leaves the room you’re in', s.chimes, (on) => mixer.set('chimes', on)),
         switchRow('mute-hidden', 'Mute when the tab is hidden', "Silences everything while you're in another app", s.muteHidden, (on) => mixer.set('muteHidden', on)),
       );
       const note = el('p', 'v2-note', "To change one friend's volume, tap them in a room. Saved on this device.");

@@ -126,7 +126,7 @@
 
 /* ---------- pills, badges ---------- */
 .dh-pill {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px 5px;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px 5px; box-sizing: border-box;
   background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge);
   font-family: var(--font-display); font-size: var(--fs-sm); letter-spacing: .03em; white-space: nowrap;
 }
@@ -187,6 +187,9 @@
 /* ---------- HUD layout (overlay on top of the canvas) ---------- */
 .dh-hud { position: absolute; inset: 0; pointer-events: none; font-family: var(--font-body); }
 .dh-hud > * { pointer-events: auto; }
+/* A soft dark band behind the top row, so the pill and buttons sit on a bar instead of floating on the map. */
+.dh-hud::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(124px + var(--safe-t)); pointer-events: none;
+  background: linear-gradient(rgba(13,9,18,.82), rgba(13,9,18,.5) 60%, rgba(13,9,18,0)); }
 .dh-hud-tl { position: absolute; top: calc(14px + var(--safe-t)); left: calc(14px + var(--safe-l)); display: grid; gap: 10px; justify-items: start; }
 .dh-hud-tr { position: absolute; top: calc(14px + var(--safe-t)); right: calc(14px + var(--safe-r)); display: flex; gap: 12px; }
 .dh-hud-br { position: absolute; bottom: calc(18px + var(--safe-b)); right: calc(18px + var(--safe-r)); display: flex; align-items: end; gap: 14px; }
@@ -205,7 +208,7 @@
   clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
 }
 
-/* toast (knocks, joins) */
+/* toast (notices, duel invites) */
 .dh-toast {
   display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center;
   background: var(--panel); color: var(--cream); padding: 12px; box-shadow: var(--frame-drop);
@@ -214,7 +217,7 @@
 .dh-toast .who { font-family: var(--font-display); font-size: var(--fs-md); }
 .dh-toast .what { color: var(--muted); font-size: var(--fs-sm); }
 .dh-toast .actions { grid-column: 1 / -1; display: flex; gap: 10px; }
-.dh-toast .actions .dh-btn { flex: 1; min-height: 40px; font-size: var(--fs-sm); }
+.dh-toast .actions .dh-btn { flex: 1; min-height: 44px; font-size: var(--fs-sm); }
 .dh-toast--small { grid-template-columns: auto 1fr; padding: 8px 12px; }
 @keyframes dh-drop { from { transform: translateY(-12px); opacity: 0; } }
 
@@ -245,7 +248,7 @@
 }
 .dh-sheet__head .grow { flex: 1; min-width: 0; }
 .dh-sheet__body { overflow-y: auto; touch-action: pan-y; padding: 12px 14px; display: grid; align-content: start; gap: 12px; }
-.dh-sheet__foot { padding: 10px; box-shadow: 0 -3px 0 var(--panel-edge); display: flex; gap: 10px; }
+.dh-sheet__foot { padding: 10px 10px calc(10px + var(--safe-b, 0px)); box-shadow: 0 -3px 0 var(--panel-edge); display: flex; gap: 10px; }
 .dh-grip { width: 44px; height: 5px; background: var(--line); justify-self: center; margin: 8px auto 0; }
 
 /* chat */
@@ -257,12 +260,12 @@
 .dh-msg--cont { grid-template-columns: 32px 1fr; } .dh-msg--cont .dh-portrait, .dh-msg--cont .meta { visibility: hidden; height: 0; }
 .dh-reacts { grid-column: 2; display: flex; gap: 6px; flex-wrap: wrap; }
 .dh-react {
-  font-size: 13px; padding: 2px 6px; background: var(--panel-edge); color: var(--cream); border: 0; cursor: pointer;
+  font-size: 13px; padding: 2px 8px; min-height: 32px; background: var(--panel-edge); color: var(--cream); border: 0; cursor: pointer;
   box-shadow: inset 0 0 0 2px var(--line); display: inline-flex; gap: 4px; align-items: center;
 }
 .dh-react[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--lamp); }
 .dh-reactbar { display: flex; gap: 4px; padding: 6px; background: var(--panel-edge); box-shadow: 0 0 0 2px var(--line); width: max-content; }
-.dh-reactbar button { font-size: 18px; width: 34px; height: 34px; background: none; border: 0; cursor: pointer; }
+.dh-reactbar button { font-size: 18px; width: 40px; height: 40px; background: none; border: 0; cursor: pointer; }
 .dh-reactbar button:hover { background: var(--panel-hi); }
 .dh-day { justify-self: center; font-family: var(--font-display); font-size: 11px; color: var(--faint); letter-spacing: .08em; text-transform: uppercase; }
 
@@ -307,7 +310,8 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 /* ---------- phone layout: switch with a container query on the game wrapper ---------- */
 .dh-game { container-type: size; container-name: game; }
 @container game (max-width: 640px) {
-  .dh-sheet--side { top: auto; left: 0; width: auto; height: 55%; }
+  /* Chat on a phone: above the joystick and the mic button, so you can still walk and mute while it's open. */
+  .dh-sheet--side { top: auto; left: 0; width: auto; height: 46%; bottom: calc(150px + var(--safe-b)); }
   .dh-hud-br { gap: 12px; }
   .dh-scrim { place-items: end center; padding: 0; }
   .dh-scrim > .dh-panel { width: 100%; max-height: 85%; }
@@ -326,21 +330,14 @@ html, body { margin: 0; height: 100%; background: var(--night); color: var(--cre
 #overlay .dh-hud-tc > * { pointer-events: auto; }
 #overlay .dh-scrim, #overlay .vol-pop { pointer-events: auto; }
 [hidden] { display: none !important; }
-.dh-pill.dh-where { max-width: calc(100vw - 150px); overflow: hidden; text-overflow: ellipsis; }
+/* The top row: the "where" pill is as tall as the round buttons beside it, and the XP chip sits under it
+   with the same gap, so the corner reads as one tidy block. */
+.dh-pill.dh-where { max-width: calc(100vw - 150px); min-height: var(--tap); overflow: hidden; text-overflow: ellipsis; }
+.dh-hud-tl, .dh-hud-tr { gap: 10px; }
 .vol-pop { position: absolute; width: min(260px, calc(100% - 32px)); box-sizing: border-box; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 50; pointer-events: auto; }
 .dh-voice-detail { position: absolute; right: 0; bottom: calc(100% + 12px); visibility: hidden; font-family: var(--font-body); font-size: var(--fs-xs); }
 .dh-pick canvas { image-rendering: pixelated; width: 48px; height: 96px; }
 .dh-error { margin: 0; color: var(--error); font-size: var(--fs-sm); }
-/* "Your room" choosers (from design/game/mvp.template.html) */
-.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.seg button { min-height: 40px; font-family: var(--font-display); font-size: 14px; border: 0; cursor: pointer; color: var(--cream);
-  background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.seg button[aria-pressed="true"] { box-shadow: inset 0 0 0 3px var(--lamp); color: var(--lamp); }
-.seg button svg { width: 15px; height: 15px; }
-.moods { display: flex; flex-wrap: wrap; gap: 8px; }
-.moods .dh-mood { font-size: 13px; padding: 4px 8px 5px; cursor: pointer; border: 0; }
-.moods .dh-mood svg { width: 14px; height: 14px; }
-.moods .dh-mood[aria-pressed="false"] { filter: saturate(.25) brightness(.7); }
 
 /* No text selection, long-press menu or tap flash anywhere in the game (it stole touches from the
    joystick). Typing, chat messages and codes to copy stay selectable. */
@@ -353,15 +350,15 @@ html, body, #game, #overlay, #overlay * {
 
 /* Settings / profile tabs, sliders, level meter (design/game/v2.html). */
 .v2-tabs { display: flex; gap: 6px; padding: 4px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); overflow-x: auto; }
-.v2-tabs button { flex: 1; min-height: 36px; border: 0; cursor: pointer; font-family: var(--font-display); font-size: 14px; color: var(--muted); background: none;
+.v2-tabs button { flex: 1; min-height: 44px; border: 0; cursor: pointer; font-family: var(--font-display); font-size: 14px; color: var(--muted); background: none;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; white-space: nowrap; }
 .v2-tabs button svg { width: 15px; height: 15px; }
 .v2-tabs button[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
-.v2-sl { display: grid; grid-template-columns: 24px 1fr 46px 36px; gap: 10px; align-items: center; }
+.v2-sl { display: grid; grid-template-columns: 24px 1fr 46px 44px; gap: 10px; align-items: center; }
 .v2-sl svg { width: 18px; height: 18px; color: var(--muted); }
 .v2-sl .lab { grid-column: 2 / -1; font-family: var(--font-display); font-size: 14px; display: flex; justify-content: space-between; margin-bottom: -6px; }
 .v2-sl .val { font-family: var(--font-display); font-size: 13px; color: var(--muted); text-align: right; }
-.v2-sl .dh-iconbtn { width: 36px; height: 36px; } .v2-sl .dh-iconbtn svg { width: 16px; height: 16px; }
+.v2-sl .dh-iconbtn { width: 44px; height: 44px; } .v2-sl .dh-iconbtn svg { width: 16px; height: 16px; }
 .v2-meter { height: 14px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: flex; gap: 2px; padding: 3px; }
 .v2-meter i { flex: 1; background: #2f2a38; } .v2-meter i.on { background: var(--ok); } .v2-meter i.on.hot { background: var(--warn); }
 .v2-note { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.45; }
@@ -428,7 +425,14 @@ html, body, #game, #overlay, #overlay * {
 /* Narrow phones: messages and the walkie strip go just under the top row (not over the "where" pill and
    buttons), and the connection rating shows as bars only. */
 @media (max-width: 600px) {
-  .dh-hud-tc { top: calc(80px + var(--safe-t)); }
+  .dh-hud-tc { top: calc(128px + var(--safe-t)); }
+  .dh-hud-tl, .dh-hud-tr { gap: 8px; }
+  .dh-hud-tl { top: calc(12px + var(--safe-t)); left: calc(12px + var(--safe-l)); }
+  .dh-hud-tr { top: calc(12px + var(--safe-t)); right: calc(12px + var(--safe-r)); }
+  /* The "where" pill shares the top row with the map, challenges and settings buttons (the guide's ?
+     button moves into Settings → More on narrow phones). */
+  .dh-pill.dh-where { max-width: calc(100vw - 196px); padding: 4px 10px; gap: 6px; }
+  #guide-button { display: none; }
   #net .dh-sub { display: none; }
 }
 
@@ -440,7 +444,7 @@ html, body, #game, #overlay, #overlay * {
 .v2-emotebar { position: absolute; right: calc(16px + var(--safe-r)); bottom: calc(120px + var(--safe-b)); width: min(260px, calc(100% - 32px)); padding: 10px; z-index: 50; pointer-events: auto; box-sizing: border-box; }
 #overlay .v2-emotebar { pointer-events: auto; }
 .vol-pop .acts { display: flex; gap: 10px; }
-.vol-pop .acts .dh-btn { flex: 1; min-height: 40px; font-size: 14px; }
+.vol-pop .acts .dh-btn { flex: 1; min-height: 44px; font-size: 14px; }
 
 /* Games (UPDATE.md Phase 12, design/game/v2.html). */
 .v2-act { position: absolute; left: 50%; bottom: calc(26px + var(--safe-b)); transform: translateX(-50%); z-index: 20; pointer-events: auto; max-width: calc(100% - 32px); }
@@ -505,6 +509,7 @@ html, body, #game, #overlay, #overlay * {
 @keyframes v2-flicker { 0%, 100% { background: #2a1d14; } 46% { background: #3a2a1a; } 50% { background: #22170f; } 54% { background: #3a2a1a; } }
 .v2-draw.go { background: var(--lamp); color: var(--panel-edge); box-shadow: inset 0 0 0 4px var(--panel-edge); animation: none; }
 .v2-draw.foul { background: #3a1a1a; }
+.v2-draw.watching { cursor: default; }
 .v2-draw.win b { color: var(--ok); }
 .v2-board-row { display: grid; grid-template-columns: 28px 32px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
 .v2-board-row.me { box-shadow: inset 0 0 0 2px var(--lamp); }
@@ -604,7 +609,7 @@ html, body, #game, #overlay, #overlay * {
 .v2-item .s { font-size: 13px; color: var(--muted); }
 
 /* Phase 14 (design/game/v2.html): XP chip, challenges, level up, confetti, noticeboard, rank chips. */
-.v2-xp { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; padding: 4px 10px 4px 4px; min-height: 40px; pointer-events: auto;
+.v2-xp { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer; padding: 4px 10px 4px 4px; min-height: 44px; box-sizing: border-box; pointer-events: auto;
   background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge); font-family: var(--font-display); position: relative; max-width: calc(100vw - 40px); }
 .v2-xp:hover { background: var(--panel-hi); }
 .v2-xp .dh-portrait { width: 30px; height: 30px; }
@@ -676,7 +681,7 @@ html, body, #game, #overlay, #overlay * {
 /* "How the house works" guide (src/ui/guide.ts): topic chips, one step at a time, skip any time. */
 .dh-guide { width: min(520px, 100%); gap: 14px; }
 .dh-guide-chips { display: flex; gap: 6px; overflow-x: auto; padding: 3px 3px 6px; scrollbar-width: thin; }
-.dh-guide-chip { flex: none; font-family: var(--font-display); font-size: var(--fs-sm); color: var(--muted); background: var(--panel-edge); border: 0; box-shadow: inset 0 0 0 2px var(--line); padding: 8px 10px; min-height: 36px; cursor: pointer; }
+.dh-guide-chip { flex: none; font-family: var(--font-display); font-size: var(--fs-sm); color: var(--muted); background: var(--panel-edge); border: 0; box-shadow: inset 0 0 0 2px var(--line); padding: 8px 10px; min-height: 44px; cursor: pointer; }
 .dh-guide-chip:hover { color: var(--cream); }
 .dh-guide-chip.on { color: var(--panel-edge); background: var(--lamp); box-shadow: inset 0 -2px 0 var(--lamp-deep); }
 .dh-guide-chip:focus-visible { outline: 3px solid var(--lamp); outline-offset: 1px; }

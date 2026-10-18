@@ -103,7 +103,7 @@ export class ChatPanel {
     const x = el('button', 'dh-iconbtn');
     x.type = 'button';
     x.id = 'chat-close';
-    x.style.cssText = 'width:36px;height:36px';
+    x.style.cssText = 'width:44px;height:44px';
     x.setAttribute('aria-label', 'Close chat');
     x.append(icon('x'));
     x.addEventListener('click', () => this.close());

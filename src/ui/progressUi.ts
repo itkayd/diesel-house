@@ -92,9 +92,11 @@ export class ProgressHud {
       this.chip.append(mid);
       this.dot.hidden = true;
       this.chip.dataset.level = '';
+      this.chip.setAttribute('aria-label', 'Your profile, level and streak');
       return;
     }
     const pr = progress(p.xp);
+    this.chip.setAttribute('aria-label', `Your profile: level ${pr.level}, ${pr.pct}% to the next`);
     const lv = el('span', 'lv');
     lv.append(medalEl(rankMedal(rankOf(pr.level)), 16), document.createTextNode(`Lv ${pr.level.toLocaleString()}`));
     const bar = el('span', 'v2-bar');
@@ -224,6 +226,8 @@ export function levelUpOverlay(from: number, to: number) {
   const o = el('div', 'v2-lvl');
   o.id = 'level-up';
   const card = el('div', 'card dh-panel');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-label', `Level up: level ${to}`);
   const r = rankOf(to);
   const newRank = rankOf(from).id !== r.id;
   card.append(el('div', 'k', 'Level up'));
@@ -238,9 +242,16 @@ export function levelUpOverlay(from: number, to: number) {
   card.append(ok);
   o.append(card);
   confetti(o, 46);
-  o.addEventListener('click', () => o.remove());
+  const back = document.activeElement;
+  const close = () => {
+    if (!o.isConnected) return;
+    o.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus({ preventScroll: true });
+  };
+  o.addEventListener('click', close);
   overlay().append(o);
-  setTimeout(() => o.remove(), 6000);
+  ok.focus({ preventScroll: true });
+  setTimeout(close, 6000);
 }
 
 function confetti(into: HTMLElement, n: number) {
@@ -265,7 +276,8 @@ export function confettiAt(x: number, y: number) {
 
 // ---- Noticeboard: this week's top housemates ----
 
-export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | null, me: string, guest: boolean, seeChallenges: () => void, tab: 'week' | 'catches' = 'week') {
+// rows / catches null: still loading, or (`failed`) they couldn't be loaded.
+export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | null, me: string, guest: boolean, seeChallenges: () => void, tab: 'week' | 'catches' = 'week', failed = false) {
   const { panel, close } = openModal('noticeboard', { dismissable: true, label: 'noticeboard-title' });
   const head = el('div', 'v2-head');
   const h = el('h2', '', 'Noticeboard');
@@ -294,7 +306,7 @@ export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | n
     if (t === 'week') {
       label.textContent = 'This week’s top housemates';
       note.textContent = 'Resets every Monday at 00:00 UTC.';
-      if (!rows) list.append(el('p', 'v2-note', 'Loading the board…'));
+      if (!rows) list.append(el('p', 'v2-note', failed ? 'Couldn’t load the board. Check your connection and open it again.' : 'Loading the board…'));
       else if (!rows.length) list.append(el('p', 'v2-note', 'Nobody has earned XP this week yet.'));
       rows?.forEach((r, i) => {
         const sub = `Lv ${r.level.toLocaleString()} · ${r.wins_week} win${r.wins_week === 1 ? '' : 's'} · ${r.best_streak}-day best streak`;
@@ -303,7 +315,7 @@ export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | n
     } else {
       label.textContent = 'Today’s catches';
       note.textContent = 'Critters turn up around the house every few minutes: walk into one to catch it. Resets at 00:00 UTC.';
-      if (!catches) list.append(el('p', 'v2-note', 'Loading today’s catches…'));
+      if (!catches) list.append(el('p', 'v2-note', failed ? 'Couldn’t load today’s catches. Try again in a moment.' : 'Loading today’s catches…'));
       else if (!catches.length) list.append(el('p', 'v2-note', 'Nothing caught yet today. Keep an eye out!'));
       catches?.forEach((r, i) => {
         const row = boardRow(i, r.user_id, r.display_name, r.character_index, r.level, `${r.caught} caught`, `+${formatXp(r.xp)}`, true, me);

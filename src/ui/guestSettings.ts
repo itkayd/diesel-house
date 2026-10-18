@@ -1,5 +1,6 @@
 import { myGuestCode, newGuestCode, setGuestCode, type GuestCode } from '../net/guestCodes';
 import { el } from './modal';
+import { play } from './sounds';
 import { addSettingsSection, switchRow } from './settings';
 
 // "Your guests" in settings (members only): your invite code to share, a switch for it, "open house" for
@@ -49,12 +50,10 @@ export function addGuestSettings(memberId: () => string | null) {
         share.type = 'button';
         const message = `Come and hang out at Diesel House: open ${location.origin}, tap "Come in as a guest" and use my code ${gc.code}.`;
         copy.addEventListener('click', async () => {
-          await navigator.clipboard?.writeText(gc!.code).catch(() => {});
-          copy.textContent = 'Copied';
+          copied(copy, await copyText(gc!.code), 'Copy code');
         });
         share.addEventListener('click', async () => {
-          await navigator.clipboard?.writeText(message).catch(() => {});
-          share.textContent = 'Copied';
+          copied(share, await copyText(message), 'Copy an invite message');
         });
         copies.append(copy, share);
         const save = async (change: Partial<GuestCode>) => {
@@ -90,4 +89,22 @@ export function addGuestSettings(memberId: () => string | null) {
     },
     true,
   );
+}
+
+// Copy, and say so on the button for a moment (or that it didn't work, so they can copy it by hand).
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function copied(btn: HTMLButtonElement, ok: boolean, label: string) {
+  btn.textContent = ok ? 'Copied ✓' : 'Couldn’t copy: select it instead';
+  play(ok ? 'confirm' : 'error', 0.4);
+  setTimeout(() => {
+    if (btn.isConnected) btn.textContent = label;
+  }, 2000);
 }

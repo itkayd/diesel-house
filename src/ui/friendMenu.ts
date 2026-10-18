@@ -37,7 +37,7 @@ export function showFriendMenu(m: FriendMenu) {
   who.append(portrait(m.character, 32), b);
   const x = el('button', 'dh-iconbtn');
   x.type = 'button';
-  x.style.cssText = 'width:36px;height:36px';
+  x.style.cssText = 'width:44px;height:44px';
   x.setAttribute('aria-label', 'Close');
   x.append(icon('x'));
   x.addEventListener('click', closeFriendMenu);
@@ -85,6 +85,12 @@ export function showFriendMenu(m: FriendMenu) {
     });
   acts.append(duel);
   pop.append(acts);
+  // Why Duel is greyed out, said where a phone user can see it (a title only shows on hover).
+  if (!startDuel && m.duelOff) {
+    const why = el('p', 'v2-note', m.duelOff);
+    why.style.margin = '0';
+    pop.append(why);
+  }
   overlay().appendChild(pop);
   // Close on the next tap outside the card (after this tap has finished).
   setTimeout(() => window.addEventListener('pointerdown', outside, true), 0);

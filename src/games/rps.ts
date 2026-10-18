@@ -20,7 +20,7 @@ const MAX_ROUNDS = 9;
 
 export type DuelMsg =
   | { k: 'invite'; id: string; from: string; to: string }
-  | { k: 'accept' | 'decline' | 'quit'; id: string; from: string; to: string }
+  | { k: 'accept' | 'decline' | 'quit'; id: string; from: string; to: string; busy?: boolean }
   | { k: 'commit'; id: string; from: string; to: string; round: number; h: string }
   | { k: 'reveal'; id: string; from: string; to: string; round: number; pick: Hand; salt: string }
   // To everyone: crown for the winner, dizzy for the loser.
@@ -31,6 +31,7 @@ type Deps = {
   send: (m: DuelMsg) => void;
   record: (players: string[], winners: string[], score: unknown) => void;
   onEnd: (winner: string, loser: string) => void; // crown and dizzy over heads
+  rematch?: () => void; // challenge them again
 };
 
 const isHand = (h: unknown): h is Hand => h === 'rock' || h === 'paper' || h === 'scissors';
@@ -187,6 +188,7 @@ export class Duel {
     this.stopTimers();
     if (this.score[0] >= TO_WIN || this.score[1] >= TO_WIN || this.round >= MAX_ROUNDS) return this.finish('done');
     this.round++;
+    this.setStatus('Next round…');
     this.timers.push(setTimeout(() => this.startRound(), 1600));
   }
 
@@ -220,6 +222,7 @@ export class Duel {
       this.deps.record([this.me.id, this.them.id], [winner], { [this.me.id]: this.score[0], [this.them.id]: this.score[1] });
     }
     this.els.again.hidden = false;
+    if (this.els.rematch && this.deps.rematch) this.els.rematch.hidden = false;
   }
 
   private stopTimers() {
@@ -287,7 +290,18 @@ export class Duel {
     again.id = 'duel-done';
     again.hidden = true;
     again.addEventListener('click', () => this.close());
-    p.append(head, vs, result, status, picks, again);
-    this.els = { round, timer, result, status, picks, again, mineHand: a.handEl, theirHand: b.handEl, scoreMe: a.sc, scoreThem: b.sc };
+    const rematch = el('button', 'dh-btn', 'Rematch');
+    rematch.type = 'button';
+    rematch.id = 'duel-rematch';
+    rematch.hidden = true;
+    rematch.addEventListener('click', () => {
+      this.close();
+      this.deps.rematch?.();
+    });
+    const ends = el('div', 'dh-row');
+    ends.style.cssText = 'justify-content:center;gap:10px;min-height:0';
+    ends.append(again, rematch);
+    p.append(head, vs, result, status, picks, ends);
+    this.els = { round, timer, result, status, picks, again, rematch, mineHand: a.handEl, theirHand: b.handEl, scoreMe: a.sc, scoreThem: b.sc };
   }
 }

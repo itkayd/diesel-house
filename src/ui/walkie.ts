@@ -1,5 +1,6 @@
 import { icon } from './icons';
 import { hudBottomRight } from './overlay';
+import { keysBlocked, notGameKey } from './modal';
 
 // The walkie-talkie button (hallway only; UPDATE.md Phase 10, design/game/v2.html): hold it, or hold the
 // walkie key (T by default), to talk to the whole hallway. A small LED shows the channel: green while
@@ -10,7 +11,6 @@ import { hudBottomRight } from './overlay';
 export type WalkieView = 'idle' | 'talking' | 'busy';
 type Callbacks = { press: () => void; release: () => void; key: () => string };
 
-const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest('input, textarea, select, [contenteditable]');
 
 export class WalkieButton {
   readonly el: HTMLButtonElement;
@@ -56,7 +56,7 @@ export class WalkieButton {
     this.el.addEventListener('lostpointercapture', up);
     this.el.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('keydown', (e) => {
-      if (this.el.hidden || e.repeat || isTyping(e.target) || e.key.toLowerCase() !== this.cb.key()) return;
+      if (this.el.hidden || e.repeat || notGameKey(e) || keysBlocked() || e.key.toLowerCase() !== this.cb.key()) return;
       e.preventDefault();
       this.keyDown = true;
       this.cb.press();
@@ -107,7 +107,7 @@ export class WalkieButton {
     this.led.dataset.state = this.view;
     const key = this.cb.key().toUpperCase();
     this.label.textContent = this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? `On air ${this.left}s` : `Hold · ${key}`;
-    this.el.setAttribute('aria-label', this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? 'On air: let go to stop' : `Walkie-talkie: hold to talk to the hallway (or hold ${key})`);
+    this.el.setAttribute('aria-label', this.view === 'busy' ? 'Channel busy' : this.view === 'talking' ? 'On air: let go to stop' : `Walkie-talkie: hold to talk to the Great Hall (or hold ${key})`);
     this.el.title = this.el.getAttribute('aria-label')!;
   }
 }

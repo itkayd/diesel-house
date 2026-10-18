@@ -328,7 +328,7 @@ async function openGuestProfile(ctx: ProfileContext) {
   const left = el('b', '', '…');
   left.id = 'profile-time-left';
   const facts = el('div', 'v2-facts');
-  facts.append(fact('timer', 'Your visit ends in ', left), fact('info', 'Guests can talk, chat and play. Ask a friend in the house for an invite to get your own room.'));
+  facts.append(fact('timer', 'Your visit ends in ', left), fact('info', 'Guests can talk, chat and play. Ask a member for an invite to become a member yourself.'));
   const change = el('button', 'dh-btn dh-btn--quiet');
   change.type = 'button';
   change.id = 'profile-change-character';

@@ -103,7 +103,11 @@ export function receiveDice(this: HouseScene, m: DiceMsg) {
 // Rock-paper-scissors duel: invite, wait for yes, then both open the duel card.
 export function startDuel(this: HouseScene, id: string) {
   const r = this.remotes.get(id);
-  if (!r || !this.presence || this.duel || this.duelInvite) return;
+  if (!r || !this.presence) return;
+  if (this.duel || this.duelInvite) {
+    toast({ icon: 'swords', id: 'duel-busy', who: 'You’re already in a duel', what: 'Finish or cancel it first.', small: true, ttl: 2500 });
+    return;
+  }
   const duelId = randomSeed().slice(0, 12);
   this.presence.sendDuel({ k: 'invite', id: duelId, from: this.presence.id, to: id });
   this.duelInvite = { id: duelId, to: id, timer: setTimeout(() => this.cancelInvite('no answer'), 20_000) };
@@ -117,15 +121,16 @@ export function startDuel(this: HouseScene, id: string) {
   });
 }
 
-export function cancelInvite(this: HouseScene, why: 'no answer' | 'cancelled' | 'declined' | 'left') {
+export function cancelInvite(this: HouseScene, why: 'no answer' | 'cancelled' | 'declined' | 'busy' | 'left') {
   const inv = this.duelInvite;
   if (!inv) return;
   clearTimeout(inv.timer);
   this.duelInvite = null;
   document.getElementById('duel-wait')?.remove();
-  if (why === 'cancelled') this.presence?.sendDuel({ k: 'quit', id: inv.id, from: this.presence.id, to: inv.to });
+  // Tell them, so a late "Play" doesn't open a duel nobody is waiting for.
+  if (why === 'cancelled' || why === 'no answer') this.presence?.sendDuel({ k: 'quit', id: inv.id, from: this.presence.id, to: inv.to });
   const name = this.remotes.get(inv.to)?.info.name ?? 'They';
-  const who = why === 'declined' ? `${name} said not now` : why === 'left' ? `${name} left` : `${name} didn’t answer`;
+  const who = why === 'busy' ? `${name} is in another duel` : why === 'declined' ? `${name} said not now` : why === 'left' ? `${name} left` : `${name} didn’t answer`;
   if (why !== 'cancelled') toast({ icon: 'swords', who, what: 'Maybe later.', small: true, ttl: 3000 });
 }
 
@@ -142,6 +147,7 @@ export function openDuel(this: HouseScene, id: string, them: string, host: boole
       send: (m) => this.presence?.sendDuel(m),
       record: (players, winners, score) => void recordGame('rps', 'duel', players, winners, score),
       onEnd: (winner, loser) => this.duelEnded(winner, loser),
+      rematch: () => this.startDuel(them),
     },
     () => (this.duel = null),
   );
@@ -167,7 +173,7 @@ export function receiveDuel(this: HouseScene, m: DuelMsg) {
   if (!r || !this.presence) return;
   const me = this.presence.id;
   if (m.k === 'invite') {
-    if (this.duel || this.duelInvite) return this.presence.sendDuel({ k: 'decline', id: m.id, from: me, to: m.from });
+    if (this.duel || this.duelInvite) return this.presence.sendDuel({ k: 'decline', id: m.id, from: me, to: m.from, busy: true });
     play('powerup', 0.5);
     const answer = (yes: boolean) => {
       document.getElementById('duel-invite')?.remove();
@@ -189,7 +195,7 @@ export function receiveDuel(this: HouseScene, m: DuelMsg) {
   }
   const inv = this.duelInvite;
   if (inv && m.id === inv.id && m.from === inv.to && (m.k === 'accept' || m.k === 'decline')) {
-    if (m.k === 'decline') return this.cancelInvite('declined');
+    if (m.k === 'decline') return this.cancelInvite(m.busy ? 'busy' : 'declined');
     clearTimeout(inv.timer);
     this.duelInvite = null;
     document.getElementById('duel-wait')?.remove();

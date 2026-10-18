@@ -49,7 +49,7 @@ export const hudToasts = () => build().tc;
 
 // Room names (src/house/rooms.ts) and "Do not disturb" (live, from the rooms table) for the HUD.
 type RoomInfo = { name: string; dnd: boolean };
-let roomInfo = (zone: Zone): RoomInfo => ({ name: zone === 'hallway' ? 'Hallway' : (roomDef(zone)?.name ?? zone), dnd: false });
+let roomInfo = (zone: Zone): RoomInfo => ({ name: zone === 'hallway' ? 'Great Hall' : (roomDef(zone)?.name ?? zone), dnd: false });
 export function setRoomInfo(f: (zone: Zone) => RoomInfo) {
   roomInfo = f;
 }

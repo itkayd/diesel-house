@@ -101,6 +101,7 @@ export type MicProblemKind = 'declined' | 'denied' | 'busy' | 'none' | 'unsuppor
 // only gives silence (on Android, usually another app holding it).
 export type MicState = 'on' | 'muted' | 'off' | 'silent';
 // ms of exact digital silence from a live mic before we call it broken (dev ?silentms= shortens it for tests)
+const KEEP_MIC_MS = 3 * 60_000; // a mic stays switched on (but silenced) this long after leaving a room
 const SILENT_AFTER = (import.meta.env.DEV && Number(new URLSearchParams(location.search).get('silentms'))) || 20_000;
 
 type Handlers = {
@@ -162,6 +163,10 @@ export class Voice {
   private channel: RealtimeChannel | null = null;
   private peers = new Map<string, Peer>();
   private stream: MediaStream | null = null;
+  // The mic after leaving a room, switched off but kept for KEEP_MIC_MS: walking room → hall → room reuses it
+  // instead of opening it again (phones show a "Microphone access" banner every time the mic opens).
+  private parked: MediaStream | null = null;
+  private parkTimer = 0;
   private localMeter: Meter | null = null;
   private ctx: AudioContext | null = null;
   private ice: { servers: RTCIceServer[]; turn: boolean; expires: number } | null = null;
@@ -223,11 +228,11 @@ export class Voice {
     const cancelled = new Promise<void>((r) => (this.cancelJoin = r));
     const wantMic = await this.h.askMic(cancelled, space);
     if (token !== this.joinToken) return;
-    const [stream] = await Promise.all([wantMic ? this.openMic() : null, this.iceServers()]);
+    const [stream] = await Promise.all([wantMic ? this.takeMic() : null, this.iceServers()]);
     if (!wantMic) this.micProblem = 'declined';
     else if (stream) this.micProblem = null;
     if (token !== this.joinToken) {
-      stream?.getTracks().forEach((t) => t.stop());
+      this.park(stream);
       return; // left (or moved rooms) while we were waiting
     }
     this.useStream(stream);
@@ -237,7 +242,7 @@ export class Voice {
     // channel first, or Supabase hands that one back.
     for (const old of supabase.getChannels()) if (old.topic === `realtime:voice:${room}`) await supabase.removeChannel(old);
     if (token !== this.joinToken) {
-      stream?.getTracks().forEach((t) => t.stop());
+      this.park(stream);
       return;
     }
     // Private: guest-list members only (and from Phase 6, only people the door lets in).
@@ -302,7 +307,7 @@ export class Voice {
     for (const id of [...this.peers.keys()]) this.closePeer(id);
     this.localMeter?.disconnect();
     this.localMeter = null;
-    this.stream?.getTracks().forEach((t) => t.stop());
+    this.park(this.stream);
     this.stream = null;
     clearInterval(this.levelTimer);
     clearInterval(this.maintainTimer);
@@ -476,6 +481,37 @@ export class Voice {
     this.stream?.getAudioTracks().forEach((t) => (t.enabled = live));
     this.lastSound = Date.now(); // muting/unmuting restarts the silence check
     this.reportMic();
+  }
+
+  // The parked mic if it's still live, else a newly opened one.
+  private async takeMic(): Promise<MediaStream | null> {
+    const kept = this.parked;
+    this.parked = null;
+    clearTimeout(this.parkTimer);
+    if (kept && kept.getAudioTracks().some((t) => t.readyState === 'live')) {
+      kept.getAudioTracks().forEach((t) => (t.enabled = true));
+      this.micProblem = null;
+      return kept;
+    }
+    kept?.getTracks().forEach((t) => t.stop());
+    return this.openMic();
+  }
+
+  // Switch the mic off and keep it a few minutes (stopped for good after that, or when the tab is closed).
+  private park(stream: MediaStream | null) {
+    if (!stream || stream === this.parked) return;
+    if (this.parked) this.parked.getTracks().forEach((t) => t.stop());
+    stream.getAudioTracks().forEach((t) => (t.enabled = false));
+    this.parked = stream;
+    clearTimeout(this.parkTimer);
+    this.parkTimer = window.setTimeout(() => this.releaseMic(), KEEP_MIC_MS);
+  }
+
+  // Let go of a kept mic (the browser's mic light goes off).
+  releaseMic() {
+    clearTimeout(this.parkTimer);
+    this.parked?.getTracks().forEach((t) => t.stop());
+    this.parked = null;
   }
 
   private async openMic(): Promise<MediaStream | null> {

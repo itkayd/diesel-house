@@ -52,9 +52,9 @@ export function critterAppeared(this: HouseScene, list: Spawn[]) {
   const here = list.filter((s) => this.zoneOf(s.x, s.y) === this.zone);
   if (here.length === 1) {
     const c = critterById(here[0].id)!;
-    critterToast(here[0].id, `A ${c.name.toLowerCase()} turned up ${this.zone === 'hallway' ? 'in the hallway' : 'in here'}!`, `Walk into it to catch it · +${c.xp} XP`);
+    critterToast(here[0].id, `A ${c.name.toLowerCase()} turned up ${this.zone === 'hallway' ? 'in the Great Hall' : 'in here'}!`, `Walk into it to catch it · +${c.xp} XP`);
   } else if (here.length > 1) {
-    critterToast(here[0].id, `${here.length} critters turned up ${this.zone === 'hallway' ? 'in the hallway' : 'in here'}!`, 'Walk into them to catch them.');
+    critterToast(here[0].id, `${here.length} critters turned up ${this.zone === 'hallway' ? 'in the Great Hall' : 'in here'}!`, 'Walk into them to catch them.');
   } else if (list.length > 1) {
     critterToast(list[0].id, `${list.length} critters are about`, 'Check the map to find them.');
   }

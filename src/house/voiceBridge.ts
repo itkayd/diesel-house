@@ -48,7 +48,10 @@ export async function pressWalkie(this: HouseScene) {
   const hall = this.hallway;
   if (!voice || !hall || voice.space !== 'hallway') return;
   if (!voice.micStream) {
+    // Pressing the walkie is asking to talk, even after "Just listen" earlier: ask again.
+    resetMicDecline();
     const ok = await askForMic(new Promise<void>(() => {}));
+    if (!ok) toast({ icon: 'mic-off', id: 'walkie-nomic', who: 'The walkie needs your mic', what: 'Allow the mic to talk on it.', small: true, ttl: 3000 });
     if (ok) {
       voice.leave();
       await voice.join('hallway');
@@ -115,7 +118,7 @@ export function updateVoice(this: HouseScene) {
   if (space && this.quietRooms.has(space) && this.voice.space !== space)
     toast({ icon: 'book-open', id: 'quiet-room', who: `${roomDef(space)?.name ?? 'This room'} is a quiet room`, what: 'People hear you only up close, like whispering.', small: true, ttl: 3200 });
   if (space === 'hallway' && this.voice.room)
-    toast({ icon: 'volume-x', id: 'back-in-hallway', who: 'Back in the hallway', what: 'Room voice off. Get close to someone to whisper.', small: true, ttl: 2200 });
+    toast({ icon: 'volume-x', id: 'back-in-hallway', who: 'Back in the Great Hall', what: 'Room voice off. Get close to someone to whisper.', small: true, ttl: 2200 });
   this.walkie?.setVisible(space === 'hallway');
   if (!space) {
     this.voice.leave();

@@ -11,7 +11,7 @@ import { addRoomSettings } from '../ui/roomSettings';
 import { addGuestSettings } from '../ui/guestSettings';
 import { toast } from '../ui/toasts';
 import { askForMic, micAlreadyAllowed } from '../ui/micPrompt';
-import { modalOpen } from '../ui/modal';
+import { keysBlocked, notGameKey } from '../ui/modal';
 import { addVoiceSettings } from '../ui/voiceSettings';
 import { EMOTES, EmoteButton } from '../ui/emotes';
 import { showSoundBanner } from '../ui/soundBanner';
@@ -166,12 +166,11 @@ export async function start(this: HouseScene) {
   new EmoteButton((e) => this.sendEmote(e));
   // Keys 1-6: quick emotes. Q: the menu for whoever is right next to us.
   addEventListener('keydown', (e) => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || modalOpen()) return;
-    const t = e.target;
-    if (t instanceof HTMLElement && t.closest('input, textarea, select, [contenteditable]')) return;
+    if (e.repeat || notGameKey(e) || keysBlocked()) return;
     const n = Number(e.key);
     if (e.key.toLowerCase() === 'e' && this.games?.promptFor) this.games.open(this.games.promptFor);
     else if (e.key.toLowerCase() === 'e' && this.boardPrompt) void this.openBoard();
+    else if (e.key.toLowerCase() === 'e' && this.timerPrompt) this.timerPrompt.querySelector('button')?.click();
     else if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
     else if (e.key.toLowerCase() === 'q') {
       const id = this.nearestRemote(48);
@@ -188,7 +187,7 @@ export async function start(this: HouseScene) {
   );
   this.games = new Games({
     me: () => ({ id: this.presence!.id, name: this.name, character: this.character, guest: !!currentUser()?.guest }),
-    names: (id) => (id === this.presence?.id ? { name: this.name, character: this.character } : (this.remotes.get(id)?.info ?? { name: '', character: 0 })),
+    names: (id) => (id === this.presence?.id ? { name: this.name, character: this.character } : (this.remotes.get(id)?.info ?? { name: '' })),
     nearby: () =>
       [...this.remotes.values()].filter((r) => r.active && r.info.zone === this.zone).map((r) => ({ id: r.info.id, name: r.info.name, character: r.info.character })),
     allowed: (spot) => (spot === 'hall' ? null : ((this.rooms.get(spot)?.games as GameId[] | null | undefined) ?? null)),
@@ -227,7 +226,7 @@ export async function start(this: HouseScene) {
       if (!err) this.roomChanged({ ...room, games, prompts });
       return err;
     },
-    (room) => gamesFor(this.spots.kind(room.id)),
+    (room) => (this.spots.kind(room.id) ? gamesFor(this.spots.kind(room.id)) : []), // no games spot here: nothing to switch
   );
   addGuestSettings(() => {
     const u = currentUser();
@@ -238,6 +237,7 @@ export async function start(this: HouseScene) {
   this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.voice?.leave());
   window.addEventListener('pagehide', () => {
     this.voice?.leave();
+    this.voice?.releaseMic();
     this.presence?.leave();
   });
 }

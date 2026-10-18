@@ -282,7 +282,7 @@ export class HotTakesView implements TableView {
           const side = majority(st.votes ?? {});
           const mine = st.votes?.[this.me];
           const myBtn = mine ? this.sides.querySelector(`[data-choice="${mine}"]`) : null;
-          if (myBtn && side && mine === side) setTimeout(() => floatText(myBtn, '+1', 'good'), 450);
+          if (myBtn && side && mine === side && Object.keys(st.votes ?? {}).length >= 2) setTimeout(() => floatText(myBtn, '+1', 'good'), 450);
         }
       }
     }
@@ -292,12 +292,14 @@ export class HotTakesView implements TableView {
     } else if (st.phase === 'reveal') {
       const side = majority(st.votes ?? {});
       const mine = st.votes?.[this.me];
-      this.status.textContent = !side ? 'Split down the middle: no points.' : mine === side ? 'You’re with the majority: +1' : mine ? 'You’re in the minority this time.' : 'The majority picked ' + side.toUpperCase() + '.';
+      const n = Object.keys(st.votes ?? {}).length;
+      this.status.textContent = n < 2 ? 'Not enough votes for a point this time.' : !side ? 'Split down the middle: no points.' : mine === side ? 'You’re with the majority: +1' : mine ? 'You’re in the minority this time.' : 'The majority picked ' + side.toUpperCase() + '.';
     } else {
       const winners = topScorers(st.points);
       this.status.textContent = '';
       const res = el('div', 'v2-result' + (winners.includes(this.me) ? ' win' : ''), winTitle(winners, this.me, this.names, s.players));
       res.id = 'wyr-result';
+      this.sides.querySelector('#wyr-result')?.remove(); // shown again (people coming and going): one line only
       this.sides.append(res);
       if (fresh && playing) play(winners.includes(this.me) ? 'win' : 'lose', 0.7);
       if (fresh && winners.includes(this.me)) requestAnimationFrame(() => burst(res, 24));

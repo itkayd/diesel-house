@@ -10,3 +10,4 @@ psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/phase14_test.sql 2>&1 | 
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/critters_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR|SCHEDULE|MULTI"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/r1_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/r3_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
+psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/games_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"

@@ -30,7 +30,7 @@ export function openCredits() {
   x.type = 'button';
   x.id = 'credits-close';
   x.setAttribute('aria-label', 'Close');
-  x.style.cssText = 'width:36px;height:36px';
+  x.style.cssText = 'width:44px;height:44px';
   x.append(icon('x'));
   x.addEventListener('click', close);
   head.append(title, x);

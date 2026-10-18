@@ -1,18 +1,20 @@
 import { el } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
-import { burst, buzz } from './juice';
+import { burst, buzz, timerBar } from './juice';
 import { cryptoInt } from './fair';
 import { nameOf } from './kit';
 import type { Names, Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
 
 // Four in a row (UPDATE.md Phase 13): two players at a table, a 7 x 6 grid, simple pixel pieces drawn in
 // CSS; everyone else at the table watches. Who goes first is random. If a player leaves, the other wins.
+// Each move has TURN_MS: run out and a piece drops in a random column for you (the game never stalls).
 // Messages: 1 per host move, 2 per the other player's move (move + snapshot); a typical game is 30-45,
 // only a completely full board (a draw) reaches 64.
 
 export const COLS = 7;
 export const ROWS = 6;
+export const TURN_MS = 30_000;
 
 export type FourState = {
   phase: 'play' | 'done';
@@ -24,6 +26,7 @@ export type FourState = {
   winner?: string | null; // null: a draw
   reason?: 'four' | 'full' | 'left';
   moves: number;
+  auto?: boolean; // the last piece was dropped by the clock
 };
 export type FourAct = { t: 'drop'; col: number; rid: number };
 
@@ -64,7 +67,7 @@ export function drop(players: Seat[], st: FourState, col: number): FourState | n
   const cell = landing(st.board, col);
   if (cell < 0) return null;
   const board = st.board.slice(0, cell) + st.turn + st.board.slice(cell + 1);
-  const next: FourState = { ...st, board, last: cell, moves: st.moves + 1, rid: st.rid + 1, turn: st.turn === 0 ? 1 : 0 };
+  const next: FourState = { ...st, board, last: cell, moves: st.moves + 1, rid: st.rid + 1, turn: st.turn === 0 ? 1 : 0, auto: false };
   const line = lineThrough(board, cell);
   if (line) return { ...next, phase: 'done', line, winner: players[st.turn].id, reason: 'four', turn: st.turn };
   if (!board.includes('.')) return { ...next, phase: 'done', winner: null, reason: 'full' };
@@ -73,6 +76,8 @@ export function drop(players: Seat[], st: FourState, col: number): FourState | n
 
 // Host side.
 export class FourHost implements TableHost {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(
     private table: Table,
     private record: Recorder,
@@ -81,12 +86,14 @@ export class FourHost implements TableHost {
   start(players: Seat[]) {
     const st: FourState = { phase: 'play', rid: 1, board: emptyBoard(), turn: cryptoInt(0, 1) as 0 | 1, moves: 0 };
     this.table.start('four', players.slice(0, 2), st);
+    this.arm();
   }
 
   // The host was a player and has gone, so the other player (us) wins.
   takeover(s: Snapshot) {
     if (s.game !== 'four' || (s.state as FourState).phase !== 'play') return;
     this.onPeople();
+    this.arm();
   }
 
   onAction(from: string, act: unknown) {
@@ -110,11 +117,32 @@ export class FourHost implements TableHost {
     this.commit({ ...st, phase: 'done', winner: other?.id ?? null, reason: 'left', rid: st.rid + 1 });
   }
 
-  stop() {}
+  stop() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  // Too slow: a piece drops in a random open column for whoever's turn it is.
+  private arm() {
+    this.stop();
+    const st = this.table.snap?.state as FourState | undefined;
+    if (!st || st.phase !== 'play') return;
+    const rid = st.rid;
+    this.timer = setTimeout(() => {
+      const s = this.table.snap;
+      const now = s?.state as FourState | undefined;
+      if (!s || !now || now.rid !== rid || now.phase !== 'play') return;
+      const open = Array.from({ length: COLS }, (_, c) => c).filter((c) => landing(now.board, c) >= 0);
+      const next = open.length ? drop(s.players, now, open[cryptoInt(0, open.length - 1)]) : null;
+      if (next) this.commit({ ...next, auto: true });
+    }, TURN_MS);
+  }
 
   private commit(next: FourState) {
     const s = this.table.snap!;
     this.table.update({ state: next });
+    if (next.phase === 'play') this.arm();
+    else this.stop();
     if (next.phase === 'done') this.record(s.players.map((p) => p.id), next.winner ? [next.winner] : [], { moves: next.moves, reason: next.reason });
   }
 }
@@ -203,17 +231,28 @@ export class FourView implements TableView {
         play('card_place', 0.6);
         buzz(10);
         this.act({ t: 'drop', col: c, rid: st.rid });
+        // No answer from the host (a lost message): let them try again.
+        const rid = st.rid;
+        setTimeout(() => {
+          if (this.rid !== rid || this.sent !== rid) return;
+          this.sent = 0;
+          this.rid = 0;
+          this.show(s);
+        }, 3000);
       });
       this.grid.append(col);
     }
     // (our own drop already clicked into place when we tapped)
     const lastBy = st.last !== undefined ? st.board[st.last] : null;
-    if (fresh && st.last !== undefined && String(seat) !== lastBy) play('card_place', 0.7);
+    if (fresh && st.last !== undefined && String(seat) !== lastBy && st.reason !== 'left') play('card_place', 0.7);
     if (fresh && mine && st.last !== undefined) buzz(10); // your move
 
+    this.root.querySelector('#four-timer')?.remove();
     this.status.className = 'v2-result';
     if (st.phase === 'play') {
-      this.status.textContent = mine ? 'Your move: tap a column' : seat < 0 ? `${name(s.players[st.turn].id)} to move · watching` : `${name(s.players[st.turn].id)} to move…`;
+      const auto = st.auto && st.last !== undefined ? 'Out of time: a piece dropped by itself. ' : '';
+      this.status.textContent = auto + (mine ? 'Your move: tap a column' : seat < 0 ? `${name(s.players[st.turn].id)} to move · watching` : `${name(s.players[st.turn].id)} to move…`);
+      this.status.after(timerBar(TURN_MS, 'four-timer'));
     } else {
       const won = st.winner === this.me;
       this.status.classList.add(won ? 'win' : seat >= 0 && st.winner ? 'lose' : 'x');

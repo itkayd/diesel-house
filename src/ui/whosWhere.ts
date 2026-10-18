@@ -133,7 +133,7 @@ export function openWhosWhere(get: () => WhoWhere) {
       row.dataset.person = p.id;
       const txt = el('span');
       txt.style.cssText = 'display:grid;gap:2px;min-width:0';
-      const where = !p.zone || p.zone === 'hallway' ? 'Hallway' : w.label(p.zone);
+      const where = !p.zone || p.zone === 'hallway' ? 'Great Hall' : w.label(p.zone);
       txt.append(el('span', 't', p.name || 'Someone'), el('span', 's', where + (p.talking ? ' · talking' : '')));
       const go = el('button', 'dh-btn dh-btn--quiet');
       go.type = 'button';

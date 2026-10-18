@@ -48,15 +48,15 @@ await page.waitForTimeout(1500);
 const again = await page.locator('#guide').count();
 check('once skipped, it doesn’t open by itself again', { again }, again === 0);
 
-await page.click('#guide-button');
-const reopened = await step();
-check('the ? button opens it again, at the start', reopened, reopened.on === 'welcome');
-await page.click('#guide-skip');
+// On a phone the ? button is hidden to keep the top bar tidy (it's in Settings → More).
+const qHidden = await page.locator('#guide-button').isHidden();
+check('on a phone the ? button stays out of the top bar', { qHidden }, qHidden);
 await page.click('#settings-button');
 await page.click('#settings-tab-more').catch(() => {});
 await page.click('#settings-guide');
 const fromSettings = await page.locator('#guide').count();
-check('Settings → How the house works opens it too', { fromSettings }, fromSettings === 1);
+const reopened = await step();
+check('Settings → How the house works opens it again, at the start', { fromSettings, ...reopened }, fromSettings === 1 && reopened.on === 'welcome');
 
 console.log(res.join('\n'));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');

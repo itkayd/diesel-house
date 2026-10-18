@@ -1,9 +1,9 @@
 // A stand-in for src/games/table.ts GameTable with no Supabase: several players' tables in one page,
 // joined by an in-memory "channel" that delivers broadcasts a moment later (like Realtime, never to the
-// sender). Same rules as GameTable: newer snapshots win, moves go to the host, and when the host leaves
+// sender). Same rules as GameTable: the winning snapshot (wins(): generation, then host id) is kept, moves go to the host, and when the host leaves
 // the player who sat down first takes over. Used by tests/e2e/table-games-local.mjs to play the Phase 13
 // games end to end in a browser. Counts sent messages like msgStats does.
-import type { Seat, Snapshot, TableHost } from '../../src/games/table';
+import { wins, type Seat, type Snapshot, type TableHost } from '../../src/games/table';
 
 type Msg = { event: 'snap' | 'act'; payload: unknown; from: string };
 
@@ -54,7 +54,7 @@ export class FakeTable {
   }
 
   start<S>(game: string, players: Seat[], state: S) {
-    this.publish({ v: (this.snap?.v ?? 0) + 1, host: this.me.id, game, players, state });
+    this.publish({ v: (this.snap?.v ?? 0) + 1, gen: (this.snap?.gen ?? 0) + 1, host: this.me.id, game, players, state });
   }
   update<S>(change: Partial<Pick<Snapshot<S>, 'players' | 'state'>>) {
     if (!this.snap || !this.isHost) return;
@@ -75,7 +75,10 @@ export class FakeTable {
     if (!this.ch.tables.has(this.me.id)) return;
     if (m.event === 'snap') {
       const s = m.payload as Snapshot;
-      if (this.snap && s.v <= this.snap.v && s.host === this.snap.host) return;
+      if (this.snap && !wins(s, this.snap)) {
+        if (this.isHost && s.host !== this.me.id) this.ch.broadcast({ event: 'snap', payload: this.snap, from: this.me.id });
+        return;
+      }
       this.snap = s;
       if (!this.isHost && this.host) {
         this.host.stop();
@@ -95,7 +98,7 @@ export class FakeTable {
     if (!s || this.ch.tables.has(s.host)) return;
     const next = s.players.filter((p) => this.ch.tables.has(p.id)).sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))[0];
     if (next?.id !== this.me.id) return;
-    this.snap = { ...s, host: this.me.id, v: s.v + 1 };
+    this.snap = { ...s, host: this.me.id, v: s.v + 1, gen: (s.gen ?? 0) + 1 };
     this.ch.broadcast({ event: 'snap', payload: this.snap, from: this.me.id });
     this.onTakeover(this.snap);
   }

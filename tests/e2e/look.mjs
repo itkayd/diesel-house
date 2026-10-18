@@ -43,7 +43,7 @@ check('fonts load locally (no Google call) and the page is night-coloured', them
 const pill = async () => ({ zone: (await A.page.locator('#where-zone').textContent()).trim(), status: (await A.page.locator('#status').textContent()).trim() });
 await A.page.waitForFunction(() => /in the house/.test(document.getElementById('status')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
 const hallPill = await pill();
-check('HUD pill in the hallway: "Hallway · N in the house"', hallPill, hallPill.zone === 'Hallway' && /^\d+ in the house$/.test(hallPill.status));
+check('HUD pill in the hallway: "Great Hall · N in the house"', hallPill, hallPill.zone === 'Great Hall' && /^\d+ in the house$/.test(hallPill.status));
 const plates = await A.page.evaluate(() => window.__house.children.list.filter((o) => o.name?.startsWith('plate-')).map((o) => o.name));
 check('a nameplate over each of the 8 doors', { plates: plates.length }, plates.length === 8);
 

@@ -54,12 +54,15 @@ export function gotProgress(this: HouseScene, r: Recorded) {
   }
   if (levelled) setTimeout(() => levelUpOverlay(r.level_before, r.level), wait + 300);
   if (r.completed.length || levelled) this.cheer();
-  // Keep an open profile up to date (where it was scrolled to), unless you're typing your name.
+  // Keep an open profile up to date (same tab, where it was scrolled to), unless you're typing your name.
   const prof = document.getElementById('profile');
-  if (prof && (first || prof.dataset.xp !== String(r.xp)) && !prof.contains(document.activeElement)) {
+  const typing = prof?.contains(document.activeElement) && document.activeElement?.matches('input, textarea');
+  if (prof && (first || prof.dataset.xp !== String(r.xp)) && !typing) {
     const top = prof.querySelector('.dh-panel')?.scrollTop ?? 0;
+    const tab = prof.querySelector('[role="tab"][aria-selected="true"]')?.id;
     this.openMyProfile();
     const again = document.getElementById('profile');
+    if (tab && tab !== 'profile-tab-about') (again?.querySelector(`#${tab}`) as HTMLButtonElement | null)?.click();
     if (again) again.querySelector('.dh-panel')!.scrollTop = top;
   }
   document.getElementById('profile')?.setAttribute('data-xp', String(r.xp));
@@ -93,9 +96,9 @@ export async function openBoard(this: HouseScene) {
   const user = currentUser();
   const guest = !!user?.guest;
   openNoticeboard(null, null, user?.id ?? '', guest, () => this.openMyChallenges());
-  if (guest || !canRecord()) return;
-  const [rows, catches] = await Promise.all([weeklyBoard(), catchBoard()]);
-  if (document.getElementById('noticeboard')) openNoticeboard(rows, catches, user?.id ?? '', guest, () => this.openMyChallenges());
+  if (guest) return;
+  const [rows, catches] = canRecord() ? await Promise.all([weeklyBoard(), catchBoard()]) : [null, null];
+  if (document.getElementById('noticeboard')) openNoticeboard(rows, catches, user?.id ?? '', guest, () => this.openMyChallenges(), 'week', true);
 }
 
 export function showBoardPrompt(this: HouseScene, on: boolean) {

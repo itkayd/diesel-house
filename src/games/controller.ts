@@ -81,10 +81,27 @@ const TABLE: Record<TableGameId, TableGame> = {
 };
 const isTableGame = (g: string): g is TableGameId => g in TABLE;
 
+// Games whose end we've already counted (challenges), kept for this tab so a reload doesn't count them again.
+const SEEN_KEY = 'diesel-house.games-seen';
+function readSeen(): string[] {
+  try {
+    return JSON.parse(sessionStorage.getItem(SEEN_KEY) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+}
+function saveSeen(seen: Set<string>) {
+  try {
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-50)));
+  } catch {
+    // private browsing: memory only
+  }
+}
+
 type Who = { id: string; name: string; character: number; guest?: boolean };
 export type GameDeps = {
   me: () => Who;
-  names: (id: string) => { name: string; character: number };
+  names: (id: string) => { name: string; character?: number };
   // People in the same place as us, for "Challenge" (Rock paper scissors).
   nearby: () => Who[];
   // Games the room owner allows at this spot (null: all).
@@ -114,6 +131,8 @@ export class Games {
   private spot: SpotId | null = null;
   private prompt: HTMLDivElement | null = null;
   private promptSpot: SpotId | null = null;
+  private arrived: SpotId | null = null; // the spot we last walked onto (its click has played)
+  private lastGame = new Map<SpotId, string>(); // per table: the game last seen starting (gen:host:game)
 
   constructor(private deps: GameDeps) {}
 
@@ -121,24 +140,28 @@ export class Games {
     return this.spot;
   }
 
-  // Standing on a spot (or not): the "Play games · E" button.
-  showPrompt(spot: SpotId | null) {
-    if (spot === this.promptSpot) return;
-    this.promptSpot = spot;
+  // Standing on a spot (or not): the "Play games · E" button. `hidden`: a window is open over it (the
+  // button goes, but coming back to it isn't a new arrival, so no click sound).
+  showPrompt(spot: SpotId | null, hidden = false) {
+    const want = hidden ? null : spot;
+    if (!hidden && !spot) this.arrived = null;
+    if (want === this.promptSpot) return;
+    this.promptSpot = want;
     this.prompt?.remove();
     this.prompt = null;
-    if (!spot) return;
+    if (!want) return;
     const box = el('div', 'v2-act');
     const b = el('button', 'dh-btn');
     b.type = 'button';
     b.id = 'game-prompt';
     b.append(icon('dice-5'), document.createTextNode('Play games'));
     if (!isTouchDevice()) b.append(el('kbd', '', 'E'));
-    b.addEventListener('click', () => this.open(spot));
+    b.addEventListener('click', () => this.open(want));
     box.append(b);
     overlay().append(box);
     this.prompt = box;
-    play('click', 0.4);
+    if (this.arrived !== want) play('click', 0.4);
+    this.arrived = want;
   }
 
   get promptFor() {
@@ -201,6 +224,7 @@ export class Games {
         // Only when something changed, so the Start button isn't rebuilt under a finger.
         if (this.spot === spot && isTableGame(this.screen) && (!this.running(spot) || !this.view) && this.tableKey(spot) !== this.shownKey) this.render();
       },
+      running: (s) => isTableGame(s.game) && TABLE[s.game].running(s.state),
       onTakeover: (s) => {
         if (!isTableGame(s.game) || this.spot !== spot) return;
         this.host?.stop();
@@ -236,7 +260,7 @@ export class Games {
   }
 
   // Phase 14: notice a game ending for us (once per game), and our Quick Draw round wins and times.
-  private seenEnd = new Set<string>();
+  private seenEnd = new Set<string>(readSeen());
   private qdBest = new Map<string, number>();
   private qdRound = new Set<string>();
   private notice(t: GameTable, s: Snapshot) {
@@ -257,6 +281,7 @@ export class Games {
     }
     if (TABLE[s.game].running(s.state) || this.seenEnd.has(key)) return;
     this.seenEnd.add(key);
+    saveSeen(this.seenEnd);
     this.deps.played?.(s.game, TABLE[s.game].winners(s).includes(t.id), { fastestMs: this.qdBest.get(key) });
   }
 
@@ -271,8 +296,16 @@ export class Games {
       this.host = null;
     }
     if (!isTableGame(s.game)) return;
-    if (this.screen !== s.game) this.show(s.game);
-    else if (this.view && this.viewGame === s.game) {
+    // Only jump to the game when one has just started (or we're playing in it), not on every update of
+    // a game we're watching from the list or the dice.
+    const start = `${s.gen ?? 0}:${s.host}:${s.game}`;
+    const isNew = this.lastGame.get(spot) !== start;
+    this.lastGame.set(spot, start);
+    const mine = s.players.some((p) => p.id === t.id);
+    if (this.screen !== s.game) {
+      if (isNew || mine) this.show(s.game);
+      else if (this.screen === 'list' || isTableGame(this.screen)) this.render();
+    } else if (this.view && this.viewGame === s.game) {
       this.view.show(s);
       this.again(t, s);
     } else this.render();
@@ -377,7 +410,16 @@ export class Games {
     if (watching) body.append(el('p', 'v2-note', `${watching} more at the table will watch.`));
     const alone = people.length < g.min;
     if (alone) body.append(el('p', 'v2-note', 'Nobody else is at this table yet. Ask a friend to walk over and open it too.'));
-    body.append(this.startButton(t, game, alone ? 'Waiting for someone to join…' : `Start with ${people.length} players`, alone));
+    // Another game is going at this table: starting this one would end theirs.
+    const busy = this.running(spot) && s ? s.game : null;
+    if (busy && isTableGame(busy)) {
+      const go = el('button', 'dh-btn dh-btn--quiet');
+      go.type = 'button';
+      go.id = `${g.short}-watch`;
+      go.append(icon(GAMES[busy].icon), document.createTextNode(`Watch ${GAMES[busy].title}`));
+      go.addEventListener('click', () => this.show(busy));
+      body.append(el('p', 'v2-note', `${GAMES[busy].title} is being played here. Start when it’s finished.`), this.startButton(t, game, 'A game is going…', true), go);
+    } else body.append(this.startButton(t, game, alone ? 'Waiting for someone to join…' : `Start with ${people.length} players`, alone));
     this.shownKey = this.tableKey(spot);
   }
 
@@ -395,7 +437,8 @@ export class Games {
     if (!root) return;
     root.querySelector('.v2-again')?.remove();
     if (TABLE[game].running(s.state)) return;
-    const b = this.startButton(t, game, 'Play again', this.lineup(t, TABLE[game]).length < TABLE[game].min);
+    const few = this.lineup(t, TABLE[game]).length < TABLE[game].min;
+    const b = this.startButton(t, game, few ? 'Waiting for a second player…' : 'Play again', few);
     b.classList.add('v2-again');
     root.append(b);
   }
@@ -409,7 +452,8 @@ export class Games {
     b.append(icon(GAMES[game].icon), document.createTextNode(label));
     b.addEventListener('click', () => {
       const players = this.lineup(t, g);
-      if (players.length < g.min) return;
+      if (players.length < g.min || (this.running(t.spot) && t.snap?.game !== game) || (this.running(t.spot) && !t.isHost)) return;
+      play('confirm', 0.5);
       this.dropView();
       this.host?.stop();
       this.host = this.newHost(t, game);

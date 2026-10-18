@@ -36,7 +36,7 @@ export function quiet(this: HouseScene, room: RoomId) {
 }
 
 export function showRooms(this: HouseScene) {
-  setRoomInfo((zone: Zone) => ({ name: zone === 'hallway' ? 'Hallway' : (roomDef(zone)?.name ?? zone), dnd: zone !== 'hallway' && this.quiet(zone) }));
+  setRoomInfo((zone: Zone) => ({ name: zone === 'hallway' ? 'Great Hall' : (roomDef(zone)?.name ?? zone), dnd: zone !== 'hallway' && this.quiet(zone) }));
   for (const id of ROOM_IDS) this.look.setRoom(id, { name: zoneLabel(id), dnd: this.quiet(id) });
   this.showPresenceStatus(this.presenceState);
 }

@@ -11,9 +11,9 @@ export function addHallwaySettings(hall: Hallway) {
     30,
     (box) => {
       box.append(
-        el('div', 'dh-label', 'Hallway'),
-        switchRow('whisper-toggle', 'Whisper in the hallway', 'People right next to you hear you quietly', hall.whisperOn, (on) => hall.setWhisper(on)),
-        switchRow('hear-walkie-toggle', 'Hear the walkie-talkie', 'Anyone in the hallway can call everyone over the radio', hall.hearWalkie, (on) => hall.setHearWalkie(on)),
+        el('div', 'dh-label', 'Great Hall'),
+        switchRow('whisper-toggle', 'Whisper in the Great Hall', 'People right next to you hear you quietly', hall.whisperOn, (on) => hall.setWhisper(on)),
+        switchRow('hear-walkie-toggle', 'Hear the walkie-talkie', 'Anyone in the Great Hall can call everyone over the radio', hall.hearWalkie, (on) => hall.setHearWalkie(on)),
       );
       const select = el('select', 'dh-input');
       select.id = 'walkie-key';

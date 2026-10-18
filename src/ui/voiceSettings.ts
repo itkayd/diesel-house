@@ -17,7 +17,7 @@ export function addVoiceSettings(voice: Voice, controls: VoiceControls, onFix: (
       const state = el('div', 'dh-row');
       state.id = 'mic-state';
       const txt = el('span', 'txt', controls.captionText);
-      txt.append(el('small', '', controls.problem ? 'People in your room can\'t hear you yet.' : 'People in your room can hear you when the mic button is green.'));
+      txt.append(el('small', '', controls.problem ? 'People in the room with you can\'t hear you yet.' : 'People in the room with you can hear you when the mic button is green.'));
       state.append(txt);
       if (controls.problem) {
         const fix = el('button', 'dh-btn');
@@ -61,10 +61,15 @@ export function addVoiceSettings(voice: Voice, controls: VoiceControls, onFix: (
       let own: MediaStream | null = null;
       let ctx: AudioContext | null = null;
       let timer = 0;
+      let closed = false;
       const start = async () => {
+        // Settings draws each tab off-screen first to see which have anything: never open the mic for that.
+        if (!box.isConnected) return;
         let stream = voice.micStream;
         if (!stream) {
-          own = await navigator.mediaDevices?.getUserMedia(MIC).catch(() => null);
+          own = (await navigator.mediaDevices?.getUserMedia(MIC).catch(() => null)) ?? null;
+          // Closed (or switched tab) while the browser was asking: let the mic go straight away.
+          if (closed) return void own?.getTracks().forEach((t) => t.stop());
           stream = own;
         }
         if (!stream) return;
@@ -84,6 +89,7 @@ export function addVoiceSettings(voice: Voice, controls: VoiceControls, onFix: (
       };
       void start();
       onSettingsClose(() => {
+        closed = true;
         clearInterval(timer);
         void ctx?.close().catch(() => {});
         own?.getTracks().forEach((t) => t.stop());

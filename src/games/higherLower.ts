@@ -120,7 +120,9 @@ export class HigherLowerHost implements TableHost {
   async takeover(s: Snapshot) {
     const st = s.state as HLState;
     if (s.game !== 'higherlower' || st.phase !== 'turn') return;
-    this.seed = randomSeed();
+    // A new seed whose first card isn't the one face up (else the same card could come straight back).
+    do this.seed = randomSeed();
+    while (cardAt(this.seed, 0) === st.card);
     const next: HLState = { ...st, commit: await sha256(this.seed), seed: undefined, dealt: [], rid: st.rid + 1, takeovers: (st.takeovers ?? 0) + 1 };
     this.table.update({ state: next });
     this.onPeople();

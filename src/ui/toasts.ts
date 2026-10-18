@@ -6,9 +6,12 @@ import { portrait } from './portrait';
 type Action = { label: string; quiet?: boolean; onClick?: () => void; id?: string };
 type Toast = { icon?: IconName; face?: number; who: string; what?: string; actions?: Action[]; small?: boolean; ttl?: number; id?: string };
 
-// Top-centre notices (design/game/mvp.html `toast`): "Sami's room · Voice connected", knocks with
-// Let in / Not now, "Room is locked". Returns a function that removes it.
+// Top-centre notices (design/game/mvp.html `toast`): "Garden · Nobody else here yet", a duel invite with
+// Play / Not now. A new notice with the same id replaces the old one, and at most MAX show at once
+// (the oldest goes). Returns a function that removes it.
+const MAX = 3;
 export function toast(t: Toast) {
+  if (t.id) document.getElementById(t.id)?.remove();
   const box = el('div', 'dh-toast' + (t.small ? ' dh-toast--small' : ''));
   if (t.id) box.id = t.id;
   box.setAttribute('role', 'status');
@@ -35,7 +38,9 @@ export function toast(t: Toast) {
     }
     box.append(a);
   }
-  hudToasts().append(box);
+  const host = hudToasts();
+  host.append(box);
+  while (host.childElementCount > MAX) host.firstElementChild?.remove();
   const ttl = t.ttl ?? 4500;
   if (ttl) setTimeout(remove, ttl);
   return remove;

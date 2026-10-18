@@ -3,7 +3,7 @@ import { portrait } from '../ui/portrait';
 import { play } from '../ui/sounds';
 import { burst, buzz, kick } from './juice';
 import { checkSeed, randomSeed, rng, sha256 } from './fair';
-import type { Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
+import type { Names, Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
 
 // Quick Draw (UPDATE.md Phase 12): 2-8 players at a table. "The lamp will flicker… wait for it", then
 // DRAW! after a random 2-6 s, and the first to tap wins the round. Early tap = out for that round. 5 rounds,
@@ -14,6 +14,7 @@ import type { Recorder, Seat, Snapshot, Table, TableHost, TableView } from './ta
 
 export const ROUNDS = 5;
 const PAUSE = 2500; // ms showing the last round's times before the next "wait for it"
+const MIN_MS = 80; // ms: no human reacts faster
 const ANSWER_MS = 3000; // after DRAW!, how long the host waits for taps
 const POINTS = [3, 2, 1];
 
@@ -74,7 +75,8 @@ export class QuickDrawHost implements TableHost {
     const s = this.table.snap;
     const st = s?.state as QDState | undefined;
     if (!s || !st || st.phase !== 'round' || a.rid !== st.rid || !s.players.some((p) => p.id === from) || from in this.times) return;
-    this.times[from] = a.t === 'early' ? -1 : Math.max(0, Math.min(ANSWER_MS, Math.round(a.ms)));
+    // Faster than a human can react (about 80 ms) counts as tapping too soon.
+    this.times[from] = a.t === 'early' || !(a.ms >= MIN_MS) ? -1 : Math.min(ANSWER_MS, Math.round(a.ms));
     if (this.waitingFor().length === 0) this.finishRound();
   }
 
@@ -145,7 +147,7 @@ export class QuickDrawView implements TableView {
   constructor(
     private me: string,
     private act: (a: Act) => void,
-    private names: (id: string) => { name: string; character: number },
+    private names: Names,
   ) {
     this.box.id = 'qd-box';
     this.box.tabIndex = 0;
@@ -168,7 +170,13 @@ export class QuickDrawView implements TableView {
   show(s: Snapshot) {
     const st = s.state as QDState;
     this.playing = s.players.some((p) => p.id === this.me);
+    this.box.classList.toggle('watching', !this.playing);
+    this.box.setAttribute('aria-disabled', String(!this.playing));
     if (st.phase === 'done') {
+      // Only once per finished game: people coming and going at the table redraw it, but the sound and
+      // confetti shouldn't play again.
+      if (this.phase === 'done' && st.rid === this.rid) return void this.renderPoints(s, st, st.last);
+      this.rid = st.rid;
       this.clear();
       this.phase = 'done';
       void this.showDone(s, st);
@@ -199,7 +207,8 @@ export class QuickDrawView implements TableView {
 
   private tap() {
     if (!this.playing) return;
-    if (this.phase === 'ready' || this.phase === 'results') {
+    // A tap while the last round's results show is just someone dismissing them: not a foul.
+    if (this.phase === 'ready') {
       this.phase = 'idle';
       this.clear();
       this.setBox('foul', 'Too soon!', 'Out for this round.');
@@ -214,6 +223,7 @@ export class QuickDrawView implements TableView {
       this.setBox('', `${ms} ms`, `${rating} Waiting for the others…`);
       kick(this.box.querySelector('b')!, 'v2-pop');
       buzz(10);
+      play(ms < 350 ? 'coin' : 'click', 0.6);
       this.act({ t: 'tap', rid: this.rid, ms });
     }
   }
@@ -235,7 +245,7 @@ export class QuickDrawView implements TableView {
         const who = this.names(r.p.id);
         const ms = r.ms === undefined ? '' : r.ms < 0 ? 'too soon' : `${r.ms} ms`;
         const chip = el('span', 'v2-xpchip', `${r.pts} pt${r.pts === 1 ? '' : 's'}${ms ? ' · ' + ms : ''}`);
-        row.append(rk, portrait(who.character, 32), el('b', '', r.p.id === this.me ? 'You' : who.name || r.p.name), chip);
+        row.append(rk, portrait(who.character ?? r.p.character, 32), el('b', '', r.p.id === this.me ? 'You' : who.name || r.p.name), chip);
         return row;
       }),
     );
@@ -263,7 +273,7 @@ export class QuickDrawView implements TableView {
   }
 
   private setBox(cls: string, big: string, small: string) {
-    this.box.className = 'v2-draw' + (cls ? ' ' + cls : '');
+    this.box.className = 'v2-draw' + (cls ? ' ' + cls : '') + (this.playing ? '' : ' watching');
     const inner = el('div');
     const b = el('b', '', big);
     inner.append(b);

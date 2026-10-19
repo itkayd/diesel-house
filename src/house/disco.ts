@@ -3,6 +3,7 @@ import { bounds, ROOMS } from './rooms';
 import { DEPTH, TILE, toScreen } from './projection';
 import { artFrame } from './art';
 import type { HouseScene } from '../scenes/HouseScene';
+import { savedDiscoBright } from '../prefs';
 
 // The Disco (REDESIGN.md R3): a dance floor that slowly changes colour, a glitter ball with light specks
 // sweeping the room, two light beams from the DJ booth, and people swaying while they stand on the floor.
@@ -30,18 +31,22 @@ export function setupDisco(this: HouseScene) {
     const glow = this.add.graphics().setDepth(DEPTH.light + 1).setBlendMode(Phaser.BlendModes.ADD); // the colour shows through the night
     const draw = () => {
       const t = this.time.now / 1000;
-      const speed = reduce ? 4 : 24; // degrees of hue per second
+      // Soft by default (UI-REVIEW U4: photosensitivity): calmer colours, slower drift. Settings → More →
+      // Bright disco lights for the full show; "reduce motion" keeps it slow either way.
+      const bright = savedDiscoBright();
+      const speed = reduce ? 4 : bright ? 24 : 10; // degrees of hue per second
+      const [sat, light, glowA] = bright ? [0.75, 0.55, 0.16] : [0.45, 0.42, 0.08];
       g.clear();
       glow.clear();
       for (let j = 0; j < r.dance!.h; j++)
         for (let i = 0; i < r.dance!.w; i++) {
           const hue = ((t * speed + i * 38 + j * 64 + ((i * j) % 3) * 50) % 360) / 360;
-          const c = Phaser.Display.Color.HSLToColor(hue, 0.75, 0.55).color;
+          const c = Phaser.Display.Color.HSLToColor(hue, sat, light).color;
           const x = tl.x + i * TILE;
           const y = tl.y + j * TILE;
           g.fillStyle(c, 1).fillRect(x, y, TILE, TILE);
           g.fillStyle(0x000000, 0.25).fillRect(x, y + TILE - 1, TILE, 1).fillRect(x + TILE - 1, y, 1, TILE);
-          glow.fillStyle(c, 0.16).fillRect(x, y, TILE, TILE);
+          glow.fillStyle(c, glowA).fillRect(x, y, TILE, TILE);
         }
     };
     draw();

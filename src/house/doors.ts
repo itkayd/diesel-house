@@ -1,3 +1,4 @@
+import { trackName } from './jukebox';
 import type { Skin } from '../characters';
 import { ROOM_IDS, type RoomId, type Zone } from '../config';
 import { roomDef } from './rooms';
@@ -24,11 +25,17 @@ export function showPresenceStatus(this: HouseScene, s: 'connecting' | 'reconnec
 export async function loadRooms(this: HouseScene) {
   for (const r of await fetchRooms()) this.rooms.set(r.id, r);
   this.showRooms();
+  this.syncMusic();
 }
 
 export function roomChanged(this: HouseScene, room: Room) {
-  this.rooms.set(room.id, { ...this.rooms.get(room.id), ...room });
+  const before = this.rooms.get(room.id);
+  this.rooms.set(room.id, { ...before, ...room });
   this.showRooms();
+  this.syncMusic();
+  // Someone put a track on while you're in the Disco.
+  if (room.id === 'disco' && this.zone === 'disco' && room.music && room.music_at !== before?.music_at)
+    toast({ icon: 'music', id: 'jukebox-toast', who: `♪ ${trackName(room.music)}`, what: `${this.nameOf(room.music_by)} put it on.`, small: true, ttl: 2500 });
 }
 
 // Do not disturb only counts while someone is in the room (it clears when the next person finds it empty).
@@ -134,4 +141,20 @@ export function replaced(this: HouseScene) {
       },
     ],
   });
+}
+
+// The Disco's jukebox: heard only inside the Disco, the same track at the same moment for everyone there.
+export function syncMusic(this: HouseScene) {
+  const disco = this.rooms.get('disco' as RoomId);
+  const inside = this.zone === 'disco';
+  this.jukebox?.set(inside ? disco?.music : null, disco?.music_at);
+  this.jukeboxUi?.setVisible(inside && !!this.presence);
+  this.jukeboxUi?.refresh();
+}
+
+// Someone's display name by account id (you, a friend here, or "Someone").
+export function nameOf(this: HouseScene, id: string | null | undefined) {
+  if (!id) return 'Someone';
+  if (id === this.presence?.id) return 'You';
+  return this.remotes.get(id)?.info.name || 'Someone';
 }

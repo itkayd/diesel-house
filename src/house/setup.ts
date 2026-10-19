@@ -11,7 +11,7 @@ import { currentUser } from '../net/profile';
 import { GameSpots } from '../scenes/gameSpots';
 import { loadSounds } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
-import { saveCharacter, savedCharacter, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
+import { saveCharacter, savedCharacter, savedDiscoBright, saveDiscoBright, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
 import { el } from '../ui/modal';
 import { openCredits } from '../ui/credits';
 import { addOldRooms } from '../ui/oldRooms';
@@ -132,6 +132,7 @@ export function create(this: HouseScene) {
           saveShowOwnTag(on);
           this.me.setTagVisible(on);
         }),
+        switchRow('disco-bright', 'Bright disco lights', 'Off: soft, slow colours on the dance floor', savedDiscoBright(), (on) => saveDiscoBright(on)),
       ),
     false,
     'more',

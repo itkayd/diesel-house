@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { type RoomId, type Zone } from '../config';
 import { DEFAULT_SKIN, type Skin } from '../characters';
 import type { HouseAnimals } from './animals';
+import type { Jukebox } from '../house/jukebox';
+import type { JukeboxButton } from '../ui/jukeboxUi';
 import { Zones } from '../house/zones';
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { msgStats } from '../net/stats';
@@ -112,6 +114,8 @@ export class HouseScene extends Phaser.Scene {
   boardPrompt: HTMLDivElement | null = null;
   critters: Critters | null = null;
   animals: HouseAnimals | null = null;
+  jukebox: Jukebox | null = null;
+  jukeboxUi: JukeboxButton | null = null;
   autoDoor: RoomId | null = null; // walking up to a quiet room's door: ask when we get there
   autoCheck = { t: 0, x: 0, y: 0 };
   wallLayer!: Phaser.Tilemaps.TilemapLayer;
@@ -156,6 +160,8 @@ export class HouseScene extends Phaser.Scene {
   showPresenceStatus = doors.showPresenceStatus;
   loadRooms = doors.loadRooms;
   roomChanged = doors.roomChanged;
+  syncMusic = doors.syncMusic;
+  nameOf = doors.nameOf;
   quiet = doors.quiet;
   showRooms = doors.showRooms;
   quietDoor = doors.quietDoor;

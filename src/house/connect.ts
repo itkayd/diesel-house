@@ -13,6 +13,9 @@ import { toast } from '../ui/toasts';
 import { askForMic, micAlreadyAllowed } from '../ui/micPrompt';
 import { keysBlocked, notGameKey } from '../ui/modal';
 import { MicPausedChip } from '../ui/micPaused';
+import { Jukebox } from './jukebox';
+import { JukeboxButton } from '../ui/jukeboxUi';
+import { setRoomMusic } from '../net/rooms';
 import { addVoiceSettings } from '../ui/voiceSettings';
 import { EMOTES, EmoteButton } from '../ui/emotes';
 import { showSoundBanner } from '../ui/soundBanner';
@@ -183,6 +186,19 @@ export async function start(this: HouseScene) {
       e.preventDefault();
       void this.chat.openToType();
     }
+  });
+  this.jukebox = new Jukebox();
+  this.jukeboxUi = new JukeboxButton({
+    now: () => {
+      const d = this.rooms.get('disco' as RoomId);
+      return { track: d?.music ?? null, by: d?.music && d.music_by ? this.nameOf(d.music_by) : null };
+    },
+    choose: async (track) => {
+      const err = await setRoomMusic('disco' as RoomId, track);
+      // Show it straight away; the live update follows for everyone else.
+      if (!err) this.roomChanged({ ...this.rooms.get('disco' as RoomId)!, music: track, music_at: track ? new Date().toISOString() : null, music_by: track ? this.presence!.id : null });
+      return err;
+    },
   });
   this.chat = new ChatPanel(
     () => ({ id: this.presence!.id, name: this.name, character: this.character }),

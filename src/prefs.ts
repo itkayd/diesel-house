@@ -61,6 +61,11 @@ const OWN_TAG_KEY = 'diesel-house.show-own-tag';
 export const savedShowOwnTag = () => read(OWN_TAG_KEY) !== '0';
 export const saveShowOwnTag = (on: boolean) => write(OWN_TAG_KEY, on ? '1' : '0');
 
+// The Disco's lights: soft (default, kinder on the eyes) or bright.
+const DISCO_KEY = 'diesel-house.disco-bright';
+export const savedDiscoBright = () => read(DISCO_KEY) === '1';
+export const saveDiscoBright = (on: boolean) => write(DISCO_KEY, on ? '1' : '0');
+
 // Which microphone to use on this device ('' = the system default).
 const MIC_KEY = 'diesel-house.mic-device';
 export const savedMicDevice = () => read(MIC_KEY) ?? '';

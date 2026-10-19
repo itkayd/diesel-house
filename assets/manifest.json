@@ -333,5 +333,39 @@
       "bytes": 3762,
       "source": "Kenney · UI Pack Pixel Adventure (CC0): Tilesheets/Small tiles/Thick outline/tilemap_packed.png"
     }
-  }
+  },
+  "music": [
+    {
+      "key": "sun_tribe",
+      "path": "public/assets/music/sun_tribe.mp3",
+      "source": "'Sun Tribe' from A Meta Data Game assets by ansimuz (https://opengameart.org/content/top-down-adventure-assets), converted from Ogg to MP3 96 kbps",
+      "licence": "CC0 (OGA page); the zip's licence also allows commercial use, changes and redistribution",
+      "commercial": true,
+      "credit": "ansimuz (appreciated)"
+    },
+    {
+      "key": "determination",
+      "path": "public/assets/music/determination.mp3",
+      "source": "'Determination' from A Meta Data Game assets by ansimuz (https://opengameart.org/content/top-down-adventure-assets), converted from Ogg to MP3 96 kbps",
+      "licence": "CC0 (OGA page); the zip's licence also allows commercial use, changes and redistribution",
+      "commercial": true,
+      "credit": "ansimuz (appreciated)"
+    },
+    {
+      "key": "ghost_town",
+      "path": "public/assets/music/ghost_town.mp3",
+      "source": "'Ghost Town' from A Meta Data Game assets by ansimuz (https://opengameart.org/content/top-down-adventure-assets), converted from Ogg to MP3 96 kbps",
+      "licence": "CC0 (OGA page); the zip's licence also allows commercial use, changes and redistribution",
+      "commercial": true,
+      "credit": "ansimuz (appreciated)"
+    },
+    {
+      "key": "sun_tribe_inside",
+      "path": "public/assets/music/sun_tribe_inside.mp3",
+      "source": "'Sun Tribe interior' from A Meta Data Game assets by ansimuz (https://opengameart.org/content/top-down-adventure-assets), converted from Ogg to MP3 96 kbps",
+      "licence": "CC0 (OGA page); the zip's licence also allows commercial use, changes and redistribution",
+      "commercial": true,
+      "credit": "ansimuz (appreciated)"
+    }
+  ]
 }

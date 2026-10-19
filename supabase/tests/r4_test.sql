@@ -74,3 +74,37 @@ end $$;
 update public.profiles set pet = null where id = auth.uid();
 select pg_temp.ok((select pet from public.profiles where id = auth.uid()) is null, 'a pet can be sent home (none)');
 reset role;
+
+-- ---- Disco jukebox (20261105) ----
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+select public.set_room_music('disco', 'sun_tribe');
+select pg_temp.ok((select music from public.rooms where id = 'disco') = 'sun_tribe' and (select music_at from public.rooms where id = 'disco') is not null, 'anyone in the house can start a track in the Disco');
+do $$ begin
+  perform public.set_room_music('disco', 'ghost_town');
+  raise exception 'FAIL: changed track twice in a row';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: no flipping tracks faster than every 2 s (%)', sqlerrm;
+end $$;
+do $$ begin
+  perform public.set_room_music('lounge', 'sun_tribe');
+  raise exception 'FAIL: jukebox outside the Disco';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: only the Disco has a jukebox (%)', sqlerrm;
+end $$;
+reset role;
+update public.rooms set music_at = now() - interval '1 minute' where id = 'disco';
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+do $$ begin
+  perform public.set_room_music('disco', 'not_a_track');
+  raise exception 'FAIL: played an unknown track';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: only known tracks (%)', sqlerrm;
+end $$;
+select public.set_room_music('disco', null);
+select pg_temp.ok((select music from public.rooms where id = 'disco') is null, 'the music can be stopped');
+reset role;

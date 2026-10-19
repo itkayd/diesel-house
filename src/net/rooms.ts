@@ -14,11 +14,14 @@ export type Room = {
   dnd_set_by: string | null;
   games?: string[] | null;
   prompts?: string[] | null;
+  music?: string | null; // the Disco's jukebox: track id (src/house/jukebox.ts) and when it started
+  music_at?: string | null;
+  music_by?: string | null;
 };
 
 export async function loadRooms(): Promise<Room[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('rooms').select('id, active, dnd, dnd_set_by, games, prompts').order('id');
+  const { data, error } = await supabase.from('rooms').select('*') // (music columns once migration 20261105 is applied).order('id');
   if (error) console.warn('Could not load rooms', error.message);
   return (data ?? []) as Room[];
 }
@@ -34,5 +37,12 @@ export async function setDnd(room: RoomId, quiet: boolean) {
 export async function setRoomRules(room: RoomId, games: string[] | null, prompts: string[] | null) {
   if (!supabase) return 'offline';
   const { error } = await supabase.rpc('set_room_rules', { room, room_games: games, room_prompts: prompts });
+  return error?.message ?? null;
+}
+
+// Put a track on the Disco's jukebox, or stop it (null). Anyone in the house can.
+export async function setRoomMusic(room: RoomId, track: string | null) {
+  if (!supabase) return 'offline';
+  const { error } = await supabase.rpc('set_room_music', { room, track });
   return error?.message ?? null;
 }

@@ -4,6 +4,7 @@ import { type Dir } from '../characters';
 import { play } from '../ui/sounds';
 import { zoneLabel } from '../ui/overlay';
 import { roomBanner } from '../ui/roomBanner';
+import { trackName } from './jukebox';
 import { modalOpen } from '../ui/modal';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ZONE_SETTLE_MS } from './consts';
@@ -56,12 +57,15 @@ export function update(this: HouseScene) {
     if (zone && zone !== 'hallway' && zone !== was && this.presence) {
       const others = this.countIn(zone) - 1;
       const quiet = this.quietRooms.has(zone);
-      roomBanner(zoneLabel(zone), quiet ? 'Quiet room · people near you hear you softly' : others > 0 ? `${others} here · joining voice…` : 'Nobody else here yet');
+      const music = zone === 'disco' ? this.rooms.get('disco' as RoomId)?.music : null;
+      const who = quiet ? 'Quiet room · people near you hear you softly' : others > 0 ? `${others} here · joining voice…` : 'Nobody else here yet';
+      roomBanner(zoneLabel(zone), music ? `${who} · ♪ ${trackName(music)}` : who);
     }
     // (Zone rides on the move message just below; presence is kept for rare changes.)
     this.sendMove(true);
     this.updateVoice();
     this.chat?.setRoom(zone && zone !== 'hallway' ? (zone as RoomId) : null);
+    this.syncMusic();
   } else {
     this.sendMove();
   }

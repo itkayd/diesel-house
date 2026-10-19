@@ -5,6 +5,7 @@ import { play } from '../ui/sounds';
 import { zoneLabel } from '../ui/overlay';
 import { roomBanner } from '../ui/roomBanner';
 import { trackName } from './jukebox';
+import { nearArcade } from './arcade';
 import { modalOpen } from '../ui/modal';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ZONE_SETTLE_MS } from './consts';
@@ -77,6 +78,7 @@ export function update(this: HouseScene) {
   const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
   this.games?.showPrompt(spot, modalOpen());
   this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
+  this.showArcadePrompt(!modalOpen() && this.canMove && !spot && nearArcade(this.player.x, this.player.y));
   if (this.canMove && !this.presence?.isReplaced) this.critters?.update(this.player);
   this.updateDancing(this.game.loop.delta);
   this.updateRoomExtras();

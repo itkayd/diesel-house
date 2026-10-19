@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { type RoomId, type Zone } from '../config';
 import { DEFAULT_SKIN, type Skin } from '../characters';
 import type { HouseAnimals } from './animals';
+import * as arcade from '../house/arcade';
 import type { Jukebox } from '../house/jukebox';
 import type { JukeboxButton } from '../ui/jukeboxUi';
 import type { WatchTogether } from '../ui/watchTogether';
@@ -113,6 +114,7 @@ export class HouseScene extends Phaser.Scene {
   metGuests = new Set<string>();
   partied = false;
   boardPrompt: HTMLDivElement | null = null;
+  arcadePrompt: HTMLDivElement | null = null;
   critters: Critters | null = null;
   animals: HouseAnimals | null = null;
   jukebox: Jukebox | null = null;
@@ -163,6 +165,8 @@ export class HouseScene extends Phaser.Scene {
   loadRooms = doors.loadRooms;
   roomChanged = doors.roomChanged;
   syncMusic = doors.syncMusic;
+  showArcadePrompt = arcade.showArcadePrompt;
+  openArcade = arcade.openArcade;
   nameOf = doors.nameOf;
   quiet = doors.quiet;
   showRooms = doors.showRooms;

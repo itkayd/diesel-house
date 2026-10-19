@@ -7,7 +7,7 @@ const CREDITS: [string, string, string, string][] = [
   ['Roguelike Indoors', 'Kenney', 'Extra props. CC0.', 'https://kenney.nl/assets/roguelike-indoors'],
   ['Pixel Interior LRK', 'bitglow', 'Bookcases, sofas, fireplaces, tables, rugs, lamps and plants in the new house.', 'https://bitglow.itch.io/pixelinterior-livingroomkitchen'],
   ['Cozy Interior 165+', 'Sleepless Poetry', 'The café counter, coffee maker, fridges, TV and speakers.', 'https://sleepless-poetry.itch.io/cozy-interior-165-pixel-art-furniture-assets'],
-  ['Ninja Adventure', 'pixel-boy', 'Every character and their faces, the animals and pets, plus the garden: grass, trees, pond, fire pit and lanterns. CC0.', 'https://pixel-boy.itch.io/ninja-adventure-asset-pack'],
+  ['Ninja Adventure', 'pixel-boy', 'Every character and their faces, the animals and pets, the Night Raid spooks, plus the garden: grass, trees, pond, fire pit and lanterns. CC0.', 'https://pixel-boy.itch.io/ninja-adventure-asset-pack'],
   ['Disco music', 'ansimuz', 'Sun Tribe, Determination and Ghost Town chiptunes on the jukebox. CC0.', 'https://opengameart.org/content/top-down-adventure-assets'],
   ['Assorted Disco', 'Michael Muirden', 'The glitter ball. CC0.', 'https://opengameart.org/node/31404'],
   ['Sound packs', 'Kenney', 'RPG Audio, Interface Sounds, Digital Audio, Music Jingles and Casino Audio. CC0.', 'https://kenney.nl/assets/category:Audio'],

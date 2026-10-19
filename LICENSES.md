@@ -19,7 +19,7 @@ Verdicts:
 | `furniture/kenney_roguelike_indoor.png` | Kenney Roguelike Indoors | CC0 | ✅ | — |
 | `ui/ui-pack.png`, `emotes/*`, `prompts/*`, `games/cards.*` | Kenney | CC0 | ✅ | — |
 | `sfx/*` | Kenney audio packs, Juhani Junkala, SoundPack01 | CC0 | ✅ | — |
-| `characters/skins.png`, `faces.png`, `animals/animals.png` (R4, 19 Oct) | Ninja Adventure (pixel-boy) | CC0 | ✅ | — |
+| `characters/skins.png`, `faces.png`, `animals/animals.png`, `arcade/nightraid.png` (R4, 19 Oct) | Ninja Adventure (pixel-boy) | CC0 | ✅ | — |
 | `music/*.mp3` (Disco jukebox, R4, 19 Oct) | ansimuz chiptunes (N7) | CC0 | ✅ | Credit ansimuz on the Credits screen (done) |
 | `ui/medals.png` | OpenGameArt `oga_medals` | CC0 (per ASSETS.md) | ⚠️ | Re-check the OGA page before launch and save a screenshot of the licence into `design/licences/` |
 | Fonts: Pixelify Sans, Atkinson Hyperlegible | Google Fonts | OFL | ✅ | — |

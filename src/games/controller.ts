@@ -119,6 +119,7 @@ export type GameDeps = {
   played?: (game: GameId, won: boolean, info: { fastestMs?: number }) => void;
   hosted?: (game: GameId, players: number) => void;
   quickDrawRound?: () => void; // we were fastest in a Quick Draw round
+  arcade?: () => void; // open Night Raid (one player)
 };
 
 export class Games {
@@ -365,7 +366,27 @@ export class Games {
       if (!b.disabled) b.addEventListener('click', () => this.show(id as Games['screen']));
       grid.append(b);
     }
-    body.append(this.whoIsHere(spot), grid, el('p', 'v2-note', 'Games are quick and you stay in voice while you play.'));
+    body.append(this.whoIsHere(spot), grid);
+    // The one-player arcade game (also at the Gaming room's cabinets).
+    const arcade = this.deps.arcade;
+    if (arcade) {
+      const a = el('button', 'v2-game v2-game--wide');
+      a.type = 'button';
+      a.id = 'games-arcade';
+      const gi = el('span', 'gi');
+      gi.append(icon('gamepad-2'));
+      const top = el('span', 'top');
+      const tag = el('span', 'tag', '1');
+      tag.prepend(icon('users', { width: 12 }));
+      top.append(gi, tag);
+      a.append(top, el('b', '', 'Night Raid (arcade)'), el('span', '', 'Throw shurikens at the spooks raiding the rooftop. Beat your best for XP.'));
+      a.addEventListener('click', () => {
+        this.close();
+        arcade();
+      });
+      body.append(a);
+    }
+    body.append(el('p', 'v2-note', 'Games are quick and you stay in voice while you play.'));
   }
 
   // Faces of everyone sitting at this table (you first).

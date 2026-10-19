@@ -179,6 +179,7 @@ export async function start(this: HouseScene) {
     const n = Number(e.key);
     if (e.key.toLowerCase() === 'e' && this.games?.promptFor) this.games.open(this.games.promptFor);
     else if (e.key.toLowerCase() === 'e' && this.boardPrompt) void this.openBoard();
+    else if (e.key.toLowerCase() === 'e' && this.arcadePrompt) void this.openArcade();
     else if (e.key.toLowerCase() === 'e' && this.timerPrompt) this.timerPrompt.querySelector('button')?.click();
     else if (n >= 1 && n <= 6) this.sendEmote(EMOTES[n - 1].id);
     else if (e.key.toLowerCase() === 'q') {
@@ -257,6 +258,7 @@ export async function start(this: HouseScene) {
     },
     hosted: (_game, players) => players >= 4 && this.tracker.emit('host_game_4'),
     quickDrawRound: () => this.tracker.emit('qd_round_won'),
+    arcade: () => void this.openArcade(),
   });
   this.chat.onActivity = (k, room) => this.tracker.emit(k === 'chat' ? 'chat_sent' : 'reaction_sent', k === 'chat' ? { u: room } : {});
   this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);

@@ -747,7 +747,7 @@ html, body, #game, #overlay, #overlay * {
 @media (prefers-reduced-motion: reduce) { .dh-guide-body { animation: none; } }
 
 /* Room title as you walk in (src/ui/roomBanner.ts). */
-.dh-room-banner { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; z-index: 5;
+.dh-room-banner { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); width: max-content; box-sizing: border-box; display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; z-index: 5;
   padding: 10px 22px 12px; background: rgba(26, 18, 32, .78); box-shadow: 0 0 0 2px var(--panel-edge), inset 0 0 0 2px var(--line); max-width: calc(100vw - 48px);
   animation: dh-banner 2.6s ease-out both; }
 .dh-room-banner b { font-family: var(--font-display); font-size: 26px; color: var(--lamp); text-shadow: 2px 2px 0 var(--panel-edge); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -810,4 +810,21 @@ html, body, #game, #overlay, #overlay * {
   /* Desktop: tucked to the right under the buttons, out of the middle of the room. */
   .dh-screen:not(.big) { left: auto; right: calc(14px + var(--safe-r)); transform: none; top: calc(84px + var(--safe-t)); width: 380px; }
   #overlay.has-screen .dh-hud-tc { top: calc(80px + var(--safe-t)); }
+}
+
+/* Night Raid (src/games/nightRaid.ts): the arcade card fills the screen on phones. */
+.v2-game--wide { width: 100%; min-height: 0; }
+.dh-arcade { width: min(560px, 100vw); }
+.dh-arcade .arcade-body { display: grid; justify-items: center; }
+.dh-arcade .arcade-title { display: grid; gap: 10px; width: 100%; }
+.dh-arcade .arcade-best { margin: 0; font-family: var(--font-display); font-size: 18px; color: var(--lamp); }
+.dh-arcade .arcade-score { margin: 0; font-family: var(--font-display); font-size: 40px; color: var(--lamp); text-align: center; }
+.dh-arcade .arcade-board .v2-item { display: grid; grid-template-columns: 22px 28px 1fr auto; gap: 10px; align-items: center; }
+.dh-arcade .arcade-board .rk { font-family: var(--font-display); color: var(--muted); text-align: center; }
+.dh-arcade .arcade-stage { position: relative; display: grid; justify-items: center; }
+.dh-arcade .arcade-canvas { display: block; image-rendering: pixelated; touch-action: none; box-shadow: 0 0 0 3px var(--panel-edge); background: #0d0912; }
+.dh-arcade .v2-head .dh-iconbtn[hidden] { display: none; }
+.dh-arcade, .dh-arcade .arcade-body { align-content: start; }
+@media (max-width: 600px) {
+  .dh-arcade-scrim .dh-panel.dh-arcade { max-height: 100dvh; height: 100dvh; padding-bottom: calc(10px + var(--safe-b)); }
 }

@@ -89,6 +89,16 @@
       "licence": "CC0",
       "commercial": true,
       "credit": "pixel-boy (appreciated, not required)"
+    },
+    {
+      "key": "nightraid",
+      "path": "public/assets/arcade/nightraid.png",
+      "type": "atlas",
+      "layout": "Named frames in src/games/nightraid.json: spooks (front walk), Giant Spirit boss, shurikens, fireballs, explosion, food, heart, shield. Built by scripts/build_arcade.py",
+      "source": "Ninja Adventure by pixel-boy (https://pixel-boy.itch.io/ninja-adventure-asset-pack)",
+      "licence": "CC0",
+      "commercial": true,
+      "credit": "pixel-boy (appreciated, not required)"
     }
   ],
   "sfx": {

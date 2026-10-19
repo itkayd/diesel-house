@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { el, openModal } from '../ui/modal';
 import { icon } from '../ui/icons';
 import { portrait } from '../ui/portrait';
@@ -26,7 +27,7 @@ export type DuelMsg =
   // To everyone: crown for the winner, dizzy for the loser.
   | { k: 'end'; id: string; from: string; to?: undefined; winner: string; loser: string; score: [number, number] };
 
-type Who = { id: string; name: string; character: number };
+type Who = { id: string; name: string; character: Skin };
 type Deps = {
   send: (m: DuelMsg) => void;
   record: (players: string[], winners: string[], score: unknown) => void;

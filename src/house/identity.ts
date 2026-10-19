@@ -1,4 +1,5 @@
-import { GUEST_CHARACTERS } from '../characters';
+import { GUEST_SKINS, skinDef, STARTERS, type Skin } from '../characters';
+import { toast } from '../ui/toasts';
 import type { PlayerInfo } from '../net/presence';
 import { currentUser, loadProfile, saveProfile } from '../net/profile';
 import { guestHosts } from '../net/guestCodes';
@@ -12,7 +13,7 @@ import type { HouseScene } from '../scenes/HouseScene';
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
 
 // Who are you? Your profile if you have one; otherwise the picker, once, saved to your profile.
-export async function identify(this: HouseScene, saved: number | null, name: string | null) {
+export async function identify(this: HouseScene, saved: Skin | null, name: string | null) {
   const user = currentUser();
   if (user && !user.guest) {
     const profile = await loadProfile(user.id);
@@ -22,7 +23,7 @@ export async function identify(this: HouseScene, saved: number | null, name: str
       return void this.choose(true);
     }
     if (profile) {
-      this.applyIdentity(profile.character_index, profile.display_name);
+      this.applyIdentity(profile.character_key, profile.display_name);
       return void this.start();
     }
     // New here: offer the picker, prefilled with anything this device remembers.
@@ -46,7 +47,7 @@ export function showHost(this: HouseScene, p: PlayerInfo) {
   if (p.guest) void this.hostOf(p.id).then((h) => this.remotes.get(p.id)?.avatar.setHost(h));
 }
 
-export function applyIdentity(this: HouseScene, character: number, name: string) {
+export function applyIdentity(this: HouseScene, character: Skin, name: string) {
   this.character = character;
   this.name = name;
   saveCharacter(character);
@@ -62,14 +63,19 @@ export async function choose(this: HouseScene, mustPick = false) {
   this.body.setVelocity(0, 0);
   const guest = !!currentUser()?.guest;
   const remembered = savedCharacter();
-  const current = guest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered;
-  const choice = await pickCharacter(this.textures, current, savedName(), mustPick ? false : undefined, guest ? GUEST_CHARACTERS : undefined);
+  const wearable = guest ? GUEST_SKINS : STARTERS;
+  const current = remembered !== null && wearable.includes(remembered) ? remembered : null;
+  const choice = await pickCharacter(this.textures, current, savedName(), mustPick ? false : undefined, wearable, guest);
   if (!choice) {
     this.canMove = true; // closed without changes
     void this.start(); // still join the house (does nothing if already in)
     return;
   }
   const { character, name } = choice;
+  if (choice.tryOn) {
+    this.canMove = true;
+    return void this.tryOn(choice.tryOn);
+  }
   this.applyIdentity(character, name);
   const user = currentUser();
   if (user && !user.guest) await saveProfile(user.id, name, character);
@@ -98,4 +104,17 @@ export function openMyProfile(this: HouseScene) {
     gamesWon: () => gamesWon(user.id),
   });
   if (this.progress) document.getElementById('profile')?.setAttribute('data-xp', String(this.progress.xp));
+}
+
+// Try a shop character on for 60 s (STORE.md §3.1): only this screen shows it; everyone else still sees
+// your own character, and it goes back by itself.
+let tryOnTimer = 0;
+export function tryOn(this: HouseScene, skin: Skin) {
+  clearTimeout(tryOnTimer);
+  this.me.setCharacter(skin);
+  toast({ icon: 'timer', id: 'try-on', who: `Trying on ${skinDef(skin)?.name ?? 'a character'}`, what: 'For 60 s. Only you see it.', small: true, ttl: 4000 });
+  tryOnTimer = window.setTimeout(() => {
+    this.me.setCharacter(this.character);
+    toast({ icon: 'timer', id: 'try-on', who: 'Back to your own character', what: 'The shop is coming soon.', small: true, ttl: 2500 });
+  }, 60_000);
 }

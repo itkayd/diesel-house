@@ -1,3 +1,4 @@
+import { legacyIndex, type Skin } from '../characters';
 import type { RoomId } from '../config';
 import { supabase } from './supabase';
 
@@ -10,7 +11,8 @@ export type Message = {
   room_id: RoomId;
   author_id: string | null; // null once a guest's account has been tidied away
   author_name: string;
-  author_character: number;
+  author_character: number; // the old character number (kept one release)
+  author_skin?: Skin | null; // the character, by key (missing on messages from before R4)
   author_guest: boolean;
   author_host: string | null; // guests: the member who invited them
   text: string;
@@ -25,7 +27,7 @@ export async function loadChat(room: RoomId): Promise<{ messages: Message[]; rea
   if (!supabase) return { messages: [], reactions: [] };
   const { data } = await supabase
     .from('messages')
-    .select('id, room_id, author_id, author_name, author_character, author_guest, author_host, text, created_at, kind')
+    .select('*') // (author_skin only exists once migration 20261103 is applied)
     .eq('room_id', room)
     .order('created_at', { ascending: false })
     .limit(HISTORY);
@@ -36,9 +38,11 @@ export async function loadChat(room: RoomId): Promise<{ messages: Message[]; rea
 }
 
 // Guests' name and character go with the message; for members the database uses their profile.
-export async function postMessage(room: RoomId, text: string, me: { name: string; character: number }, kind: 'text' | 'roll' = 'text') {
+export async function postMessage(room: RoomId, text: string, me: { name: string; character: Skin }, kind: 'text' | 'roll' = 'text') {
   if (!supabase) return 'offline';
-  const { error } = await supabase.from('messages').insert({ room_id: room, text, author_name: me.name.slice(0, 24), author_character: me.character, kind });
+  const row = { room_id: room, text, author_name: me.name.slice(0, 24), author_character: legacyIndex(me.character), kind };
+  let { error } = await supabase.from('messages').insert({ ...row, author_skin: me.character });
+  if (error && /author_skin/.test(error.message)) ({ error } = await supabase.from('messages').insert(row)); // before migration 20261103
   return error?.message ?? null;
 }
 

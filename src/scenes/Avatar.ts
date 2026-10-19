@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { animKey, type Dir } from '../characters';
+import { animKey, asSkin, type Dir, type Skin } from '../characters';
 import type { NetQuality } from '../net/netQuality';
 import { rankOf } from '../challenges/levels';
 import { makeTagIcons, micKey, netKey, type MicIcon } from './tagIcons';
@@ -11,8 +11,8 @@ const CREAM = '#fff4e0';
 const LAMP = '#f4b860';
 const MUTED = '#bcaccb';
 const OK = 0x6fdc8c;
-// The tag sits just above the head: chibis are about 20 px tall in their 32 px frame, LimeZu people 23.
-const tagGap = (character: number) => (character < 16 ? 23 : 26);
+// The tag sits just above the head (Ninja Adventure people fill their 16 px frame).
+const TAG_GAP = 18;
 
 // A character sprite with a name tag and a speaking ring (design/game/mvp.html .dh-tag / .dh-ring).
 // Position is the character's feet.
@@ -23,10 +23,8 @@ export class Avatar {
   private tagBg: Phaser.GameObjects.Graphics;
   private ring: Phaser.GameObjects.Ellipse;
   private pulse: Phaser.Time.TimerEvent;
-  private character: number;
-  private get gap() {
-    return tagGap(this.character);
-  }
+  private character: Skin;
+  private readonly gap = TAG_GAP;
   private tagWanted = true;
   private isSpeaking = false;
   private name: string;
@@ -60,10 +58,10 @@ export class Avatar {
   facing: Dir = 'down';
   private danceTween: Phaser.Tweens.Tween | null = null;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, character: number, name: string, isMe = false) {
-    this.character = character;
+  constructor(scene: Phaser.Scene, x: number, y: number, character: Skin, name: string, isMe = false) {
+    this.character = asSkin(character);
     this.name = name;
-    this.sprite = scene.add.sprite(x, y, 'chibis_a').setOrigin(0.5, 1);
+    this.sprite = scene.add.sprite(x, y, 'skins').setOrigin(0.5, 1);
 
     // Floor ring while talking: a soft green oval that steps bigger and back (or sits still).
     this.ring = scene.add.ellipse(x, y - 1, 18, 7, OK, 0.35).setStrokeStyle(1, OK, 1).setVisible(false);
@@ -171,8 +169,8 @@ export class Avatar {
     this.drawTagBg();
   }
 
-  setCharacter(index: number) {
-    this.character = index;
+  setCharacter(skin: Skin) {
+    this.character = asSkin(skin);
     this.animate(this.sprite.anims.currentAnim?.key.includes('-walk-') ?? false);
   }
 

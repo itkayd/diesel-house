@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import type { RoomId, Zone } from '../config';
 import { icon } from './icons';
 import { el, openModal } from './modal';
@@ -14,7 +15,7 @@ export type WhoWhere = {
   size: { w: number; h: number }; // the house, px
   zones: { name: Zone; rect: Box; outline: { x: number; y: number }[] }[]; // rect: bounding box; outline: the real shape
   me: { x: number; y: number; zone: Zone | null };
-  people: { id: string; name: string; character: number; x: number; y: number; zone: Zone | null; talking: boolean }[];
+  people: { id: string; name: string; character: Skin; x: number; y: number; zone: Zone | null; talking: boolean }[];
   label: (zone: Zone) => string;
   critters: { id: string; name: string; x: number; y: number; zone: Zone | null }[]; // to catch right now
   critterSeconds: number; // until they wander off

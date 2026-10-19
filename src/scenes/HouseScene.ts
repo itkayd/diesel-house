@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { type RoomId, type Zone } from '../config';
+import { DEFAULT_SKIN, type Skin } from '../characters';
 import { Zones } from '../house/zones';
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { msgStats } from '../net/stats';
@@ -47,7 +48,7 @@ export class HouseScene extends Phaser.Scene {
   zones!: Zones;
   zone: Zone | null = null;
   joystick: Joystick | null = null;
-  character = 0;
+  character: Skin = DEFAULT_SKIN;
   name = '';
   canMove = false;
 
@@ -138,6 +139,7 @@ export class HouseScene extends Phaser.Scene {
   showHost = identity.showHost;
   applyIdentity = identity.applyIdentity;
   choose = identity.choose;
+  tryOn = identity.tryOn;
   openMyProfile = identity.openMyProfile;
   showMicNote = voiceBridge.showMicNote;
   showMyMic = voiceBridge.showMyMic;

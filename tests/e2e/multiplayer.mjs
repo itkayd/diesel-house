@@ -44,14 +44,14 @@ await A.page.keyboard.down('ArrowRight');
 const t0 = Date.now();
 while (Date.now() - t0 < 2000) { const s = await remoteA(); samples.push({ t: Date.now(), ...s }); await B.page.waitForTimeout(16); }
 await A.page.keyboard.up('ArrowRight');
-const walking = samples.filter((s) => s.anim === 'char16-walk-right').length;
+const walking = samples.filter((s) => s.anim === 'ninja.boy-walk-right').length;
 check('B sees A walking right (walk animation)', { walkingSamples: walking, of: samples.length }, walking > samples.length / 2);
 let jumps = 0; for (let i = 1; i < samples.length; i++) if (samples[i].x - samples[i - 1].x > 8) jumps++;
 const back = samples.filter((s, i) => i && s.x < samples[i - 1].x - 0.5).length;
 check('movement on B is smooth (no big jumps, never goes backwards)', { bigJumps: jumps, backwards: back, samples: samples.length }, jumps === 0 && back === 0);
 await B.page.waitForTimeout(700);
 const ap = await aPos(); r = await remoteA();
-check('after A stops, B shows A at the same spot, idle', { A: ap, onB: r }, Math.abs(r.x - ap.x) <= 1 && Math.abs(r.y - ap.y) <= 1 && r.anim === 'char16-idle-right');
+check('after A stops, B shows A at the same spot, idle', { A: ap, onB: r }, Math.abs(r.x - ap.x) <= 1 && Math.abs(r.y - ap.y) <= 1 && r.anim === 'ninja.boy-idle-right');
 
 // Latency: time from A starting to move to B seeing it move
 await B.page.waitForTimeout(300);
@@ -79,11 +79,11 @@ await B.page.screenshot({ path: `${out}/p3_b_view.png` });
 // Change character + name on A
 await A.page.click('#xp-chip');
 await A.page.fill('#player-name', 'Alice renamed');
-await A.page.click('button[data-character="17"]');
+await A.page.click('button[data-character="ninja.villager3"]');
 await A.page.click('#picker-done');
-const tn = Date.now(); while (Date.now() - tn < 8000) { r = await remoteA(); if (r.name === 'Alice renamed' && r.character === 17) break; await B.page.waitForTimeout(100); }
+const tn = Date.now(); while (Date.now() - tn < 8000) { r = await remoteA(); if (r.name === 'Alice renamed' && r.character === 'ninja.villager3') break; await B.page.waitForTimeout(100); }
 r = { ...(await remoteA()), ms: Date.now() - tn };
-check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 17 && r.zone === 'garden');
+check('A changes name/character, B sees it', r, r.name === 'Alice renamed' && r.character === 'ninja.villager3' && r.zone === 'garden');
 
 // A leaves
 // Look for A specifically: real visitors may come and go at the same time, so the head count alone can mislead.

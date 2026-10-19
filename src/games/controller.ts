@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { isTouchDevice } from '../ui/joystick';
 import { icon, type IconName } from '../ui/icons';
 import { el, openModal } from '../ui/modal';
@@ -99,10 +100,10 @@ function saveSeen(seen: Set<string>) {
   }
 }
 
-type Who = { id: string; name: string; character: number; guest?: boolean };
+type Who = { id: string; name: string; character: Skin; guest?: boolean };
 export type GameDeps = {
   me: () => Who;
-  names: (id: string) => { name: string; character?: number };
+  names: (id: string) => { name: string; character?: Skin };
   // People in the same place as us, for "Challenge" (Rock paper scissors).
   nearby: () => Who[];
   // Games the room owner allows at this spot (null: all).

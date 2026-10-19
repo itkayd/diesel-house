@@ -2,14 +2,14 @@ import Phaser from 'phaser';
 import { type RoomId } from '../config';
 import { Zones } from './zones';
 import { HALL, ROOMS } from './rooms';
-import { GUEST_CHARACTERS } from '../characters';
+import { DEFAULT_SKIN, GUEST_SKINS, STARTERS } from '../characters';
 import { installAudioUnlock } from '../net/audio';
 import { signOut } from '../net/auth';
 import { currentUser } from '../net/profile';
 import { GameSpots } from '../scenes/gameSpots';
 import { loadSounds } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
-import { savedCharacter, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
+import { saveCharacter, savedCharacter, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
 import { el } from '../ui/modal';
 import { openCredits } from '../ui/credits';
 import { addOldRooms } from '../ui/oldRooms';
@@ -60,15 +60,17 @@ export function create(this: HouseScene) {
   this.spawnAt = spawn;
   const isGuest = !!currentUser()?.guest;
   const remembered = savedCharacter();
-  const saved = isGuest && remembered !== null && !GUEST_CHARACTERS.includes(remembered) ? null : remembered; // guests: 2 choices
+  // Guests choose from 2, members from the starters (the shop adds owned characters, phase S2).
+  const saved = remembered !== null && (isGuest ? GUEST_SKINS : STARTERS).includes(remembered) ? remembered : null;
   const name = savedName();
-  this.character = saved ?? 0;
+  this.character = saved ?? DEFAULT_SKIN;
+  if (saved) saveCharacter(saved); // an old number (before R4) is kept as its key from now on
   this.name = name ?? '';
   this.me = new Avatar(this, spawn.x!, spawn.y!, this.character, this.name, true);
   this.player = this.me.sprite;
   this.physics.add.existing(this.player);
   this.body = this.player.body as Phaser.Physics.Arcade.Body;
-  this.body.setSize(10, 6).setOffset(3, 26);
+  this.body.setSize(10, 6).setOffset(3, 10); // the feet of a 16 px Ninja Adventure person
   this.physics.add.collider(this.player, walls);
   this.physics.add.collider(this.player, this.look.solids); // furniture bases
   // Doorways: an invisible barrier that only stops you when someone inside asked not to be disturbed

@@ -3,12 +3,11 @@ import { el, openModal } from './modal';
 
 // Credits (ASSETS.md), reachable from settings. OpenMoji's CC BY-SA licence requires the credit and a link.
 const CREDITS: [string, string, string, string][] = [
-  ['Modern Interiors', 'LimeZu', 'Floors, walls, furniture and four characters. Free version, non-commercial use.', 'https://limezu.itch.io/moderninteriors'],
-  ['Modern Chibis', 'finalbossblues', '16 characters from the Asset Alliance sprite collection.', 'https://finalbossblues.itch.io/16-char-sprite-collection-modern-chibis-asset-alliance'],
+  ['Modern Interiors', 'LimeZu', 'Floors, walls and furniture. Free version, non-commercial use.', 'https://limezu.itch.io/moderninteriors'],
   ['Roguelike Indoors', 'Kenney', 'Extra props. CC0.', 'https://kenney.nl/assets/roguelike-indoors'],
   ['Pixel Interior LRK', 'bitglow', 'Bookcases, sofas, fireplaces, tables, rugs, lamps and plants in the new house.', 'https://bitglow.itch.io/pixelinterior-livingroomkitchen'],
   ['Cozy Interior 165+', 'Sleepless Poetry', 'The café counter, coffee maker, fridges, TV and speakers.', 'https://sleepless-poetry.itch.io/cozy-interior-165-pixel-art-furniture-assets'],
-  ['Ninja Adventure', 'pixel-boy', 'The garden: grass, trees, pond, fire pit and lanterns. CC0.', 'https://pixel-boy.itch.io/ninja-adventure-asset-pack'],
+  ['Ninja Adventure', 'pixel-boy', 'Every character and their faces, plus the garden: grass, trees, pond, fire pit and lanterns. CC0.', 'https://pixel-boy.itch.io/ninja-adventure-asset-pack'],
   ['Assorted Disco', 'Michael Muirden', 'The glitter ball. CC0.', 'https://opengameart.org/node/31404'],
   ['Sound packs', 'Kenney', 'RPG Audio, Interface Sounds, Digital Audio, Music Jingles and Casino Audio. CC0.', 'https://kenney.nl/assets/category:Audio'],
   ['Game art', 'Kenney', 'Emotes, Playing Cards (with dice), UI Pack Pixel Adventure and Input Prompts. CC0.', 'https://kenney.nl/assets'],

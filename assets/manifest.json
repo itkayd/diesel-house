@@ -35,126 +35,6 @@
       "source": "Roguelike Indoors by Kenney (CC0)"
     },
     {
-      "key": "chibis_a",
-      "path": "public/assets/characters/chibis_a.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 12,
-      "rows": 8,
-      "layout": "RPG Maker: 4x2 characters per sheet, each 3 frames wide x 4 rows (down, left, right, up)",
-      "characterIndexes": "0-7",
-      "source": "16-Char Sprite Collection (Modern Chibis) by finalbossblues"
-    },
-    {
-      "key": "chibis_b",
-      "path": "public/assets/characters/chibis_b.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 12,
-      "rows": 8,
-      "layout": "RPG Maker: 4x2 characters per sheet, each 3 frames wide x 4 rows (down, left, right, up)",
-      "characterIndexes": "8-15",
-      "source": "16-Char Sprite Collection (Modern Chibis) by finalbossblues"
-    },
-    {
-      "key": "limezu_adam_run",
-      "path": "public/assets/characters/limezu_adam_run.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 16,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_adam_idle",
-      "path": "public/assets/characters/limezu_adam_idle.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 16,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_alex_run",
-      "path": "public/assets/characters/limezu_alex_run.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 17,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_alex_idle",
-      "path": "public/assets/characters/limezu_alex_idle.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 17,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_amelia_run",
-      "path": "public/assets/characters/limezu_amelia_run.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 18,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_amelia_idle",
-      "path": "public/assets/characters/limezu_amelia_idle.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 18,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_bob_run",
-      "path": "public/assets/characters/limezu_bob_run.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 19,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
-      "key": "limezu_bob_idle",
-      "path": "public/assets/characters/limezu_bob_idle.png",
-      "type": "spritesheet",
-      "frameWidth": 16,
-      "frameHeight": 32,
-      "columns": 24,
-      "rows": 1,
-      "layout": "24 frames: 6 per direction (right, up, left, down)",
-      "characterIndex": 19,
-      "source": "Modern Interiors Free v2.2 by LimeZu (non-commercial)"
-    },
-    {
       "key": "house_v3",
       "path": "public/assets/furniture/house_v3.png",
       "type": "image + art table (src/house/art/topdown.json)",
@@ -173,6 +53,30 @@
       "use": "grass (Ninja Adventure, CC0), roof decking, hedge and skyline wall faces (drawn in code)",
       "source": "Ninja Adventure by pixel-boy (CC0) + Diesel House",
       "commercial": true
+    },
+    {
+      "key": "skins",
+      "path": "public/assets/characters/skins.png",
+      "type": "spritesheet",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "layout": "92 characters, 10 per row; each a 4 x 7 block (facings down, up, left, right x walk 1-4, attack, jump, item). Built by scripts/build_skins.py; list in src/house/skins.json",
+      "source": "Ninja Adventure by pixel-boy (https://pixel-boy.itch.io/ninja-adventure-asset-pack)",
+      "licence": "CC0",
+      "commercial": true,
+      "credit": "pixel-boy (appreciated, not required)"
+    },
+    {
+      "key": "faces",
+      "path": "public/assets/characters/faces.png",
+      "type": "spritesheet",
+      "frameWidth": 38,
+      "frameHeight": 38,
+      "layout": "Each character's Faceset, same order as skins.png",
+      "source": "Ninja Adventure by pixel-boy (https://pixel-boy.itch.io/ninja-adventure-asset-pack)",
+      "licence": "CC0",
+      "commercial": true,
+      "credit": "pixel-boy (appreciated, not required)"
     }
   ],
   "sfx": {

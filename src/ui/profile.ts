@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { myGuestCode, newGuestCode, setGuestCode, type GuestCode } from '../net/guestCodes';
 import { currentUser } from '../net/profile';
 import { myVisit } from '../net/visit';
@@ -18,7 +19,7 @@ import { levelChip, medalEl } from './progressUi';
 
 export type ProfileContext = {
   name: string;
-  character: number;
+  character: Skin;
   host: string | null; // guests: the member who invited you (if known already)
   changeCharacter: () => void;
   rename: (name: string) => Promise<void> | void;
@@ -62,7 +63,7 @@ function fact(ic: IconName, ...parts: (string | Node)[]) {
 }
 const bold = (t: string) => el('b', '', t);
 
-function face(character: number, onTap: () => void) {
+function face(character: Skin, onTap: () => void) {
   const b = el('button', 'big');
   b.type = 'button';
   b.id = 'profile-face';

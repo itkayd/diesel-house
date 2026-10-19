@@ -299,10 +299,37 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 .dh-range::-moz-range-thumb { width: 16px; height: 22px; border: 0; border-radius: 0; background: var(--lamp); }
 
 /* character picker grid */
-.dh-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
-.dh-pick { height: 88px; border: 0; cursor: pointer; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); display: grid; place-items: center; }
+.dh-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.dh-pick { --rc: var(--line); position: relative; min-height: 104px; padding: 8px 4px 6px; border: 0; cursor: pointer; font: inherit; color: var(--cream);
+  background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--rc); display: grid; justify-items: center; align-content: start; gap: 3px; }
+.dh-pick canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.dh-pick .nm { font-size: 11px; line-height: 1.15; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dh-pick .st { font-family: var(--font-display); font-size: 10px; color: var(--muted); }
+.dh-pick .st.own { color: var(--ok); }
+.dh-pick .fv { position: absolute; top: 3px; right: 5px; font-size: 11px; color: var(--lamp); }
+.dh-pick.r-starter { --rc: #3f6b4c; } .dh-pick.r-common { --rc: var(--line); } .dh-pick.r-rare { --rc: #4c6fa8; } .dh-pick.r-epic { --rc: #8a62b4; }
+.dh-pick.locked canvas { opacity: .8; }
 .dh-pick[aria-checked="true"] { box-shadow: inset 0 0 0 3px var(--lamp); background: #3b2a1f; }
 .dh-pick:focus-visible { outline: 3px solid var(--cream); outline-offset: 2px; }
+/* Picker: preview, filters, footer (src/ui/picker.ts) */
+.dh-pick-preview { position: relative; display: flex; gap: 14px; align-items: center; padding: 10px 12px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-pick-preview .stage { width: 64px; height: 64px; image-rendering: pixelated; flex: none; background: radial-gradient(circle at 50% 70%, #3a2c46 0, transparent 70%); }
+.dh-pick-preview .info { display: grid; gap: 4px; min-width: 0; justify-items: start; }
+.dh-pick-preview b { font-family: var(--font-display); font-size: 18px; }
+.dh-pick-preview .note { font-size: 12px; color: var(--muted); }
+.dh-pick-preview .note:empty { display: none; }
+.dh-pick-preview .moves { display: flex; gap: 6px; flex-wrap: wrap; }
+.dh-pick-preview .moves .dh-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--lamp); color: var(--lamp); }
+.dh-rarity { font-family: var(--font-display); font-size: 11px; padding: 1px 6px; color: var(--panel-edge); background: var(--muted); }
+.dh-rarity[data-rarity="starter"] { background: var(--ok); } .dh-rarity[data-rarity="rare"] { background: #7fb2ff; } .dh-rarity[data-rarity="epic"] { background: #c99bff; }
+.dh-fav { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; font-size: 18px; color: var(--faint); }
+.dh-fav[aria-pressed="true"] { color: var(--lamp); }
+.dh-pick-filters { display: grid; gap: 8px; }
+.dh-pick-filters .cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.dh-pick-filters .cats::-webkit-scrollbar { display: none; }
+.dh-pick-filters .cats .dh-chip[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
+.dh-pick-foot { position: sticky; bottom: -16px; display: grid; gap: 8px; padding: 10px 0 4px; background: var(--panel); box-shadow: 0 -10px 10px -6px var(--panel); }
+.dh-pick-foot .dh-error { margin: 0; }
 
 /* modal scrim */
 .dh-scrim { position: absolute; inset: 0; background: rgba(13,9,18,.7); display: grid; place-items: center; padding: 16px; }
@@ -343,7 +370,6 @@ html, body { margin: 0; height: 100%; background: var(--night); color: var(--cre
 .dh-hud-tl, .dh-hud-tr { gap: 10px; }
 .vol-pop { position: absolute; width: min(260px, calc(100% - 32px)); box-sizing: border-box; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); z-index: 50; pointer-events: auto; }
 .dh-voice-detail { position: absolute; right: 0; bottom: calc(100% + 12px); visibility: hidden; font-family: var(--font-body); font-size: var(--fs-xs); }
-.dh-pick canvas { image-rendering: pixelated; width: 48px; height: 96px; }
 .dh-error { margin: 0; color: var(--error); font-size: var(--fs-sm); }
 
 /* No text selection, long-press menu or tap flash anywhere in the game (it stole touches from the

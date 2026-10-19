@@ -69,15 +69,15 @@ if (!picker) {
   process.exit(1);
 }
 if (picker) {
-  G.choices = await G.page.$$eval('button[data-character]', (bs) => bs.map((b) => Number(b.dataset.character)));
+  G.choices = await G.page.$$eval('button[data-character]:has(.st.own)', (bs) => bs.map((b) => b.dataset.character));
   await G.page.fill('#player-name', G.name);
-  await G.page.click('button[data-character="18"]');
+  await G.page.click('button[data-character="ninja.woman"]');
   await G.page.click('#picker-done');
 }
 await G.page.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 }).catch(() => {});
 G.id = await G.page.evaluate(() => window.__house?.presence?.id);
 check('a guest gets in with the code', { picker, joined: !!G.id }, picker && !!G.id);
-check('guests choose from 2 characters only (Adam, Amelia)', { choices: G.choices }, JSON.stringify(G.choices) === '[16,18]');
+check('guests can wear 2 characters only (Boy, Woman); the rest are shown for the shop', { choices: G.choices }, JSON.stringify(G.choices) === '["ninja.boy","ninja.woman"]');
 
 // Visitor (another member) sees "Sam test · friend of Tester" over the guest's head.
 const B = await signIn(B_);

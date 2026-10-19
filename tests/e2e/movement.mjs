@@ -75,7 +75,7 @@ for (let i = 1; i < samples.length; i++) {
   if (Math.abs(d) > 8) jumps++;
   if (d >= 1) backwards++; // walking west, x should never increase by a visible (whole) pixel
 }
-const walking = samples.filter((s) => s.anim === 'char16-walk-left').length;
+const walking = samples.filter((s) => s.anim === 'ninja.boy-walk-left').length;
 check('with 200 ms lag: smooth (no jumps > 8 px, never moves backwards)', { samples: samples.length, jumps, backwards }, jumps === 0 && backwards === 0);
 check('with 200 ms lag: walk animation shows while walking', { walking, of: samples.length }, walking > samples.length * 0.8);
 const maxErr = Math.max(...errs);
@@ -85,7 +85,7 @@ check('with 200 ms lag: B draws A steadily close behind where A really is', { av
 await B.page.waitForTimeout(1200);
 let a = await truePos(A);
 let v = await seen();
-check('after stopping, B shows A exactly where A stopped, idle', { A: a, onB: v }, Math.abs(v.x - a.x) <= 1 && Math.abs(v.y - a.y) <= 1 && v.anim === 'char16-idle-left');
+check('after stopping, B shows A exactly where A stopped, idle', { A: a, onB: v }, Math.abs(v.x - a.x) <= 1 && Math.abs(v.y - a.y) <= 1 && v.anim === 'ninja.boy-idle-left');
 
 // 3. Walls: walking into the hallway wall (not at a door) stops on both screens at the same spot.
 await tp(A, 600, 480);

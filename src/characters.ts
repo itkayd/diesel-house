@@ -1,74 +1,73 @@
 import Phaser from 'phaser';
+import data from './house/skins.json';
+
+// Characters ("skins", REDESIGN.md R4 / STORE.md §3): Ninja Adventure 16 px people, one atlas built by
+// scripts/build_skins.py. A skin is a key like 'ninja.boy', stored in profiles.character_key. The atlas
+// lists its facings, so isometric skins (4 diagonal facings) can join later (REDESIGN.md §5 rule 7):
+// code asks for "the frame facing this way", never fixed frame numbers.
 
 export type Dir = 'down' | 'left' | 'right' | 'up';
 export const DIRS: Dir[] = ['down', 'left', 'right', 'up'];
 
-export const CHARACTER_COUNT = 20; // 16 finalbossblues chibis (0-15) + 4 LimeZu (16-19); matches profiles.character_index
+export type Skin = string;
+export type Rarity = 'starter' | 'common' | 'rare' | 'epic';
+export type SkinCategory = 'people' | 'ninja' | 'animal' | 'fantasy';
+export type SkinDef = { key: Skin; name: string; cat: SkinCategory; rarity: Rarity; at: number };
+type Anim = 'walk' | 'idle' | 'attack' | 'jump' | 'item';
 
-const LIMEZU = ['adam', 'alex', 'amelia', 'bob'];
+export const SKINS: SkinDef[] = (data.skins as Omit<SkinDef, 'at'>[]).map((s, at) => ({ ...s, at }));
+const BY_KEY = new Map(SKINS.map((s) => [s.key, s]));
+export const skinDef = (key: Skin) => BY_KEY.get(key) ?? null;
+export const DEFAULT_SKIN: Skin = 'ninja.boy';
+// Free for everyone (the rest come with the shop, phase S2). Same list as public.starter_characters().
+export const STARTERS: Skin[] = SKINS.filter((s) => s.rarity === 'starter').map((s) => s.key);
+// Guests choose from two. Same list as public.guest_characters().
+export const GUEST_SKINS: Skin[] = ['ninja.boy', 'ninja.woman'];
+export const guestSkin = (s: Skin) => (GUEST_SKINS.includes(s) ? s : GUEST_SKINS[0]);
 
-// Guests choose from two characters only: LimeZu Adam (male) and Amelia (female). Members have all 20.
-export const GUEST_CHARACTERS = [16, 18];
-export const guestCharacter = (index: number) => (GUEST_CHARACTERS.includes(index) ? index : GUEST_CHARACTERS[0]);
+// Old character numbers (0-15 chibis, 16-19 LimeZu people) and the starter each became. Same table as
+// public.character_from_index() (supabase/migrations/20261103_character_key.sql).
+const LEGACY: Skin[] = [
+  'ninja.boy', 'ninja.woman', 'ninja.villager', 'ninja.villager2', 'ninja.villager3', 'ninja.villager4',
+  'ninja.princess', 'ninja.eskimo', 'ninja.child', 'ninja.oldman', 'ninja.villager5', 'ninja.villager6',
+  'ninja.boy', 'ninja.woman', 'ninja.villager', 'ninja.villager2',
+  'ninja.boy', 'ninja.villager3', 'ninja.woman', 'ninja.oldman',
+];
+// The number an older copy of the game shows for a skin (kept one release; anything but a starter: 0).
+export const legacyIndex = (s: Skin) => Math.max(0, LEGACY.indexOf(s));
+// Whatever arrives (a key, an old number, junk) as a skin we can draw.
+export function asSkin(x: unknown): Skin {
+  if (typeof x === 'string' && BY_KEY.has(x)) return x;
+  if (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x < LEGACY.length) return LEGACY[x];
+  return DEFAULT_SKIN;
+}
 
-// Frame source for one character: which texture + frame for each walk step and the idle pose.
-type CharFrames = {
-  walk: Record<Dir, { key: string; frame: number }[]>;
-  idle: Record<Dir, { key: string; frame: number }[]>;
+// Atlas layout: each skin is a block of `facings` columns × `rows` rows of `cell` px frames.
+const COLS = data.perRow * data.facings.length;
+const frameOf = (s: SkinDef, anim: Anim, dir: Dir, step: number) => {
+  const bx = s.at % data.perRow;
+  const by = Math.floor(s.at / data.perRow);
+  const row = (data.anims as Record<Anim, number[]>)[anim][step];
+  return (by * data.rows + row) * COLS + bx * data.facings.length + data.facings.indexOf(dir);
 };
 
-function chibi(index: number): CharFrames {
-  // RPG Maker layout: 4x2 characters per sheet, each 3 frames wide, rows down/left/right/up.
-  const key = index < 8 ? 'chibis_a' : 'chibis_b';
-  const i = index % 8;
-  const col0 = (i % 4) * 3;
-  const row0 = Math.floor(i / 4) * 4;
-  const f = (dirRow: number, step: number) => ({ key, frame: (row0 + dirRow) * 12 + col0 + step });
-  const walk = {} as CharFrames['walk'];
-  const idle = {} as CharFrames['idle'];
-  DIRS.forEach((d, r) => {
-    walk[d] = [0, 1, 2, 1].map((s) => f(r, s));
-    idle[d] = [f(r, 1)];
-  });
-  return { walk, idle };
-}
-
-function limezu(index: number): CharFrames {
-  // 24-frame strips, 6 per direction in the order right, up, left, down.
-  const name = LIMEZU[index - 16];
-  const order: Dir[] = ['right', 'up', 'left', 'down'];
-  const walk = {} as CharFrames['walk'];
-  const idle = {} as CharFrames['idle'];
-  order.forEach((d, n) => {
-    walk[d] = [0, 1, 2, 3, 4, 5].map((s) => ({ key: `limezu_${name}_run`, frame: n * 6 + s }));
-    idle[d] = [0, 1, 2, 3, 4, 5].map((s) => ({ key: `limezu_${name}_idle`, frame: n * 6 + s }));
-  });
-  return { walk, idle };
-}
-
-export const characterFrames = (index: number) => (index < 16 ? chibi(index) : limezu(index));
-
-export const animKey = (index: number, kind: 'walk' | 'idle', dir: Dir) => `char${index}-${kind}-${dir}`;
+export const animKey = (skin: Skin, kind: 'walk' | 'idle', dir: Dir) => `${skin}-${kind}-${dir}`;
 
 export function loadCharacterSheets(load: Phaser.Loader.LoaderPlugin) {
-  const sheet = { frameWidth: 16, frameHeight: 32 };
-  load.spritesheet('chibis_a', 'assets/characters/chibis_a.png', sheet);
-  load.spritesheet('chibis_b', 'assets/characters/chibis_b.png', sheet);
-  for (const n of LIMEZU) {
-    load.spritesheet(`limezu_${n}_run`, `assets/characters/limezu_${n}_run.png`, sheet);
-    load.spritesheet(`limezu_${n}_idle`, `assets/characters/limezu_${n}_idle.png`, sheet);
-  }
+  load.spritesheet('skins', 'assets/characters/skins.png', { frameWidth: data.cell, frameHeight: data.cell });
+  load.spritesheet('faces', 'assets/characters/faces.png', { frameWidth: data.face, frameHeight: data.face });
 }
 
 export function createCharacterAnims(anims: Phaser.Animations.AnimationManager) {
-  for (let i = 0; i < CHARACTER_COUNT; i++) {
-    const c = characterFrames(i);
+  for (const s of SKINS)
     for (const d of DIRS) {
-      anims.create({ key: animKey(i, 'walk', d), frames: c.walk[d], frameRate: i < 16 ? 8 : 10, repeat: -1 });
-      anims.create({ key: animKey(i, 'idle', d), frames: c.idle[d], frameRate: 8, repeat: -1 });
+      anims.create({ key: animKey(s.key, 'walk', d), frames: data.anims.walk.map((_, i) => ({ key: 'skins', frame: frameOf(s, 'walk', d, i) })), frameRate: 8, repeat: -1 });
+      anims.create({ key: animKey(s.key, 'idle', d), frames: [{ key: 'skins', frame: frameOf(s, 'idle', d, 0) }], frameRate: 1, repeat: -1 });
     }
-  }
 }
 
-// The pose shown in the character picker.
-export const portraitFrame = (index: number) => characterFrames(index).idle.down[0];
+// One frame of a skin (the picker's preview steps through walk, attack and jump).
+export const skinFrame = (skin: Skin, anim: Anim, dir: Dir, step = 0) => ({ key: 'skins', frame: frameOf(skinDef(skin) ?? SKINS[0], anim, dir, step) });
+export const walkSteps = data.anims.walk.length;
+// The face (38 × 38 Faceset) for portraits.
+export const faceFrame = (skin: Skin) => ({ key: 'faces', frame: (skinDef(skin) ?? SKINS[0]).at });

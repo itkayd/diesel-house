@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { emoteGrid, type EmoteId } from './emotes';
 import { icon } from './icons';
 import { el } from './modal';
@@ -8,7 +9,7 @@ let pop: HTMLDivElement | null = null;
 
 export type FriendMenu = {
   name: string;
-  character: number;
+  character: Skin;
   // Set when we're in a voice call with them: their volume slider.
   volume?: { value: number; onChange: (v: number) => void };
   // Otherwise a line on where they are ("In Diesel's room. Walk in to hear them.").

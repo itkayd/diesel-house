@@ -89,7 +89,7 @@ Raw files go in `assets/raw/v4-packs/` (gitignored). Verified on each pack's pag
 
 ## 6. Before launch: licence to-do
 - [ ] Buy the LimeZu full pack, or remove every `limezu_*` file (tiles, furniture, 4 characters, login scene).
-- [ ] Replace the 16 chibis with Ninja Adventure starters. Migrate `profiles.character_index` → `character_key` (see `STORE.md` §3.4).
+- [x] Replace the 16 chibis with Ninja Adventure starters. Migrate `profiles.character_index` → `character_key` (see `STORE.md` §3.4). Done in R4 (19 Oct 2026): chibi and LimeZu character files removed; migration `20261103_character_key.sql`.
 - [ ] Remove Pixel Wanderer, Cute Fantasy and Reading Nook from anything shipped, including the R2 mock-ups in `public/mockups/`.
 - [ ] Re-check the medals licence and save proof.
 - [ ] Add the `commercial` flag to the manifest, plus the CI check.

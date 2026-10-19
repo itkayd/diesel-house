@@ -1,3 +1,4 @@
+import { asSkin, legacyIndex, type Skin } from '../characters';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { RoomId } from '../config';
 import { devTest } from '../net/mode';
@@ -15,7 +16,7 @@ import { supabase } from '../net/supabase';
 // higher generation, then the lower host id. So there is always exactly one host.
 
 export type SpotId = 'hall' | RoomId;
-export type Seat = { id: string; name: string; character: number; guest?: boolean; at: number }; // at: when they sat down
+export type Seat = { id: string; name: string; character: Skin; guest?: boolean; at: number }; // at: when they sat down
 export type Snapshot<S = unknown> = { v: number; gen?: number; host: string; game: string; players: Seat[]; state: S };
 
 // What a game's host and screen need from a table (GameTable, or a stand-in in tests).
@@ -35,7 +36,7 @@ export interface TableView {
   destroy(): void;
 }
 // name '' and no character for someone we don't know (the seat's own name and character are used then).
-export type Names = (id: string) => { name: string; character?: number };
+export type Names = (id: string) => { name: string; character?: Skin };
 // The host saves the result (record_game): players, winners, score, the revealed seed.
 export type Recorder = (players: string[], winners: string[], score: unknown, seed?: string) => void;
 
@@ -189,16 +190,16 @@ export class GameTable {
 
   private track() {
     this.seated = true;
-    void this.channel?.track({ name: this.me.name, character: this.me.character, guest: !!this.me.guest, at: this.at });
+    void this.channel?.track({ name: this.me.name, character: legacyIndex(this.me.character), skin: this.me.character, guest: !!this.me.guest, at: this.at });
   }
 
   private sync() {
-    const state = this.channel?.presenceState<{ name: string; character: number; guest: boolean; at: number }>() ?? {};
+    const state = this.channel?.presenceState<{ name: string; character: number | Skin; skin?: Skin; guest: boolean; at: number }>() ?? {};
     const before = new Map(this.present);
     this.present.clear();
     for (const [id, metas] of Object.entries(state)) {
       const m = metas[0];
-      if (m) this.present.set(id, { id, name: m.name, character: m.character, guest: m.guest, at: m.at });
+      if (m) this.present.set(id, { id, name: m.name, character: asSkin(m.skin ?? m.character), guest: m.guest, at: m.at });
     }
     const now = Date.now();
     for (const [id, seat] of before) if (!this.present.has(id) && !this.gone.has(id)) this.gone.set(id, { seat, at: now });

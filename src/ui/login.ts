@@ -1,6 +1,7 @@
 import './login.css';
 import { houseIsOpen, joinWithCode, signInMember, visitAsGuest } from '../net/auth';
 import { NAME_MAX, PASSWORD_MIN } from '../shared/members';
+import skins from '../house/skins.json';
 
 // The front door: design/login/login.html (same look, fonts, colours, animated living room), with three
 // ways in and no emails: members sign in with name + password; new members join with Diesel's invite
@@ -8,8 +9,7 @@ import { NAME_MAX, PASSWORD_MIN } from '../shared/members';
 
 const SRC = {
   scene: 'assets/ui/login_scene.png',
-  adam: 'assets/characters/limezu_adam_idle.png',
-  amelia: 'assets/characters/limezu_amelia_idle.png',
+  skins: 'assets/characters/skins.png',
 };
 const T = 16;
 const SW = 384; // scene size in pixels (24 x 11 tiles)
@@ -211,8 +211,13 @@ function layout() {
   ctx.imageSmoothingEnabled = false;
 }
 
-function sprite(img: HTMLImageElement, frame: number, x: number, y: number) {
-  ctx.drawImage(img, frame * 16, 0, 16, 32, ox + x * s, oy + y * s, 16 * s, 32 * s);
+// One Ninja Adventure person from the skins atlas (scripts/build_skins.py), feet at (x, y + 32) like the
+// 16 × 32 people this scene was drawn for. `row`: 0-3 walk steps.
+function sprite(key: string, facing: string, row: number, x: number, y: number) {
+  const at = skins.skins.findIndex((k) => k.key === key);
+  const col = (at % skins.perRow) * skins.facings.length + skins.facings.indexOf(facing);
+  const r = Math.floor(at / skins.perRow) * skins.rows + row;
+  ctx.drawImage(imgs.skins, col * 16, r * 16, 16, 16, ox + x * s, oy + (y + 16) * s, 16 * s, 16 * s);
 }
 
 function glow(x: number, y: number, r: number, color: string, a: number) {
@@ -230,11 +235,11 @@ function frame(t: number) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(imgs.scene, ox, oy, SW * s, SH * s);
 
-  // characters: Amelia by the sofa facing right, Adam on the rug facing the viewer
-  const f = reduce ? 0 : Math.floor(sec * 7) % 6;
-  sprite(imgs.amelia, 0 + f, 8.4 * T, 3.6 * T);
-  const adamFacing = doorTarget ? 6 : 18; // turns to face the door once you knock
-  sprite(imgs.adam, adamFacing + f, 11.5 * T, 4.1 * T);
+  // characters: a woman by the sofa facing right, a boy on the rug facing the viewer, who turns to face
+  // the door once you knock (a little bob now and then, so they look alive)
+  const bob = reduce ? 0 : Math.floor(sec * 2) % 4 === 0 ? 1 : 0;
+  sprite('ninja.woman', 'right', bob, 8.4 * T, 3.6 * T);
+  sprite('ninja.boy', doorTarget ? 'up' : 'down', bob ? 2 : 0, 11.5 * T, 4.1 * T);
 
   // night: tint everything, then add warm light back
   ctx.globalCompositeOperation = 'multiply';

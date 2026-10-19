@@ -1,4 +1,4 @@
-import { CHARACTER_COUNT } from './characters';
+import { asSkin, skinDef, type Skin } from './characters';
 
 // Per-device choices. Phase 5 moves these into the user's Supabase profile.
 const CHARACTER_KEY = 'diesel-house.character';
@@ -21,13 +21,16 @@ function write(key: string, value: string) {
   }
 }
 
-export function savedCharacter(): number | null {
+// A skin key ('ninja.boy'); an old number (0-19) from before R4 becomes its starter.
+export function savedCharacter(): Skin | null {
   const v = read(CHARACTER_KEY);
-  const n = v === null ? NaN : Number(v);
-  return Number.isInteger(n) && n >= 0 && n < CHARACTER_COUNT ? n : null;
+  if (v === null) return null;
+  if (skinDef(v)) return v;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n < 20 ? asSkin(n) : null;
 }
 
-export const saveCharacter = (index: number) => write(CHARACTER_KEY, String(index));
+export const saveCharacter = (skin: Skin) => write(CHARACTER_KEY, skin);
 
 export const savedName = () => read(NAME_KEY)?.trim().slice(0, NAME_MAX) || null;
 

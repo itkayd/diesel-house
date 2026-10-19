@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 export type CatchResult =
   | { ok: true; critter: string; name: string; xp: number; progress: Recorded }
   | { ok: false; why: 'taken' | 'gone' | 'nothing' | 'enough' | 'error'; by?: string };
-export type CatchRow = { user_id: string; display_name: string; character_index: number; level: number; caught: number; xp: number; critters: string[] };
+export type CatchRow = { user_id: string; display_name: string; character_index: number; character_key?: string; level: number; caught: number; xp: number; critters: string[] };
 
 export const canCatch = () => !!supabase && !devTest;
 

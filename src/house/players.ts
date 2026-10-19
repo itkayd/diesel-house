@@ -1,4 +1,4 @@
-import { guestCharacter } from '../characters';
+import { guestSkin } from '../characters';
 import type { MoveMsg, PlayerInfo } from '../net/presence';
 import { play } from '../ui/sounds';
 import { Avatar } from '../scenes/Avatar';
@@ -9,7 +9,7 @@ import { CORRECT_EVERY, IDLE_RESEND, EXTRAPOLATE_MAX, SNAP_OVER, GLIDE_MS, STALE
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
 
 export function addRemote(this: HouseScene, p: PlayerInfo) {
-  if (p.guest) p = { ...p, character: guestCharacter(p.character) };
+  if (p.guest) p = { ...p, character: guestSkin(p.character) };
   const avatar = new Avatar(this, 0, 0, p.character, p.name);
   avatar.setVisible(false); // shown once we know where they are
   avatar.setGuest(!!p.guest);
@@ -49,7 +49,7 @@ export function removeRemote(this: HouseScene, id: string) {
 export function updateRemote(this: HouseScene, p: PlayerInfo) {
   const r = this.remotes.get(p.id);
   if (!r) return;
-  if (p.guest) p = { ...p, character: guestCharacter(p.character) };
+  if (p.guest) p = { ...p, character: guestSkin(p.character) };
   if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
   if (r.info.name !== p.name) r.avatar.setName(p.name);
   r.avatar.setGuest(!!p.guest);

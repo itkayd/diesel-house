@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Dir } from '../characters';
+import { asSkin, legacyIndex, type Dir, type Skin } from '../characters';
 import type { Zone } from '../config';
 import type { Room } from './rooms';
 import type { DuelMsg } from '../games/rps';
@@ -14,7 +14,7 @@ import { supabase } from './supabase';
 // updates per 30 s; more and it closes the channel: ClientPresenceRateLimitReached).
 // `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
 // lv / st: level and day streak for name tags (Phase 14); members only, set once known.
-export type PlayerInfo = { id: string; name: string; character: number; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality; lv?: number; st?: number };
+export type PlayerInfo = { id: string; name: string; character: Skin; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality; lv?: number; st?: number };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -30,6 +30,8 @@ export type DiceMsg = { from: string; v: number[]; s: number };
 export type TimerMsg = { from: string; room: string; k: 'set' | 'stop' | 'ask'; left?: number };
 // Presence also carries which tab this is and when it joined, so a second tab of the same person wins.
 type Meta = Omit<PlayerInfo, 'id'> & { tab: string; since: number };
+// On the wire, `character` is the old number (for older copies of the game, one release) and `skin` the key.
+type WireMeta = Omit<Meta, 'character'> & { character: number | Skin; skin?: Skin };
 
 type Handlers = {
   onJoin: (p: PlayerInfo) => void;
@@ -180,7 +182,7 @@ export class Presence {
       return;
     }
     this.lastTrack = Date.now();
-    void ch.track(this.info);
+    void ch.track({ ...this.info, character: legacyIndex(this.info.character), skin: this.info.character } satisfies WireMeta);
   }
 
   // Supabase retries some failures itself; if we're still not back after a while, make a fresh channel.
@@ -249,7 +251,7 @@ export class Presence {
 
   // Diff presence state against what we knew, and report joins/leaves/changes.
   private sync() {
-    const state = this.channel!.presenceState<Meta>();
+    const state = this.channel!.presenceState<WireMeta>();
     const seen = new Set<string>();
     for (const [key, metas] of Object.entries(state)) {
       if (!metas.length) continue;
@@ -265,7 +267,7 @@ export class Presence {
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
       const lv = Number.isFinite(m.lv) && m.lv! >= 1 ? Math.floor(m.lv!) : undefined;
       const st = Number.isFinite(m.st) && m.st! >= 0 ? Math.floor(m.st!) : undefined;
-      const p: PlayerInfo = { id: key, name: m.name, character: m.character, zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net, lv, st };
+      const p: PlayerInfo = { id: key, name: m.name, character: asSkin(m.skin ?? m.character), zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net, lv, st };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);

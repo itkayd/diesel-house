@@ -116,7 +116,7 @@ await G.fill('#gs-code', code);
 await G.click('#guest .knock');
 await G.waitForSelector('#player-name', { timeout: 20000 });
 await G.fill('#player-name', 'Sam profile');
-await G.click('button[data-character="18"]');
+await G.click('button[data-character="ninja.woman"]');
 await G.click('#picker-done');
 await G.waitForFunction(() => window.__house?.presence?.channel?.state === 'joined', null, { timeout: 20000 });
 await G.click('#xp-chip');

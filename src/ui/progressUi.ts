@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { CHALLENGE_ICONS, MEDAL_CELLS, medalById, RANK_MEDALS, type Medal } from '../challenges/pool';
 import { formatXp, legendStars, progress, rankOf, type Rank } from '../challenges/levels';
 import type { BoardRow, Challenge, Progress } from '../net/progress';
@@ -49,7 +50,7 @@ export class ProgressHud {
   private state: Progress | null = null;
 
   constructor(
-    private me: () => { character: number; guest: boolean },
+    private me: () => { character: Skin; guest: boolean },
     private openChallenges: () => void,
     openProfile: () => void,
   ) {
@@ -325,7 +326,7 @@ export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | n
       else if (!rows.length) list.append(el('p', 'v2-note', 'Nobody has earned XP this week yet.'));
       rows?.forEach((r, i) => {
         const sub = `Lv ${r.level.toLocaleString()} · ${r.wins_week} win${r.wins_week === 1 ? '' : 's'} · ${r.best_streak}-day best streak`;
-        list.append(boardRow(i, r.user_id, r.display_name, r.character_index, r.level, sub, formatXp(r.xp_week), r.xp_week > 0, me));
+        list.append(boardRow(i, r.user_id, r.display_name, r.character_key ?? r.character_index, r.level, sub, formatXp(r.xp_week), r.xp_week > 0, me));
       });
     } else {
       label.textContent = 'Today’s catches';
@@ -333,7 +334,7 @@ export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | n
       if (!catches) list.append(el('p', 'v2-note', failed ? 'Couldn’t load today’s catches. Try again in a moment.' : 'Loading today’s catches…'));
       else if (!catches.length) list.append(el('p', 'v2-note', 'Nothing caught yet today. Keep an eye out!'));
       catches?.forEach((r, i) => {
-        const row = boardRow(i, r.user_id, r.display_name, r.character_index, r.level, `${r.caught} caught`, `+${formatXp(r.xp)}`, true, me);
+        const row = boardRow(i, r.user_id, r.display_name, r.character_key ?? r.character_index, r.level, `${r.caught} caught`, `+${formatXp(r.xp)}`, true, me);
         // What they caught: a little row of critters (the latest 8).
         const pets = el('span', 'v2-pets');
         r.critters.slice(-8).forEach((c) => {
@@ -368,7 +369,7 @@ export function openNoticeboard(rows: BoardRow[] | null, catches: CatchRow[] | n
   show(tab);
 }
 
-function boardRow(i: number, id: string, name: string, character: number, level: number, sub: string, chip: string, top: boolean, me: string) {
+function boardRow(i: number, id: string, name: string, character: Skin | number, level: number, sub: string, chip: string, top: boolean, me: string) {
   const row = el('div', 'v2-board-row' + (id === me ? ' me' : ''));
   row.dataset.player = id;
   const who = el('b');

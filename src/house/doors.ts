@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import { ROOM_IDS, type RoomId, type Zone } from '../config';
 import { roomDef } from './rooms';
 import { loadRooms as fetchRooms, setDnd, type Room } from '../net/rooms';
@@ -86,7 +87,7 @@ export function tidyQuiet(this: HouseScene, left: Zone | null, entered: Zone | n
 // Nameplate faces and room warmth, from who's where.
 export function refreshRooms(this: HouseScene) {
   for (const room of ROOM_IDS) {
-    const chars: number[] = [];
+    const chars: Skin[] = [];
     if (this.zone === room) chars.push(this.character);
     for (const r of this.remotes.values()) if (r.active && r.info.zone === room) chars.push(r.info.character);
     this.look.setOccupants(room, chars);

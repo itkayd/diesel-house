@@ -1,3 +1,4 @@
+import type { Skin } from '../characters';
 import type { RoomId } from '../config';
 import { deleteMessage, loadChat, MAX_LENGTH, postMessage, setReaction, type Message, type Reaction } from '../net/chat';
 import type { ChatChange } from '../net/presence';
@@ -38,7 +39,7 @@ const QUICK: [string, string][] = [
   ['🎲 /roll', '/roll'],
 ];
 
-type Me = { id: string; name: string; character: number };
+type Me = { id: string; name: string; character: Skin };
 
 export class ChatPanel {
   private button: HTMLButtonElement;
@@ -281,7 +282,7 @@ export class ChatPanel {
         el('span', 'time', when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })),
       );
       const text = el('div', 'text', m.text);
-      row.append(portrait(m.author_character, 32), meta, text);
+      row.append(portrait(m.author_skin ?? m.author_character, 32), meta, text);
 
       const counts = this.reactions.get(m.id);
       const chips = [...(counts ?? new Map<string, Set<string>>()).entries()].filter(([, s]) => s.size);

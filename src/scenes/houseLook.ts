@@ -1,9 +1,8 @@
 import Phaser from 'phaser';
-import { portraitFrame } from '../characters';
+import { skinFrame, type Skin } from '../characters';
 import type { RoomId } from '../config';
 import { DND_COLOUR, DND_ICON, iconDataUrl, type IconName } from '../ui/icons';
 import { roomDef } from '../house/rooms';
-import { faceTop } from '../ui/portrait';
 import { DEPTH, depthOf, toScreen } from '../house/projection';
 
 // The look of the house, after design/game/mvp.html: furniture sprites depth-sorted with people, a night
@@ -134,7 +133,7 @@ export class HouseLook {
   }
 
   // Who's in each room: warms it up and shows faces on the door's nameplate.
-  setOccupants(room: RoomId, characters: number[]) {
+  setOccupants(room: RoomId, characters: Skin[]) {
     const glow = this.roomGlow.get(room);
     if (glow) {
       const target = characters.length ? ROOM_LIVE_ALPHA : 0;
@@ -210,7 +209,7 @@ class Nameplate {
     this.render();
   }
 
-  setHeads(characters: number[]) {
+  setHeads(characters: Skin[]) {
     const key = characters.join(',');
     if (key === this.headKey) return;
     this.headKey = key;
@@ -222,15 +221,10 @@ class Nameplate {
     const total = shown.length * 9 + (more ? 10 : 0) - 1;
     let x = -total / 2;
     for (const c of shown) {
-      // 8x8 face: a 16x16 crop of the front-facing pose at half size, on a dark tile.
+      // 8x8 face: the front-facing pose (16 px) at half size, on a dark tile.
       const bg = this.scene.add.rectangle(x - 1, -1, 10, 10, EDGE).setOrigin(0);
-      const { key: tex, frame } = portraitFrame(c);
-      const img = this.scene.add
-        .image(x, 0, tex, frame)
-        .setOrigin(0)
-        .setCrop(0, faceTop(c), 16, 16)
-        .setScale(0.5);
-      img.y = -faceTop(c) * 0.5; // the crop keeps the frame's origin
+      const { key: tex, frame } = skinFrame(c, 'idle', 'down');
+      const img = this.scene.add.image(x, 0, tex, frame).setOrigin(0).setScale(0.5);
       this.box.add([bg, img]);
       this.heads.push(bg, img);
       x += 9;

@@ -24,7 +24,7 @@ export type Recorded = Progress & {
   new_medals: { id: string; xp: number }[];
 };
 export type GameEvent = { k: string; n?: number; u?: string };
-export type BoardRow = { user_id: string; display_name: string; character_index: number; level: number; xp_week: number; wins_week: number; streak: number; best_streak: number };
+export type BoardRow = { user_id: string; display_name: string; character_index: number; character_key?: string; level: number; xp_week: number; wins_week: number; streak: number; best_streak: number };
 
 export const canRecord = () => !!supabase && !devTest;
 

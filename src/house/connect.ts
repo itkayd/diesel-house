@@ -12,6 +12,7 @@ import { addGuestSettings } from '../ui/guestSettings';
 import { toast } from '../ui/toasts';
 import { askForMic, micAlreadyAllowed } from '../ui/micPrompt';
 import { keysBlocked, notGameKey } from '../ui/modal';
+import { MicPausedChip } from '../ui/micPaused';
 import { addVoiceSettings } from '../ui/voiceSettings';
 import { EMOTES, EmoteButton } from '../ui/emotes';
 import { showSoundBanner } from '../ui/soundBanner';
@@ -148,9 +149,11 @@ export async function start(this: HouseScene) {
         this.showMyMic();
         if (s === 'silent') this.warnSilentMic();
       },
+      onMicParked: (until) => micChip.set(until),
     },
     { forceRelay },
   );
+  const micChip = new MicPausedChip(() => this.voice?.releaseMic());
   this.voiceControls = new VoiceControls({
     onMute: (m) => this.voice!.setMuted(m),
     onPushToTalk: (on) => this.voice!.setPushToTalk(on),

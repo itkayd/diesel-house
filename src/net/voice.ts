@@ -101,7 +101,7 @@ export type MicProblemKind = 'declined' | 'denied' | 'busy' | 'none' | 'unsuppor
 // only gives silence (on Android, usually another app holding it).
 export type MicState = 'on' | 'muted' | 'off' | 'silent';
 // ms of exact digital silence from a live mic before we call it broken (dev ?silentms= shortens it for tests)
-const KEEP_MIC_MS = 3 * 60_000; // a mic stays switched on (but silenced) this long after leaving a room
+export const KEEP_MIC_MS = 45_000; // a mic stays switched on (but silenced) this long after leaving a room
 const SILENT_AFTER = (import.meta.env.DEV && Number(new URLSearchParams(location.search).get('silentms'))) || 20_000;
 
 type Handlers = {
@@ -120,6 +120,9 @@ type Handlers = {
   volumeFor: (id: string) => number;
   // Our mic's state changed (shared with everyone so they can see why they can't hear us).
   onMicState?: (s: MicState) => void;
+  // The mic is kept (switched off) after leaving a room, until `until` (ms), or null once it's let go or
+  // in use again. The phone's mic light stays on meanwhile, so the HUD says so.
+  onMicParked?: (until: number | null) => void;
 };
 
 // Total bytes received over a connection (audio, plus the control messages that flow even when muted).
@@ -488,6 +491,7 @@ export class Voice {
     const kept = this.parked;
     this.parked = null;
     clearTimeout(this.parkTimer);
+    if (kept) this.h.onMicParked?.(null);
     if (kept && kept.getAudioTracks().some((t) => t.readyState === 'live')) {
       kept.getAudioTracks().forEach((t) => (t.enabled = true));
       this.micProblem = null;
@@ -497,7 +501,8 @@ export class Voice {
     return this.openMic();
   }
 
-  // Switch the mic off and keep it a few minutes (stopped for good after that, or when the tab is closed).
+  // Switch the mic off and keep it KEEP_MIC_MS (stopped for good after that, when the chip is tapped, or
+  // when the tab is closed).
   private park(stream: MediaStream | null) {
     if (!stream || stream === this.parked) return;
     if (this.parked) this.parked.getTracks().forEach((t) => t.stop());
@@ -505,11 +510,13 @@ export class Voice {
     this.parked = stream;
     clearTimeout(this.parkTimer);
     this.parkTimer = window.setTimeout(() => this.releaseMic(), KEEP_MIC_MS);
+    this.h.onMicParked?.(Date.now() + KEEP_MIC_MS);
   }
 
   // Let go of a kept mic (the browser's mic light goes off).
   releaseMic() {
     clearTimeout(this.parkTimer);
+    if (this.parked) this.h.onMicParked?.(null);
     this.parked?.getTracks().forEach((t) => t.stop());
     this.parked = null;
   }

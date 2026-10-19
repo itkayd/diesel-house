@@ -745,3 +745,12 @@ html, body, #game, #overlay, #overlay * {
 /* Settings → More: keyboard shortcuts. */
 .dh-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
 .dh-keys kbd { justify-self: start; font-family: var(--font-display); font-size: 12px; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line), inset 0 -3px 0 var(--line); padding: 3px 7px 5px; white-space: nowrap; }
+
+/* "Mic paused" chip (src/ui/micPaused.ts): the mic is held, switched off, for a few seconds after a room. */
+.dh-mic-paused { position: absolute; right: calc(14px + var(--safe-r)); bottom: calc(112px + var(--safe-b)); pointer-events: auto; z-index: 6; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 10px; border: 0; cursor: pointer; font: inherit; font-size: 13px;
+  color: var(--cream); background: var(--panel); box-shadow: 0 0 0 3px var(--panel-edge), inset 3px 0 0 var(--warn); }
+.dh-mic-paused svg { color: var(--warn); }
+.dh-mic-paused .t { font-family: var(--font-display); }
+.dh-mic-paused .left { color: var(--muted); min-width: 3ch; }
+.dh-mic-paused .x { color: var(--lamp); text-decoration: underline; text-underline-offset: 2px; }
+.dh-mic-paused:hover, .dh-mic-paused:focus-visible { box-shadow: 0 0 0 3px var(--panel-edge), inset 3px 0 0 var(--warn), inset 0 0 0 2px var(--lamp); outline: none; }

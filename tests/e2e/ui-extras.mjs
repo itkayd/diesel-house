@@ -67,6 +67,21 @@ await page.click('#settings-tab-more');
 const keys = await page.locator('#settings-keys kbd').count();
 check('Settings → More lists the keyboard shortcuts', { keys }, keys >= 8);
 
+// 7. A mic kept after leaving a room: "Mic paused" with a countdown; a tap lets it go (the light goes off).
+await page.keyboard.press('Escape');
+const paused = await page.evaluate(async () => {
+  const v = window.__house.voice;
+  const stream = new AudioContext().createMediaStreamDestination().stream;
+  v.park(stream);
+  await new Promise((r) => setTimeout(r, 300));
+  const chip = document.getElementById('mic-paused');
+  const shown = !!chip && !chip.hidden;
+  const text = chip?.textContent;
+  chip?.click();
+  return { shown, text, after: !chip?.hidden, live: stream.getAudioTracks().some((t) => t.readyState === 'live') };
+});
+check('a kept mic shows "Mic paused" with seconds left; tapping it turns the mic off', paused, paused.shown && /Mic paused\s*4\d?s/.test(paused.text ?? '') && !paused.after && !paused.live);
+
 console.log(res.join('\n'));
 console.log(errors.length ? `page errors: ${errors.join(' | ')}` : 'no page errors');
 await browser.close();

@@ -45,7 +45,15 @@ Verdicts:
 
 ## 3. New packs for fighting, movement and the store (18 Oct 2026)
 
-Raw files go in `assets/raw/v4-packs/` (gitignored). Verified on each pack's page on 18 Oct 2026.
+**All downloaded (19 Oct 2026)**: 17 files in `assets/raw/v4-packs/` on Diesel's laptop (gitignored) and in `DieselHouse_v4_lite.zip` → `packs/v4/`. Each pack's licence was verified on its page on 18 Oct 2026, and against the licence file inside the zip where there is one. Contact sheets: `design/redesign/contact_v4_*.png`.
+
+File notes:
+- `Tiny Swords.zip` is "Update 010", the itch file labelled **old version, CC0**.
+- `Tiny Swords (Free Pack).zip` is the newer free pack: commercial OK, no resale.
+- ansimuz's zip licence says "personal or commercial… you can re-distribute", matching the OGA CC0 page.
+- Foozle's Readme says CC0.
+- Kenney zips include CC0 `License.txt`.
+- Tiny RPG: use `v2.0 Free Soldier & Orc`; the older versions are duplicates.
 
 | # | Pack | What's in it | View / size | Licence | Use for |
 |---|---|---|---|---|---|
@@ -62,7 +70,7 @@ Raw files go in `assets/raw/v4-packs/` (gitignored). Verified on each pack's pag
 | N11 | [Kenney 1-Bit Pack](https://kenney.nl/assets/1-bit-pack) | 1,000+ icons (coins, gems, keys, hearts, UI glyphs) | 16 px | **CC0** | Store and currency icons |
 | N12 | [Kenney Game Icons](https://kenney.nl/assets/game-icons) | UI icons (cart, lock, star, plus, gift…) | Vector/PNG | **CC0** | Store UI buttons |
 | N13 | [Kenney Particle Pack](https://kenney.nl/assets/particle-pack) | Sparkles, stars, smoke, magic | PNG | **CC0** | Purchase confetti, level-up, hit effects |
-| N14 | [Gems / Coins Free](https://laredgames.itch.io/gems-coins-free) (La Red Games) | **Animated** gold/silver/red coins + yellow/blue/grey/red/green gems | 16 px | **CC0** | **Gems and Coins currency icons** (spinning) |
+| N14 | [Gems / Coins Free](https://laredgames.itch.io/gems-coins-free) (La Red Games) | **Animated** gold/silver/red coins + yellow/blue/grey/red/green gems | 16 px | **CC0** | **Currency icons:** `MonedaD.png` (gold coin, 5 frames) = **Coins**, `spr_coin_azu.png` (blue gem, 4 frames) = **Gems** |
 | N15 | [Spinning coin](https://opengameart.org/content/spinning-coin-anim) (rzuf) | Spinning coin sheet + frames | — | **CC0** | Backup coin icon |
 
 **Rejected after checking:**

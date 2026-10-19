@@ -15,7 +15,7 @@ How Diesel House makes money. Read with `LICENSES.md` (only commercial-safe asse
 
 | | **Coins** (earned) | **Gems** (premium) |
 |---|---|---|
-| Icon | Spinning gold coin (N14 Gems/Coins, CC0) | Spinning blue gem (N14) |
+| Icon | Spinning gold coin `MonedaD.png` (N14 Gems/Coins, CC0) | Spinning blue gem `spr_coin_azu.png` (N14) |
 | How you get them | Playing: daily login, challenges, games, critter catches, Ghoul night, levelling up | Buying gem packs; Diesel+; Season Pass; small rewards (every 5 levels) |
 | Can you buy them with money? | **No** | Yes |
 | Spend on | Common characters, common pets, basic decor, emotes | Rare/Epic/Limited characters, voice effects, frames, house themes, Season Pass |

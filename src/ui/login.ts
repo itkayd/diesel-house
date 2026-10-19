@@ -21,12 +21,12 @@ const HTML = `
 <main class="stage">
   <header class="sign">
     <h1>Diesel House</h1>
-    <p>8 rooms · walk in to talk</p>
+    <p>7 rooms · party games · walk in to talk</p>
   </header>
   <section class="card" aria-live="polite">
     <form id="signin" data-mode="signin" novalidate style="display:grid;gap:14px">
       <h2>Knock to come in</h2>
-      <p class="lede">Step into a room and you hear everyone inside. Step back into the hallway and it goes quiet.</p>
+      <p class="lede">Hang out with friends in a little pixel house. Walk into a room and you’re talking with everyone inside; walk out and it goes quiet. Games at every table.</p>
       <div class="field">
         <label for="si-name">Your name</label>
         <input id="si-name" name="username" type="text" autocomplete="username" maxlength="${NAME_MAX}" required>
@@ -63,7 +63,7 @@ const HTML = `
 
     <form id="guest" data-mode="guest" hidden novalidate style="display:grid;gap:14px">
       <h2>Visit as a guest</h2>
-      <p class="lede">Ask a friend in the house for their invite code. Guests can look around and talk in rooms with open doors for 12 hours; you'll pick a name and character inside.</p>
+      <p class="lede">Ask a friend in the house for their invite code. Guests can look around, talk, chat and play games for 12 hours. You'll pick a name and character inside.</p>
       <div class="field">
         <label for="gs-code">Friend's invite code</label>
         <input id="gs-code" name="code" type="text" autocomplete="off" autocapitalize="characters" placeholder="ABCD-1234">

@@ -47,8 +47,8 @@ Each step needs one test in `tests/e2e/` that walks it at phone size.
 
 | Stage | What | Done when |
 |---|---|---|
-| **U1 · Help and rules** (this commit) | Game handbook (`src/games/rules.ts`): a ? in the games panel, rules folded in every lobby, the handbook from the guide and Settings. Guide: Having fun, Inviting, House rules | Every game's rules reachable in 1 tap from its lobby; guide tests pass |
-| **U2 · First run** | Section 3's path: a welcome hint system (one-time, dismissable), an empty-house mode (arcade, critters, "invite a friend" card), and clearer front-door copy | A new phone user reaches a game lobby in under 60 s without help |
+| **U1 · Help and rules** (done 19 Oct) | Game handbook (`src/games/rules.ts`): a ? in the games panel, rules folded in every lobby, the handbook from the guide and Settings. Guide: Having fun, Inviting, House rules | Every game's rules reachable in 1 tap from its lobby; guide tests pass |
+| **U2 · First run** (done 19 Oct: `src/ui/hints.ts`, `tests/e2e/first-run.mjs`) | Section 3's path: a welcome hint system (one-time, dismissable), an empty-house mode (arcade, critters, "invite a friend" card), and clearer front-door copy | A new phone user reaches a game lobby in under 60 s without help |
 | **U3 · HUD and navigation** | The top bar from `design/store/store.html` (zone, Map, Store, Settings; then XP + wallet). Labels and tooltips on desktop. The open items from `UI-REVIEW.md` (U1 camera void, U2 XP skeleton, U3 top bar, U5 banner, U6 name tag, U8 skeleton rows, U10 offline pill, U11 labels) | No item left open in UI-REVIEW §2 |
 | **U4 · Social and safety** | Block / Report in the friend menu, a filter on names, chat and guesses, a report queue for Diesel, a friends list with "join them", and "Invite to table" (ping friends to a game) | A blocked person can't be heard, seen chatting or invite you; reports reach Diesel |
 | **U5 · Games polish** | A "Ready" step in lobbies, rematch with the same players, end-of-game stats, spectator chat, sound passes per game | Each game feels finished: a start, a middle, a clear end, and an easy "again" |

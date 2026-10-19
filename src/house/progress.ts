@@ -7,6 +7,7 @@ import { isTouchDevice } from '../ui/joystick';
 import { WHISPER } from '../scenes/hallway';
 import { Tracker } from '../challenges/tracker';
 import { canRecord, weeklyBoard, type Recorded } from '../net/progress';
+import { firstRun } from '../ui/hints';
 import { challengeToast, confettiAt, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
 import { catchBoard } from '../net/critters';
 import type { HouseScene } from '../scenes/HouseScene';
@@ -38,6 +39,7 @@ export function gotProgress(this: HouseScene, r: Recorded) {
   const prevLevel = this.progress?.level;
   this.progress = r;
   this.progressHud?.update(r, first ? 0 : r.gained);
+  if (!first && r.gained > 0) firstRun.notify('xp');
   this.me.setProgress(r.level, r.streak);
   this.presence?.update(this.rankInfo());
   // One after another: challenges, then medals (a new rank shows in the level-up instead), then level up.

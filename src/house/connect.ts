@@ -32,6 +32,7 @@ import { addWhosWhereButton } from '../ui/whosWhere';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ROOMS } from './rooms';
 import { setupGuide } from '../ui/guide';
+import { firstRun } from '../ui/hints';
 
 // Going online: presence, voice, chat, games, settings and the HUD buttons, once you have picked a character.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -40,6 +41,24 @@ import { setupGuide } from '../ui/guide';
 export async function start(this: HouseScene) {
   this.canMove = true;
   setupGuide(true); // the ? button, and the guide itself on a first visit
+  // One-time tips for the first minutes, and a card when nobody else is in (src/ui/hints.ts).
+  firstRun.begin({
+    zone: () => this.zone,
+    moved: () => Math.hypot(this.player.x - this.spawnAt.x, this.player.y - this.spawnAt.y) > 24,
+    others: () => [...this.remotes.values()].filter((r) => r.active).length,
+    nearby: () =>
+      [...this.remotes.values()].filter(
+        (r) => r.active && (this.zone && this.zone !== 'hallway' ? r.info.zone === this.zone : Math.hypot(r.avatar.sprite.x - this.player.x, r.avatar.sprite.y - this.player.y) < 90),
+      ).length,
+    nearGames: () => !!this.games?.promptFor,
+    member: !currentUser()?.guest,
+    arcade: () => void this.openArcade(),
+    invite: () => {
+      this.openMyProfile();
+      setTimeout(() => document.getElementById('profile-tab-code')?.click(), 60);
+    },
+    map: () => this.whosWhere(),
+  });
   if (this.starting) return;
   this.starting = true;
   showWhere(this.zone, 'Connecting…', 'warn');

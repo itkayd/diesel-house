@@ -953,3 +953,19 @@ html, body, #game, #overlay, #overlay * {
 .dh-rules-book .v2-head h2 { flex: 1; }
 .dh-rules-book .dh-guide-head .dh-title { font-size: var(--fs-lg); }
 .dh-guide-act { margin-top: 12px; }
+
+/* First-run tips and the quiet-house card (src/ui/hints.ts). */
+.dh-hint { position: fixed; z-index: 40; pointer-events: auto; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; box-sizing: border-box;
+  padding: 10px 10px 10px 12px; background: var(--cream); color: var(--panel-edge); font-size: 14px; line-height: 1.35; font-weight: 700;
+  box-shadow: 0 0 0 3px var(--panel-edge), 4px 4px 0 3px rgba(13,9,18,.45); animation: dh-hint-in .2s steps(3); }
+.dh-hint::after { content: ''; position: absolute; left: calc(var(--arrow, 50%) - 8px); bottom: -11px; width: 0; height: 0;
+  border: 8px solid transparent; border-top-color: var(--cream); border-bottom: 0; filter: drop-shadow(0 3px 0 var(--panel-edge)); }
+.dh-hint.below::after { bottom: auto; top: -11px; border-top-color: transparent; border-bottom: 8px solid var(--cream); border-top: 0; filter: drop-shadow(0 -3px 0 var(--panel-edge)); }
+.dh-hint-ok { border: 0; cursor: pointer; font-family: var(--font-display); font-size: 13px; color: var(--panel-edge); background: var(--lamp); padding: 6px 10px; min-height: 36px; box-shadow: 0 0 0 2px var(--panel-edge), inset 0 -3px 0 var(--lamp-deep); }
+.dh-hint-ok:focus-visible { outline: 3px solid var(--panel-edge); outline-offset: 2px; }
+@keyframes dh-hint-in { from { transform: translateY(6px); opacity: 0; } }
+.dh-quiet { position: relative; grid-template-columns: 44px 1fr; padding-right: 52px; }
+.dh-quiet .dh-quiet-x { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; }
+.dh-quiet-acts { flex-wrap: wrap; }
+.dh-quiet-acts .dh-btn { flex: 1 1 auto; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .dh-hint { animation: none; } }

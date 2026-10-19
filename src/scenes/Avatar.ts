@@ -60,7 +60,7 @@ export class Avatar {
   facing: Dir = 'down';
   private danceTween: Phaser.Tweens.Tween | null = null;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, character: Skin, name: string, isMe = false) {
+  constructor(scene: Phaser.Scene, x: number, y: number, character: Skin, name: string, private isMe = false) {
     this.character = asSkin(character);
     this.name = name;
     this.sprite = scene.add.sprite(x, y, 'skins').setOrigin(0.5, 1);
@@ -157,7 +157,7 @@ export class Avatar {
     if (m === this.mic) return;
     this.mic = m;
     if (m) this.micImg.setTexture(micKey(m));
-    this.micImg.setVisible(!!m);
+    this.micImg.setVisible(!!m && !this.isMe); // your own mic and connection are on the HUD already
     this.drawTagBg();
   }
 
@@ -167,7 +167,7 @@ export class Avatar {
     if (q === this.net) return;
     this.net = q;
     if (q) this.netImg.setTexture(netKey(q));
-    this.netImg.setVisible(!!q && q !== 'super');
+    this.netImg.setVisible(!!q && q !== 'super' && !this.isMe);
     this.drawTagBg();
   }
 

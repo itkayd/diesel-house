@@ -110,14 +110,18 @@
 .dh-mic[data-state="ptt"] { background: var(--panel-hi); color: var(--cream); }
 .dh-mic[data-state="blocked"], .dh-mic[data-state="nomic"], .dh-mic[data-state="busy"], .dh-mic[data-state="off"] { background: var(--panel); color: var(--error); box-shadow: inset 0 0 0 3px var(--error); }
 .dh-mic[data-state="silent"] { background: var(--panel); color: var(--lamp); box-shadow: inset 0 0 0 3px var(--lamp); animation: dh-blink 1.2s steps(2) infinite; }
-/* Always-visible mic state under the button ("Mic on", "Muted", "Mic blocked"…). */
-.dh-mic-caption { margin-top: 6px; text-align: center; font-family: var(--font-display); font-size: var(--fs-xs); color: var(--cream);
-  background: var(--panel); box-shadow: 0 0 0 2px var(--panel-edge); padding: 2px 6px; white-space: nowrap; }
+/* Always-visible mic state, written inside the bottom of the button ("Mic on", "Muted", "Mic blocked"…). */
+.dh-mic { width: 76px; height: 76px; align-content: center; }
+.dh-mic svg { margin-top: -14px; width: 28px; height: 28px; }
+.dh-mic-caption { position: absolute; left: 0; right: 0; bottom: 11px; text-align: center; pointer-events: none;
+  font-family: var(--font-display); font-size: 11px; letter-spacing: .02em; color: var(--panel-edge); white-space: nowrap; }
+#voice-controls .dh-mic-caption[data-state="ptt"] { color: var(--cream); }
+#voice-controls .dh-mic-caption[data-state="muted"], #voice-controls .dh-mic-caption[data-state="talking"] { color: var(--panel-edge); }
 .dh-mic-caption[data-problem="true"] { color: var(--error); }
 .dh-mic-caption[data-state="silent"] { color: var(--lamp); }
 .dh-mic-caption[data-state="muted"] { color: var(--error); }
-.dh-mic .dh-conn {   /* voice connection dot: ok | warn | error */
-  position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; box-shadow: 0 0 0 3px var(--panel-edge);
+.dh-mic .dh-conn {   /* voice connection dot: ok | warn | error, tucked into the corner */
+  position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; box-shadow: 0 0 0 2px rgba(13,9,18,.55);
 }
 .dh-conn[data-s="ok"] { background: var(--ok); }
 .dh-conn[data-s="warn"] { background: var(--warn); animation: dh-blink 1s steps(2) infinite; }
@@ -197,17 +201,19 @@
 .dh-hud-bl { position: absolute; bottom: calc(18px + var(--safe-b)); left: calc(18px + var(--safe-l)); }
 .dh-hud-tc { position: absolute; top: calc(14px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: grid; gap: 10px; width: min(92%, 380px); }
 
-/* joystick (touch only) */
+/* joystick (touch only): a faint ring that lights up while your thumb is on it */
 .dh-joy {
-  width: 124px; height: 124px; position: relative; touch-action: none;
-  background: rgba(13,9,18,.45); box-shadow: 0 0 0 3px var(--panel-edge), inset 0 0 0 3px rgba(255,244,224,.12);
-  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);  /* octagon = pixel circle */
+  width: 112px; height: 112px; position: relative; touch-action: none; border-radius: 50%;
+  background: radial-gradient(circle, rgba(13,9,18,.10) 0 38%, rgba(13,9,18,.38) 39% 100%);
+  box-shadow: inset 0 0 0 2px rgba(255,244,224,.22), 0 0 0 2px rgba(13,9,18,.35);
+  opacity: .7; transition: opacity .15s;
 }
+.dh-joy.on { opacity: 1; box-shadow: inset 0 0 0 2px rgba(255,214,107,.55), 0 0 0 2px rgba(13,9,18,.45); }
 .dh-joy .knob {
-  position: absolute; left: 36px; top: 36px; width: 52px; height: 52px; background: var(--cream);
-  box-shadow: inset 0 -4px 0 var(--muted);
-  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
+  position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,244,224,.88); box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), 0 2px 0 rgba(13,9,18,.45);
 }
+.dh-joy.on .knob { background: var(--cream); }
 
 /* toast (notices, duel invites) */
 .dh-toast {
@@ -339,8 +345,18 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 .dh-game { container-type: size; container-name: game; }
 @container game (max-width: 640px) {
   /* Chat on a phone: above the joystick and the mic button, so you can still walk and mute while it's open. */
-  .dh-sheet--side { top: auto; left: 0; width: auto; height: 46%; bottom: calc(150px + var(--safe-b)); }
-  .dh-hud-br { gap: 12px; }
+  .dh-sheet--side { top: auto; left: 0; width: auto; height: 46%; bottom: calc(176px + var(--safe-b)); }
+  /* Bottom-right on a phone: the small buttons (chat, music, emotes…) in a row above the mic, filled
+     from the right, so nothing runs into the joystick on the left. */
+  .dh-hud-br { display: grid; grid-template-columns: repeat(3, 48px); gap: 12px 10px; direction: rtl; align-items: end;
+    bottom: calc(14px + var(--safe-b)); right: calc(14px + var(--safe-r)); }
+  .dh-hud-br > * { direction: ltr; }
+  .dh-hud-br > .dh-iconbtn { width: 48px; height: 48px; }
+  .dh-hud-br > .dh-iconbtn svg { width: 20px; height: 20px; }
+  .dh-hud-br > #voice-controls, .dh-hud-br > .dh-walkie { grid-column: 1 / -1; justify-self: start; }
+  .dh-hud-bl { bottom: calc(22px + var(--safe-b)); left: calc(16px + var(--safe-l)); }
+  .dh-mic-paused { bottom: calc(176px + var(--safe-b)); }
+  .v2-emotebar { bottom: calc(176px + var(--safe-b)); }
   .dh-scrim { place-items: end center; padding: 0; }
   .dh-scrim > .dh-panel { width: 100%; max-height: 85%; }
 }
@@ -485,7 +501,7 @@ html, body, #game, #overlay, #overlay * {
 .v2-act .dh-btn { white-space: nowrap; font-size: 15px; min-height: 44px; padding: 6px 14px 9px; }
 .v2-act .dh-btn svg { width: 18px; height: 18px; }
 /* Phones: above the joystick and the chat / emote / mic buttons instead of on top of them. */
-@media (pointer: coarse) { .v2-act { bottom: calc(150px + var(--safe-b)); } }
+@media (pointer: coarse) { .v2-act { bottom: calc(184px + var(--safe-b)); } }
 .v2-act .dh-btn { animation: dh-drop .18s steps(3); }
 .v2-act kbd { font-family: var(--font-display); font-size: 12px; background: rgba(13,9,18,.25); padding: 0 5px; }
 .v2-list { display: grid; gap: 8px; }

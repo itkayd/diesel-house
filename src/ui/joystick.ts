@@ -5,7 +5,7 @@ const DEADZONE = 6; // px
 
 export const isTouchDevice = () => window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
-// On-screen joystick for phones (an octagon, the pixel version of a circle). `vector` is -1..1 on each
+// On-screen joystick for phones (a faint ring that lights up while held). `vector` is -1..1 on each
 // axis; its length is how far it's pushed.
 export class Joystick {
   readonly vector = { x: 0, y: 0 };
@@ -32,6 +32,7 @@ export class Joystick {
         if (this.pointerId !== null) return; // already held by another finger
         this.pointerId = e.pointerId;
         this.base.setPointerCapture(e.pointerId);
+        this.base.classList.add('on');
         this.move(e);
       },
       { passive: false },
@@ -54,6 +55,7 @@ export class Joystick {
     this.pointerId = null;
     this.vector.x = this.vector.y = 0;
     this.knob.style.transform = '';
+    this.base.classList.remove('on');
   }
 
   private move(e: PointerEvent) {

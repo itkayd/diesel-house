@@ -4,6 +4,7 @@ import { DEFAULT_SKIN, type Skin } from '../characters';
 import type { HouseAnimals } from './animals';
 import type { Jukebox } from '../house/jukebox';
 import type { JukeboxButton } from '../ui/jukeboxUi';
+import type { WatchTogether } from '../ui/watchTogether';
 import { Zones } from '../house/zones';
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { msgStats } from '../net/stats';
@@ -116,6 +117,7 @@ export class HouseScene extends Phaser.Scene {
   animals: HouseAnimals | null = null;
   jukebox: Jukebox | null = null;
   jukeboxUi: JukeboxButton | null = null;
+  watch: WatchTogether | null = null;
   autoDoor: RoomId | null = null; // walking up to a quiet room's door: ask when we get there
   autoCheck = { t: 0, x: 0, y: 0 };
   wallLayer!: Phaser.Tilemaps.TilemapLayer;

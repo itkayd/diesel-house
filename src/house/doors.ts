@@ -150,6 +150,7 @@ export function syncMusic(this: HouseScene) {
   this.jukebox?.set(inside ? disco?.music : null, disco?.music_at);
   this.jukeboxUi?.setVisible(inside && !!this.presence);
   this.jukeboxUi?.refresh();
+  this.watch?.sync(); // the Lounge's and the Disco's screen
 }
 
 // Someone's display name by account id (you, a friend here, or "Someone").

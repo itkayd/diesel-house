@@ -108,3 +108,48 @@ end $$;
 select public.set_room_music('disco', null);
 select pg_temp.ok((select music from public.rooms where id = 'disco') is null, 'the music can be stopped');
 reset role;
+
+-- ---- Watch together (20261106) ----
+reset role;
+update public.rooms set music_at = null, music = null where id = 'disco';
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+select public.set_room_media('lounge', 'youtube', 'dQw4w9WgXcQ', 12, false);
+select pg_temp.ok((select media_kind = 'youtube' and media_id = 'dQw4w9WgXcQ' and media_pos = 12 and not media_paused and media_at is not null from public.rooms where id = 'lounge'), 'a YouTube video goes on in the Lounge, at 12 s');
+do $$ begin
+  perform public.set_room_media('lounge', 'youtube', 'dQw4w9WgXcQ', 13, true);
+  raise exception 'FAIL: two changes at the same moment';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: two taps at the same moment: the first wins (%)', sqlerrm;
+end $$;
+reset role;
+update public.rooms set media_at = now() - interval '1 minute' where id = 'lounge';
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+select public.set_room_media('lounge', 'youtube', 'dQw4w9WgXcQ', 70, true);
+select pg_temp.ok((select media_paused and media_pos = 70 from public.rooms where id = 'lounge'), 'pausing keeps where it was');
+do $$ begin
+  perform public.set_room_media('cafe', 'youtube', 'dQw4w9WgXcQ', 0, false);
+  raise exception 'FAIL: a screen in the Café';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: only the Lounge and the Disco have a screen (%)', sqlerrm;
+end $$;
+do $$ begin
+  perform public.set_room_media('disco', 'youtube', 'not a video id', 0, false);
+  raise exception 'FAIL: a junk video id';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: only real-looking YouTube / Spotify ids (%)', sqlerrm;
+end $$;
+select public.set_room_music('disco', 'sun_tribe');
+select public.set_room_media('disco', 'spotify', 'track:4cOdK2wGLETKBW3PvgPWqT', 0, false);
+select pg_temp.ok((select music is null and media_kind = 'spotify' from public.rooms where id = 'disco'), 'a Spotify track in the Disco stops the jukebox');
+reset role;
+update public.rooms set media_at = now() - interval '1 minute' where id = 'lounge';
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+select public.set_room_media('lounge', null, null, null, false);
+select pg_temp.ok((select media_kind is null and media_id is null and media_at is null from public.rooms where id = 'lounge'), 'stop clears the screen');
+reset role;

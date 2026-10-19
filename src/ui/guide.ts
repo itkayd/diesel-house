@@ -55,8 +55,8 @@ function steps(): Step[] {
       lines: [
         'Garden (up from the hall): trees, a pond, a fire pit. The sky follows your clock.',
         'Library: a quiet room. People only hear you up close. A shared study timer sits on the desk.',
-        'Disco: stand on the dance floor and you dance. Gaming room: the big games table and arcades.',
-        'Café: check the fridge for today’s special. Lounge: fireplace, TV and a games table. Rooftop: the city at night.',
+        'Disco: stand on the dance floor and you dance; the ♪ button is the jukebox. Gaming room: the big games table and arcades.',
+        'Café: check the fridge for today’s special. Lounge: fireplace, games table and the TV: tap the TV button, paste a YouTube or Spotify link and everyone in the room watches with you (the Disco has one too). Rooftop: the city at night.',
       ],
     },
     {

@@ -17,6 +17,13 @@ export type Room = {
   music?: string | null; // the Disco's jukebox: track id (src/house/jukebox.ts) and when it started
   music_at?: string | null;
   music_by?: string | null;
+  // Watch together (Lounge, Disco): src/house/media.ts
+  media_kind?: string | null;
+  media_id?: string | null;
+  media_pos?: number | null;
+  media_at?: string | null;
+  media_paused?: boolean | null;
+  media_by?: string | null;
 };
 
 export async function loadRooms(): Promise<Room[]> {
@@ -44,5 +51,12 @@ export async function setRoomRules(room: RoomId, games: string[] | null, prompts
 export async function setRoomMusic(room: RoomId, track: string | null) {
   if (!supabase) return 'offline';
   const { error } = await supabase.rpc('set_room_music', { room, track });
+  return error?.message ?? null;
+}
+
+// Put a YouTube video / Spotify item on a room's screen for everyone (null: stop), at `pos` seconds.
+export async function setRoomMedia(room: RoomId, m: { kind: string; id: string; pos: number; paused: boolean } | null) {
+  if (!supabase) return 'offline';
+  const { error } = await supabase.rpc('set_room_media', { room, kind: m?.kind ?? null, id: m?.id ?? null, pos: m?.pos ?? null, paused: m?.paused ?? false });
   return error?.message ?? null;
 }

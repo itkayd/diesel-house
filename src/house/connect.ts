@@ -15,7 +15,10 @@ import { keysBlocked, notGameKey } from '../ui/modal';
 import { MicPausedChip } from '../ui/micPaused';
 import { Jukebox } from './jukebox';
 import { JukeboxButton } from '../ui/jukeboxUi';
-import { setRoomMusic } from '../net/rooms';
+import { setRoomMedia, setRoomMusic } from '../net/rooms';
+import { devTest } from '../net/mode';
+import { WatchTogether } from '../ui/watchTogether';
+import { mediaOf, SCREEN_ROOMS } from './media';
 import { addVoiceSettings } from '../ui/voiceSettings';
 import { EMOTES, EmoteButton } from '../ui/emotes';
 import { showSoundBanner } from '../ui/soundBanner';
@@ -199,6 +202,34 @@ export async function start(this: HouseScene) {
       if (!err) this.roomChanged({ ...this.rooms.get('disco' as RoomId)!, music: track, music_at: track ? new Date().toISOString() : null, music_by: track ? this.presence!.id : null });
       return err;
     },
+  });
+  // Watch & listen together: the Lounge's TV and the Disco's screen.
+  const screenRoom = () => (this.zone && SCREEN_ROOMS.includes(this.zone) && this.presence ? (this.zone as RoomId) : null);
+  this.watch = new WatchTogether({
+    room: screenRoom,
+    state: () => {
+      const r = screenRoom();
+      return r ? mediaOf(this.rooms.get(r)) : null;
+    },
+    set: async (m) => {
+      const room = screenRoom();
+      if (!room) return 'Walk into the Lounge or the Disco first.';
+      const err = await setRoomMedia(room, m);
+      if (!err)
+        this.roomChanged({
+          ...this.rooms.get(room)!,
+          media_kind: m?.kind ?? null,
+          media_id: m?.id ?? null,
+          media_pos: m?.pos ?? null,
+          media_at: m ? new Date().toISOString() : null,
+          media_paused: m?.paused ?? false,
+          media_by: m ? this.presence!.id : null,
+          ...(m && room === 'disco' ? { music: null, music_at: null } : {}),
+        });
+      return err;
+    },
+    nameOf: (id) => this.nameOf(id),
+    fake: devTest && new URLSearchParams(location.search).has('fakemedia'),
   });
   this.chat = new ChatPanel(
     () => ({ id: this.presence!.id, name: this.name, character: this.character }),

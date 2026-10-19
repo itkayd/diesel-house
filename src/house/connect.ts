@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { type RoomId } from '../config';
+import { type RoomId, WATCH_TOGETHER } from '../config';
 import { currentUser } from '../net/profile';
 import { setDnd, setRoomRules } from '../net/rooms';
 import { gamesFor, type GameId } from '../games/catalog';
@@ -204,9 +204,10 @@ export async function start(this: HouseScene) {
       return err;
     },
   });
-  // Watch & listen together: the Lounge's TV and the Disco's screen.
+  // Watch & listen together: the Lounge's TV and the Disco's screen (off until the big update).
+  const fakeMedia = devTest && new URLSearchParams(location.search).has('fakemedia');
   const screenRoom = () => (this.zone && SCREEN_ROOMS.includes(this.zone) && this.presence ? (this.zone as RoomId) : null);
-  this.watch = new WatchTogether({
+  if (WATCH_TOGETHER || fakeMedia) this.watch = new WatchTogether({
     room: screenRoom,
     state: () => {
       const r = screenRoom();
@@ -230,7 +231,7 @@ export async function start(this: HouseScene) {
       return err;
     },
     nameOf: (id) => this.nameOf(id),
-    fake: devTest && new URLSearchParams(location.search).has('fakemedia'),
+    fake: fakeMedia,
   });
   this.chat = new ChatPanel(
     () => ({ id: this.presence!.id, name: this.name, character: this.character }),

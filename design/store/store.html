@@ -19,17 +19,17 @@ img,.px{image-rendering:pixelated}
 .notes{max-width:420px;font-size:14px;line-height:1.5;color:var(--muted)}.notes h2{font-family:var(--fd);color:var(--cream)}
 .notes code{color:var(--lamp)}
 /* HUD */
-.hud{position:absolute;inset:0 0 auto 0;padding:12px;display:grid;grid-template-columns:1fr auto;gap:8px;background:linear-gradient(#140f1cee,#140f1c00)}
+.hud{position:absolute;inset:0 0 auto 0;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;background:linear-gradient(#140f1cee,#140f1c00)}
 .pill,.btn,.chip{background:var(--panel);box-shadow:var(--frame);border:0;color:var(--cream);font-family:var(--fd)}
-.pill{display:flex;align-items:center;gap:8px;padding:8px 12px;height:44px;font-size:15px}
+.pill{display:flex;align-items:center;gap:8px;padding:8px 12px;height:44px;font-size:15px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;background:var(--ok)}
 .row{display:flex;gap:8px}
 .btn{width:44px;height:44px;display:grid;place-items:center;cursor:pointer;font-size:18px}
 .btn.store{background:var(--lamp);color:var(--panel-edge)}
-.wallet{grid-column:1/-1;display:flex;gap:8px}
-.chip{display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;font-size:15px;cursor:pointer}
+.wallet{grid-column:1/-1;display:flex;gap:6px;min-width:0}
+.chip{display:flex;align-items:center;gap:5px;height:36px;padding:0 8px;font-size:14px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 .chip img{width:16px;height:16px}.chip .plus{margin-left:2px;width:20px;height:20px;background:var(--lamp);color:var(--panel-edge);display:grid;place-items:center;font-size:14px}
-.chip.xp{gap:8px}.bar{width:56px;height:8px;background:var(--panel-edge)}.bar i{display:block;height:100%;width:62%;background:var(--lamp)}
+.chip.xp{gap:6px;flex:1 1 auto;min-width:0;overflow:hidden}.bar{width:36px;height:8px;background:var(--panel-edge)}.bar i{display:block;height:100%;width:62%;background:var(--lamp)}
 .world{position:absolute;inset:0;background:radial-gradient(circle at 50% 55%,#3a2c46 0,#140f1c 60%)}
 .me{position:absolute;left:50%;top:52%;width:48px;height:48px;margin-left:-24px;background:url(img/walk_Boy.png) 0 0/192px 192px;animation:walk .6s steps(4) infinite}
 @keyframes walk{to{background-position:0 -192px}}
@@ -87,6 +87,7 @@ img,.px{image-rendering:pixelated}
     <div class="pill"><span>⌂</span> Great Hall <span class="dot"></span></div>
     <div class="row"><button class="btn" aria-label="Who's where">▦</button><button class="btn store" id="openStore" aria-label="Store">🛍</button><button class="btn" aria-label="Settings">⚙</button></div>
     <div class="wallet">
+      <button class="chip" aria-label="Catches today" id="catchChip">🐾 <span id="catches"></span></button>
       <button class="chip xp" aria-label="Profile"><img class="px" src="img/face_Boy.png" style="width:22px;height:22px"> Lv 12 <span class="bar"><i></i></span></button>
       <button class="chip" id="coinsChip" aria-label="Coins"><img class="px" src="img/GoldCoin.png"><span id="coins"></span></button>
       <button class="chip" id="gemsChip" aria-label="Gems: get more"><img class="px" src="img/GemPurple.png"><span id="gems"></span><span class="plus">+</span></button>
@@ -105,6 +106,8 @@ img,.px{image-rendering:pixelated}
   <h2>Store mock-up: how to read it</h2>
   <p>Tap the gold bag (top right) or the gem chip. Try buying characters with coins or gems. Run out of gems to see the "get more" path.</p>
   <ul>
+    <li><b>Catches chip</b> 🐾 7/15 (40 with VIP), resets at your local midnight.</li>
+    <li><b>VIP Pass</b> (Gems tab): 3/7/30 days for gems, never auto-renews, buying again adds time (max 180 days). No subscription.</li>
     <li><b>Wallet chips</b> sit under the zone pill, next to the XP chip. Coins have no "+" (they can't be bought); gems have "+" and open the Gems tab.</li>
     <li><b>Each item has one price</b>, in coins <i>or</i> gems.</li>
     <li><b>The confirm sheet shows the maths</b>: balance now, minus the price, gives the balance after. Without enough funds, the button turns into the cheapest pack that covers the gap.</li>
@@ -125,11 +128,11 @@ const CHARS = [
   ['Vampire','Vampire','limited','gems',1500],['Sultan','Sultan','event','gems',600]];
 const PACKS = [[100,'£0.99',0],[550,'£4.99',9],[1200,'£9.99',19,1],[2600,'£19.99',29],[7000,'£49.99',39]];
 const PRICE_PENCE = {100:99,550:499,1200:999,2600:1999,7000:4999};
-const S = { coins: 2350, gems: 450, owned: new Set(['Boy','Cavegirl']), wearing:'Boy', tab:'featured', busy:false };
+const S = { vipDays: 0, catches: 7, coins: 2350, gems: 450, owned: new Set(['Boy','Cavegirl']), wearing:'Boy', tab:'featured', busy:false };
 const $ = (s) => document.querySelector(s);
 const fmt = (n) => n.toLocaleString('en-GB');
 const ico = (c) => `<img class="px" src="img/${c==='coins'?'GoldCoin':'GemPurple'}.png" alt="">`;
-function wallet(){ $('#coins').textContent = fmt(S.coins); $('#gems').textContent = fmt(S.gems); }
+function wallet(){ $('#catches').textContent = `${S.catches}/${S.vipDays?40:15}`; $('#coins').textContent = fmt(S.coins); $('#gems').textContent = fmt(S.gems); }
 function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('on'),1800); }
 const TABS = [['featured','Featured'],['characters','Characters'],['pets','Pets'],['style','Style'],['gems','Gems']];
 function tabs(){ $('#tabs').innerHTML = TABS.map(([k,l])=>`<button class="tab" role="tab" aria-selected="${S.tab===k}" data-k="${k}">${l}</button>`).join(''); }
@@ -146,7 +149,9 @@ function render(){
   if (S.tab==='pets') b.innerHTML = `<div class="grid">${[['cat','Cat','coins',3000],['dog','Dog','gems',400]].map(([id,n,cur,p])=>`<button class="card" style="--rc:var(--common)"><div class="px" style="width:64px;height:64px;background:url(img/pet_${id}.png) 0 0/128px 64px"></div><span class="nm">${n}</span><span class="price">${ico(cur)}${fmt(p)}</span></button>`).join('')}</div><p class="fine">Pets follow you around the house. Cosmetic only.</p>`;
   if (S.tab==='style') b.innerHTML = `<p class="fine">Frames · voice effects · emotes (same card layout).</p>`;
   if (S.tab==='gems') b.innerHTML = PACKS.map(([g,p,bonus,pop])=>`<button class="pack ${pop?'pop':''}" data-pack="${g}"><span class="g">${ico('gems')}${fmt(g)}</span>${bonus?`<span class="bonus">+${bonus}% bonus</span>`:''}${pop?'<span class="bonus" style="color:var(--lamp)">Most popular</span>':''}<span class="money">${p}</span></button>`).join('')+
-    `<div class="plus-card"><b>Diesel+</b> · £4.99/month<ul><li>400 gems every month</li><li>+25% coins</li><li>Your own house to open to the public</li><li>Host rooms of 50 · supporter badge · monthly exclusive</li></ul><button class="primary" style="width:100%;min-height:44px;border:0;font-family:var(--fd)">Try Diesel+</button></div>
+    `<div class="plus-card"><b>VIP Pass</b> · paid with gems · never auto-renews<ul><li><b>40 critter catches a day</b> (free: 15)</li><li>+25% coins · gold name + VIP badge</li><li>Your house gets 3 rooms (free: 1)</li><li>Host public rooms of 30 · VIP shop row · Disco VIP corner</li></ul>
+    <div class="act">${[[3,150],[7,300],[30,900]].map(([d,g])=>`<button class="${d===7?'primary':'secondary'}" data-vip="${d}:${g}" style="flex-direction:column">${d} days<br><span class="price" style="justify-content:center">${ico('gems')}${g}</span></button>`).join('')}</div>
+    <p class="fine">${S.vipDays ? `VIP active · ${S.vipDays} days left (buying again adds time)` : 'Not VIP yet'}</p></div>
     <p class="fine">Prices include VAT. Gems never expire. Items are cosmetic and don't affect games.</p>`;
 }
 function cheapestPackFor(short){ return PACKS.find(([g])=>g>=short) || PACKS[PACKS.length-1]; }
@@ -179,6 +184,7 @@ document.addEventListener('click', (e)=>{ const t=e.target.closest('button,[data
   else if (t.dataset.k){ S.tab=t.dataset.k; render(); }
   else if (t.dataset.buy){ buy(t.dataset.buy, t); }
   else if (t.dataset.pack){ buyPack(+t.dataset.pack); }
+  else if (t.dataset.vip){ const [d,g]=t.dataset.vip.split(':').map(Number); if (S.gems<g){ S.tab='gems'; toast(`Need ${fmt(g-S.gems)} more gems`); render(); return; } if (S.vipDays+d>180){ toast('VIP can be at most 180 days ahead'); return; } S.gems-=g; S.vipDays+=d; toast(`VIP +${d} days`); render(); }
   else if (t.dataset.wear){ S.wearing=t.dataset.wear; document.querySelector('.me').style.backgroundImage=`url(img/walk_${t.dataset.wear}.png)`; toast('Wearing it'); closeBuy(); render(); }
   else if (t.dataset.m){ const pv=$('#pv'); const id=[...pv.style.backgroundImage.matchAll(/_(\w+)\.png/g)][0][1]; const m=t.dataset.m;
     pv.style.backgroundImage=`url(img/${m}_${id}.png)`; pv.style.backgroundSize = m==='walk' ? '256px 256px' : '256px 64px'; pv.style.animation = m==='walk' ? 'walk64 .6s steps(4) infinite' : 'none'; }

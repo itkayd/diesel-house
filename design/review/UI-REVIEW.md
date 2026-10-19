@@ -42,7 +42,7 @@ Severity: **P1** fix before the store ships · **P2** fix in the store phase · 
 7. **After buying:** a toast ("Knight unlocked"), a coin/gem chip pulse, confetti (Kenney Particle Pack), a "Wear now" button.
 8. **Gems tab:**
    - Packs with **real price incl. VAT** and the bonus %, with "Most popular" on £9.99.
-   - The Diesel+ card under the packs.
+   - The **VIP Pass** card under the packs: 3 / 7 / 30 days for gems, "never auto-renews", plus what VIP gets (40 catches a day, +25% coins, a bigger house, a badge). There's no subscription (STORE.md §4).
    - Small print: "Prices include VAT. Gems never expire. Items are cosmetic."
 9. **Never** show gem prices converted to £ on items (it's confusing and not required), and never use timers that pressure a purchase, other than honest rotation countdowns.
 10. **Errors in plain English:**

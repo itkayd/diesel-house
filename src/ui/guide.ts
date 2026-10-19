@@ -62,7 +62,7 @@ function steps(): Step[] {
     {
       id: 'games', icon: 'dice-5', chip: 'Games', title: 'Playing games',
       lines: [
-        `Walk to a table with a GAMES sign and ${phone ? 'tap Play games' : 'press E'}: dice, rock-paper-scissors, Quick Draw, Higher or lower, Would you rather, Four in a row.`,
+        `Walk to a table with a GAMES sign and ${phone ? 'tap Play games' : 'press E'}: Quiz night, Sketch & guess, Liar’s dice, Letter rush, Quick Draw, Higher or lower, Would you rather, Four in a row, dice and rock-paper-scissors.`,
         'Tables are in the hall, the Gaming room, the Café and the Lounge. The Garden’s picnic blanket has the games that need no table.',
         'Anywhere in the house: tap a friend and choose Duel for a quick rock-paper-scissors.',
       ],

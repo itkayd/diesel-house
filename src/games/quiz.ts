@@ -2,7 +2,7 @@ import { el } from '../ui/modal';
 import { play } from '../ui/sounds';
 import { portrait } from '../ui/portrait';
 import { burst, buzz, floatText, kick, timerBar } from './juice';
-import { randomSeed, rng, sha256 } from './fair';
+import { checkSeed, randomSeed, rng, sha256 } from './fair';
 import { nameOf, pointsRows, topScorers, winTitle } from './kit';
 import QUIZ from './quiz.json';
 import type { Names, Recorder, Seat, Snapshot, Table, TableHost, TableView } from './table';
@@ -292,9 +292,17 @@ export class QuizView implements TableView {
       const res = el('div', 'v2-result' + (winners.includes(this.me) ? ' win' : ''), winTitle(winners, this.me, this.names, s.players));
       res.id = 'quiz-result';
       if (redraw) {
-        this.opts.replaceChildren(res);
+        const fair = el('p', 'v2-note', 'Checking the questions were fair…');
+        fair.id = 'quiz-fair';
+        this.opts.replaceChildren(res, fair);
         if (fresh && playing) play(winners.includes(this.me) ? 'win' : 'lose', 0.7);
         if (fresh && winners.includes(this.me)) requestAnimationFrame(() => burst(res, 24));
+        // The seed matches the hash shown at the start, and picks the very same last question.
+        void (async () => {
+          const ok = !!st.seed && (await checkSeed(st.seed, st.commit)) && pickQuestions(st.seed)[st.round - 1]?.q.q === st.q.q;
+          fair.textContent = ok ? 'Fair: the questions match the host’s sealed list.' : 'Couldn’t check the questions.';
+          fair.dataset.fair = String(ok);
+        })();
       }
     }
     this.list.replaceChildren(...pointsRows(s.players, st.points, this.me, this.names, { chip: (id) => (st.phase === 'ask' && st.answered.includes(id) ? 'answered' : '') }));

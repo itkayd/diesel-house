@@ -6,10 +6,14 @@ import '../../src/ui/theme.css';
 import { FourHost, FourView } from '../../src/games/fourInARow';
 import { HigherLowerHost, HigherLowerView } from '../../src/games/higherLower';
 import { HotTakesHost, HotTakesView } from '../../src/games/hotTakes';
+import { LetterRushHost, LetterRushView } from '../../src/games/letterRush';
+import { LiarsDiceHost, LiarsDiceView } from '../../src/games/liarsDice';
+import { QuizHost, QuizView } from '../../src/games/quiz';
+import { SketchHost, SketchView } from '../../src/games/sketch';
 import type { Snapshot, TableHost, TableView } from '../../src/games/table';
 import { FakeChannel, FakeTable } from './fakeTable';
 
-type Game = 'higherlower' | 'wyr' | 'four';
+type Game = 'higherlower' | 'wyr' | 'four' | 'quiz' | 'sketch' | 'liars' | 'letters';
 const records: { game: Game; players: string[]; winners: string[]; score: unknown; seed?: string }[] = [];
 const names = new Map<string, { name: string; character: number }>();
 
@@ -17,17 +21,26 @@ function makeHost(game: Game, t: FakeTable, prompts: string[]): TableHost {
   const record = (players: string[], winners: string[], score: unknown, seed?: string) => records.push({ game, players, winners, score, seed });
   if (game === 'higherlower') return new HigherLowerHost(t, record);
   if (game === 'wyr') return new HotTakesHost(t, record, () => prompts);
+  if (game === 'quiz') return new QuizHost(t, record);
+  if (game === 'sketch') return new SketchHost(t, record);
+  if (game === 'liars') return new LiarsDiceHost(t, record);
+  if (game === 'letters') return new LetterRushHost(t, record);
   return new FourHost(t, record);
 }
 function makeView(game: Game, t: FakeTable): TableView {
   const n = (id: string) => names.get(id) ?? { name: '', character: 0 };
   if (game === 'higherlower') return new HigherLowerView(t.id, (a) => t.act(a), n);
   if (game === 'wyr') return new HotTakesView(t.id, (a) => t.act(a), n);
+  if (game === 'quiz') return new QuizView(t.id, (a) => t.act(a), n);
+  if (game === 'sketch') return new SketchView(t.id, (a) => t.act(a), n);
+  if (game === 'liars') return new LiarsDiceView(t.id, (a) => t.act(a), n);
+  if (game === 'letters') return new LetterRushView(t.id, (a) => t.act(a), n);
   return new FourView(t.id, (a) => t.act(a), n);
 }
 
 const ch = new FakeChannel();
 const tables = new Map<string, FakeTable>();
+const views = new Map<string, TableView>();
 
 // A player sits down: a column with their screen.
 function join(id: string, name: string, game: Game, prompts: string[] = []) {
@@ -44,6 +57,7 @@ function join(id: string, name: string, game: Game, prompts: string[] = []) {
   t.onSnapshot = (s: Snapshot) => {
     if (!view) {
       view = makeView(game, t);
+      views.set(id, view);
       col.append(view.root);
     }
     view.show(s);
@@ -69,4 +83,4 @@ function leave(id: string) {
   document.getElementById(`p-${id}`)?.remove();
 }
 
-Object.assign(window, { harness: { join, start, leave, records, ch, tables } });
+Object.assign(window, { harness: { join, start, leave, records, ch, tables, views } });

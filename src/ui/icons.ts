@@ -71,6 +71,10 @@ import {
   Minimize2,
   ChevronDown,
   Link,
+  Brain,
+  Brush,
+  Dices,
+  Type,
   type IconNode,
 } from 'lucide';
 
@@ -85,6 +89,7 @@ const ICONS = {
   'arrow-up': ArrowUp, 'arrow-down': ArrowDown, footprints: Footprints, map: MapIcon,
   flame: Flame, trophy: Trophy, sun: Sun, 'calendar-days': CalendarDays, 'clipboard-list': ClipboardList, 'paw-print': PawPrint,
   tv: Tv, pause: Pause, rewind: Rewind, 'fast-forward': FastForward, 'maximize-2': Maximize2, 'minimize-2': Minimize2, 'chevron-down': ChevronDown, link: Link,
+  brain: Brain, brush: Brush, dices: Dices, type: Type,
 } satisfies Record<string, IconNode>;
 export type IconName = keyof typeof ICONS;
 

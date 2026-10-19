@@ -9,6 +9,10 @@ import { diceView, type Roll } from './dice';
 import { FourHost, FourView } from './fourInARow';
 import { HigherLowerHost, HigherLowerView } from './higherLower';
 import { HotTakesHost, HotTakesView } from './hotTakes';
+import { LetterRushHost, LetterRushView } from './letterRush';
+import { LiarsDiceHost, LiarsDiceView, type LDState } from './liarsDice';
+import { QuizHost, QuizView } from './quiz';
+import { SketchHost, SketchView } from './sketch';
 import { topScorers } from './kit';
 import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
 import { ALL_GAMES, gamesFor, type GameId } from './catalog';
@@ -29,10 +33,14 @@ const GAMES: Record<GameId, { icon: IconName; title: string; sub: string; player
   higherlower: { icon: 'arrow-up-down', title: 'Higher or lower', sub: 'Guess the next card. Bank before you bust.', players: '2–8' },
   wyr: { icon: 'messages-square', title: 'Would you rather', sub: 'Vote in secret, then see who picked what.', players: '2–8' },
   four: { icon: 'grid-3x3', title: 'Four in a row', sub: 'Two players, a 7 by 6 grid. Others watch.', players: '2' },
+  quiz: { icon: 'brain', title: 'Quiz night', sub: '8 questions. Fastest right answer scores most.', players: '2–8' },
+  sketch: { icon: 'brush', title: 'Sketch & guess', sub: 'Take turns to draw a word. Everyone else guesses.', players: '2–8' },
+  liars: { icon: 'dices', title: 'Liar’s dice', sub: 'Bid on the dice under everyone’s cups. Call the bluff.', players: '2–6' },
+  letters: { icon: 'type', title: 'Letter rush', sub: 'One letter, four categories, 60 seconds.', players: '2–8' },
 };
 
 // The games played on a spot's table: who can play, the lobby's line, and their host and screen.
-type TableGameId = 'quickdraw' | 'higherlower' | 'wyr' | 'four';
+type TableGameId = 'quickdraw' | 'higherlower' | 'wyr' | 'four' | 'quiz' | 'sketch' | 'liars' | 'letters';
 type Ctx = { table: Table; record: Recorder; prompts: () => string[] };
 type TableGame = {
   short: string; // element ids: qd-start, hl-lobby, …
@@ -79,6 +87,41 @@ const TABLE: Record<TableGameId, TableGame> = {
       const w = (s.state as { winner?: string | null }).winner;
       return w ? [w] : [];
     },
+  },
+  quiz: {
+    short: 'quiz', min: 2, max: 8,
+    lobby: 'Everyone at this table plays. 8 questions, 15 seconds each, answered in secret. First right answer 3 points, second 2, the rest 1.',
+    host: (c) => new QuizHost(c.table, c.record),
+    view: (me, act, names) => new QuizView(me, act, names),
+    running: (st) => (st as { phase: string }).phase !== 'done',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
+  },
+  sketch: {
+    short: 'sk', min: 2, max: 8,
+    lobby: 'Everyone takes a turn to draw a secret word while the others type guesses. Quicker guesses score more, and the artist scores for every right guess.',
+    host: (c) => new SketchHost(c.table, c.record),
+    view: (me, act, names) => new SketchView(me, act, names),
+    running: (st) => (st as { phase: string }).phase !== 'done',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
+  },
+  liars: {
+    short: 'ld', min: 2, max: 6,
+    lobby: 'Five dice each, hidden under your cup. Bid how many of a face are on the whole table (1s count as any face), or call Liar! Lose all your dice and you’re out.',
+    host: (c) => new LiarsDiceHost(c.table, c.record),
+    view: (me, act, names) => new LiarsDiceView(me, act, names),
+    running: (st) => (st as { phase: string }).phase !== 'done',
+    winners: (s) => {
+      const w = (s.state as LDState).winner;
+      return w ? [w] : [];
+    },
+  },
+  letters: {
+    short: 'lr', min: 2, max: 8,
+    lobby: 'A letter and four categories: write an answer for each in 60 seconds. Then thumbs down anything that doesn’t count. 3 rounds.',
+    host: (c) => new LetterRushHost(c.table, c.record),
+    view: (me, act, names) => new LetterRushView(me, act, names),
+    running: (st) => (st as { phase: string }).phase !== 'done',
+    winners: (s) => topScorers((s.state as { points: Record<string, number> }).points),
   },
 };
 const isTableGame = (g: string): g is TableGameId => g in TABLE;

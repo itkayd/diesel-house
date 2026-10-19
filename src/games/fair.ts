@@ -36,3 +36,13 @@ export function cryptoInt(lo: number, hi: number) {
   while (b[0] >= max);
   return lo + (b[0] % span);
 }
+
+// A copy of `xs` shuffled with `r` (a seeded rng): the same order for the same seed.
+export function shuffleWith<T>(r: () => number, xs: readonly T[]) {
+  const a = [...xs];
+  for (let k = a.length - 1; k > 0; k--) {
+    const j = Math.floor(r() * (k + 1));
+    [a[k], a[j]] = [a[j], a[k]];
+  }
+  return a;
+}

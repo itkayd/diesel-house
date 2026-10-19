@@ -1,3 +1,5 @@
+import { openRules } from '../games/rules';
+import { currentUser } from '../net/profile';
 import { icon, type IconName } from './icons';
 import { isTouchDevice } from './joystick';
 import { el, openModal } from './modal';
@@ -5,17 +7,20 @@ import { hudButtons } from './overlay';
 import { addSettingsSection } from './settings';
 import { play } from './sounds';
 
-// "How the house works": a short guide in a pop-up, step by step (friends were lost in the new house).
+// "How the house works": a short guide in a pop-up, step by step (friends were lost in the new house):
+// getting around, talking, the rooms, games (with a button to every game's rules), ideas for a good night,
+// friends, inviting people, XP and the house rules.
 // Shown once, on your first visit after picking a character; open it again any time from the ? button
 // or Settings → More. Every step can be skipped (Next), the whole guide too (Skip intro), and the topic
 // chips at the top jump straight to any step.
 
 const DONE_KEY = 'diesel-house.guide-done';
 
-type Step = { id: string; icon: IconName; chip: string; title: string; lines: string[] };
+type Step = { id: string; icon: IconName; chip: string; title: string; lines: string[]; action?: { label: string; icon: IconName; run: () => void } };
 
 function steps(): Step[] {
   const phone = isTouchDevice();
+  const guest = !!currentUser()?.guest;
   return [
     {
       id: 'welcome', icon: 'house', chip: 'Welcome', title: 'Welcome to Diesel House',
@@ -62,35 +67,64 @@ function steps(): Step[] {
     {
       id: 'games', icon: 'dice-5', chip: 'Games', title: 'Playing games',
       lines: [
-        `Walk to a table with a GAMES sign and ${phone ? 'tap Play games' : 'press E'}: Quiz night, Sketch & guess, Liar’s dice, Letter rush, Quick Draw, Higher or lower, Would you rather, Four in a row, dice and rock-paper-scissors.`,
-        'Tables are in the hall, the Gaming room, the Café and the Lounge. The Garden’s picnic blanket has the games that need no table.',
-        'Anywhere in the house: tap a friend and choose Duel for a quick rock-paper-scissors.',
+        `Walk to a table with a GAMES sign and ${phone ? 'tap Play games' : 'press E'}. Tables are in the hall, the Gaming room, the Café and the Lounge; the Garden’s picnic blanket has the games that need no table.`,
+        'Everyone who opens the same table sits at it. Pick a game, check who’s playing, and tap Start. Anyone else at the table watches, and can play the next one.',
+        'Party games for 2–8: Quiz night, Sketch & guess, Liar’s dice, Letter rush, Quick Draw, Higher or lower, Would you rather. For two: Four in a row and rock-paper-scissors (tap any friend and pick Duel). On your own: dice, and Night Raid at the Gaming room’s arcade.',
+        'Every game has a ? with its rules, and they open by themselves the first time you try one. You stay in voice while you play, so talk it through.',
+      ],
+      action: { label: 'How to play each game', icon: 'circle-help', run: () => openRules() },
+    },
+    {
+      id: 'fun', icon: 'flame', chip: 'Having fun', title: 'Ideas for a good night in',
+      lines: [
+        'Game night: get everyone to the Gaming room table and run Quiz night, then Sketch & guess. Liar’s dice is best with 3 or 4.',
+        'Dance in the Disco and pick the music on the jukebox (♪). Sit round the Garden fire pit at sunset, or the Rooftop at night.',
+        'Study or work together in the Library: start the shared timer on the desk and keep voices low.',
+        'Chase the daily challenges, catch critters, and try to take the Night Raid house record (it pays 150 XP).',
+        'New here? Wave (smiley button), say hi, and ask someone to show you round. Everyone was new once.',
       ],
     },
     {
       id: 'friends', icon: 'smile-plus', chip: 'Friends', title: 'Friends and emotes',
       lines: [
-        'Tap a friend for their menu: send them an emote, start a duel, or change how loud they are.',
+        'Tap a friend for their menu: send them an emote, start a duel, or change how loud they are to you (slide it to 0 to mute them, just for you).',
         phone ? 'The smiley button sends an emote everyone near you can see.' : 'The smiley button sends an emote; keys 1–6 are quick emotes, Q opens the menu for whoever is next to you.',
-        'Faces on a door sign show who’s inside that room.',
+        'Faces on a door sign show who’s inside that room. The map (top right) shows everyone in the house.',
       ],
+    },
+    {
+      id: 'invite', icon: 'ticket', chip: 'Inviting', title: 'Inviting people',
+      lines: guest
+        ? [
+            'You’re visiting as a guest: you can walk around, talk in rooms with open doors, chat and play for 12 hours.',
+            'Want to stay? Ask the friend who invited you, or Diesel, about becoming a member.',
+          ]
+        : [
+            'Guests: open your profile (your XP chip, top left) → Guest code. Make a code and share it with a friend; they tap “Come in as a guest” on the front door and type it in.',
+            'Guests stay for 12 hours, can talk, chat and play, and their name tag says they’re your friend. You look after your guests.',
+            'Switch your code off any time, or make a new one if it was shared too widely.',
+            'Members (own account, XP, medals, the leaderboard): membership is by invite. Ask Diesel to add a friend’s email.',
+            'Show newcomers round: meet them on the front porch, open the map with them, and start a game. It makes all the difference.',
+          ],
     },
     {
       id: 'xp', icon: 'trophy', chip: 'XP', title: 'Challenges, XP and medals',
       lines: [
         'The trophy button has 3 daily and 3 weekly challenges. Each one gives XP.',
-        'XP raises your level. Tap your XP chip (top left) for your profile, medals and streak.',
-        'Little critters turn up around the house. Walk into one to catch it for XP.',
+        'XP raises your level. Tap your XP chip (top left) for your profile, medals and streak. Come back on following days to build a streak.',
+        'Little critters turn up around the house. Walk into one to catch it for XP. From level 3 you can pick a pet that follows you.',
+        'Playing and winning games, visiting every room and beating your Night Raid best all count.',
       ],
     },
     {
       id: 'rules', icon: 'scroll-text', chip: 'House rules', title: 'House rules',
       lines: [
-        'Be kind. This is a house for friends.',
-        'A door sign with a moon means "Do not disturb". If you go in anyway, keep it quiet. Anyone inside can turn the sign on (Settings → Room); it goes off when the room empties.',
-        'The Library is for quiet talk.',
-        'Mute when it’s noisy where you are.',
-        'You can invite a guest with your guest code (in your profile). Share it privately; you look after your guests.',
+        'Be kind. Treat everyone like a friend of a friend, because they are.',
+        'No bullying, hate, threats or harassment, in voice, chat, names or drawings. Keep it friendly for everyone in the house.',
+        'Keep private things private: don’t share anyone’s address, phone number, photos or passwords (or your own).',
+        'Respect quiet: a moon on a door means Do not disturb, and the Library is for low voices. Mute your mic when it’s noisy where you are.',
+        'Play fair: no spamming chat or emotes, and no trying to break the games.',
+        'Someone bothering you? Turn them down to 0 in their menu, walk to another room, and tell Diesel. Breaking the rules can lose someone their invite or guest code.',
       ],
     },
   ];
@@ -157,6 +191,14 @@ export function openGuide(start = 0) {
     const ul = el('ul', 'dh-guide-lines');
     for (const line of s.lines) ul.append(el('li', '', line));
     body.append(head, ul);
+    if (s.action) {
+      const a = el('button', 'dh-btn dh-btn--quiet dh-guide-act');
+      a.type = 'button';
+      a.id = `guide-act-${s.id}`;
+      a.append(icon(s.action.icon), document.createTextNode(s.action.label));
+      a.addEventListener('click', s.action.run);
+      body.append(a);
+    }
     chipEls.forEach((c, j) => {
       c.classList.toggle('on', j === i);
       c.setAttribute('aria-selected', String(j === i));
@@ -214,7 +256,15 @@ export function setupGuide(firstVisit: boolean) {
         document.getElementById('settings-sheet')?.remove();
         openGuide();
       });
-      box.append(g);
+      const r = el('button', 'dh-btn dh-btn--quiet');
+      r.type = 'button';
+      r.id = 'settings-rules';
+      r.append(icon('dice-5'), document.createTextNode('How to play the games'));
+      r.addEventListener('click', () => {
+        document.getElementById('settings-sheet')?.remove();
+        openRules();
+      });
+      box.append(g, r);
       // Keyboard shortcuts (only worth showing with a keyboard).
       if (window.matchMedia('(pointer: fine)').matches) {
         const keys = el('div', 'dh-keys');

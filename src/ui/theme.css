@@ -934,3 +934,22 @@ html, body, #game, #overlay, #overlay * {
 .v2-sk-line b { font-family: var(--font-display); font-weight: 500; color: var(--muted); }
 .v2-sk-line.ok { color: var(--ok); } .v2-sk-line.ok b { color: var(--ok); }
 .v2-sk-line.close { color: var(--gold); }
+
+/* How to play (src/games/rules.ts): a game's rules card, folded in a lobby or in the handbook. */
+.dh-rules { display: grid; gap: 10px; }
+.dh-rules-goal { margin: 0; font-size: var(--fs-md); font-weight: 700; line-height: 1.4; color: var(--cream); }
+.dh-rules-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.dh-rules-chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display); font-size: 12px; color: var(--muted); background: var(--panel-edge); padding: 3px 8px; box-shadow: inset 0 0 0 1px var(--line); }
+.dh-rules-sec { display: grid; gap: 4px; }
+.dh-rules-sec ul, .dh-rules-sec ol { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 14px; line-height: 1.45; color: var(--cream); }
+.dh-rules-sec li::marker { color: var(--lamp); font-family: var(--font-display); }
+.dh-rules-fold { background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-rules-fold > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; cursor: pointer; font-family: var(--font-display); color: var(--lamp); list-style: none; }
+.dh-rules-fold > summary::-webkit-details-marker { display: none; }
+.dh-rules-fold > summary::after { content: '+'; margin-left: auto; font-size: 18px; color: var(--muted); }
+.dh-rules-fold[open] > summary::after { content: '–'; }
+.dh-rules-fold > summary:focus-visible { outline: 3px solid var(--lamp); outline-offset: -3px; }
+.dh-rules-fold > .dh-rules { padding: 0 12px 12px; }
+.dh-rules-book .v2-head h2 { flex: 1; }
+.dh-rules-book .dh-guide-head .dh-title { font-size: var(--fs-lg); }
+.dh-guide-act { margin-top: 12px; }

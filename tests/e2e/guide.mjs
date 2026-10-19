@@ -19,7 +19,7 @@ const shown = await page.waitForSelector('#guide', { timeout: 30000 }).then(() =
 const step = () => page.evaluate(() => ({ title: document.getElementById('guide-title')?.textContent, on: document.querySelector('.dh-guide-chip.on')?.dataset.step, back: !document.getElementById('guide-back')?.hidden }));
 const first = await step();
 const chips = await page.locator('.dh-guide-chip').count();
-check('first visit: the guide opens by itself at Welcome, 9 topics, no Back', { shown, first, chips }, shown && first.on === 'welcome' && !first.back && chips === 9);
+check('first visit: the guide opens by itself at Welcome, 11 topics, no Back', { shown, first, chips }, shown && first.on === 'welcome' && !first.back && chips === 11);
 
 await page.click('#guide-next');
 const second = await step();

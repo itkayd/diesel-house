@@ -16,6 +16,7 @@ import { SketchHost, SketchView } from './sketch';
 import { topScorers } from './kit';
 import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
 import { ALL_GAMES, gamesFor, type GameId } from './catalog';
+import { openRules, rulesFold } from './rules';
 import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type Table, type TableHost, type TableView } from './table';
 
 // The games corner (west end of the hallway) and room tables (UPDATE.md Phase 12): walking onto a spot
@@ -229,7 +230,14 @@ export class Games {
     x.setAttribute('aria-label', 'Close');
     x.append(icon('x'));
     x.addEventListener('click', () => this.close());
-    head.append(icon('dice-5'), h, x);
+    // How to play: the game on screen, or the handbook from the start.
+    const help = el('button', 'dh-iconbtn');
+    help.type = 'button';
+    help.id = 'games-help';
+    help.setAttribute('aria-label', 'How to play');
+    help.append(icon('circle-help'));
+    help.addEventListener('click', () => openRules(this.screen === 'list' ? 'quiz' : this.screen));
+    head.append(icon('dice-5'), h, help, x);
     this.body = el('div');
     this.body.style.cssText = 'display:grid;gap:12px';
     p.append(head, this.body);
@@ -429,7 +437,12 @@ export class Games {
       });
       body.append(a);
     }
-    body.append(el('p', 'v2-note', 'Games are quick and you stay in voice while you play.'));
+    const how = el('button', 'dh-btn dh-btn--quiet');
+    how.type = 'button';
+    how.id = 'games-how';
+    how.append(icon('circle-help'), document.createTextNode('How every game works'));
+    how.addEventListener('click', () => openRules());
+    body.append(how, el('p', 'v2-note', 'Games are quick and you stay in voice while you play.'));
   }
 
   // Faces of everyone sitting at this table (you first).
@@ -454,7 +467,7 @@ export class Games {
 
   private renderRps(body: HTMLElement) {
     const people = this.deps.nearby();
-    body.append(el('p', 'v2-note', people.length ? 'Pick someone to challenge. Best of three.' : 'Nobody here yet. You can also tap a friend anywhere and pick Duel.'));
+    body.append(el('p', 'v2-note', people.length ? 'Pick someone to challenge. Best of three.' : 'Nobody here yet. You can also tap a friend anywhere and pick Duel.'), rulesFold('rps'));
     const list = el('div', 'v2-list');
     for (const p of people) {
       const row = el('div', 'v2-item');
@@ -493,7 +506,7 @@ export class Games {
     // Lobby: the first `max` people at the table play (us first), the rest watch.
     const people = this.lineup(t, g);
     const watching = Math.max(0, (t.people.length || 1) - people.length);
-    body.append(el('p', 'v2-note', g.lobby));
+    body.append(el('p', 'v2-note', g.lobby), rulesFold(game));
     const list = el('div', 'v2-list');
     list.id = `${g.short}-lobby`;
     for (const p of people) {

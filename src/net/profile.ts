@@ -11,15 +11,14 @@ export const setUser = (u: User | null) => (user = u);
 export const currentUser = () => user;
 
 // `picked` is false until a new member has chosen their character (joining makes the profile with their name).
-export type Profile = { id: string; display_name: string; character_key: Skin; picked: boolean };
+export type Profile = { id: string; display_name: string; character_key: Skin; picked: boolean; pet: string | null };
 
 export async function loadProfile(id: string): Promise<Profile | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('profiles').select('id, display_name, character_index, character_key, picked').eq('id', id).maybeSingle();
-  if (!error) return data ? { ...data, character_key: asSkin(data.character_key ?? data.character_index) } : null;
-  // The database doesn't have character_key yet (migration 20261103 not applied): use the old number.
-  const old = await supabase.from('profiles').select('id, display_name, character_index, picked').eq('id', id).maybeSingle();
-  return old.data ? { ...old.data, character_key: asSkin(old.data.character_index) } : null;
+  // All columns: works before and after the R4 migrations (character_key, pet).
+  const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+  if (!data) return null;
+  return { id: data.id, display_name: data.display_name, picked: data.picked, character_key: asSkin(data.character_key ?? data.character_index), pet: data.pet ?? null };
 }
 
 export async function saveProfile(id: string, name: string, character: Skin) {
@@ -28,4 +27,11 @@ export async function saveProfile(id: string, name: string, character: Skin) {
   let { error } = await supabase.from('profiles').upsert({ ...row, character_key: character });
   if (error && /character_key/.test(error.message)) ({ error } = await supabase.from('profiles').upsert(row)); // before migration 20261103
   if (error) console.warn('Could not save your profile', error.message);
+}
+
+// Your pet (an animal key, or null for none). The database checks it's yours (free pets from level 3).
+export async function savePet(id: string, pet: string | null) {
+  if (!supabase) return 'offline';
+  const { error } = await supabase.from('profiles').update({ pet }).eq('id', id);
+  return error?.message ?? null;
 }

@@ -5,7 +5,9 @@ import { myVisit } from '../net/visit';
 import { cleanName, DOMAIN, NAME_MAX } from '../shared/members';
 import { icon, type IconName } from './icons';
 import { el, openModal } from './modal';
-import { portrait } from './portrait';
+import { animalIcon, portrait } from './portrait';
+import { ANIMALS, animalFrame, FREE_PETS, PET_LEVEL } from '../house/animals';
+import { play } from './sounds';
 import { toast } from './toasts';
 import { ACHIEVEMENTS, RANK_MEDALS, type Medal } from '../challenges/pool';
 import { formatXp, legendStars, progress as levelProgress, rankOf, xpFor } from '../challenges/levels';
@@ -25,6 +27,8 @@ export type ProfileContext = {
   rename: (name: string) => Promise<void> | void;
   progress: Progress | null; // null while it's loading (or offline)
   gamesWon: () => Promise<number | null>;
+  pet: string | null; // your pet (src/house/animals.ts), or none
+  setPet: (pet: string | null) => Promise<string | null>; // an error message, or null when saved
 };
 
 const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'unknown');
@@ -139,6 +143,7 @@ export function openProfile(ctx: ProfileContext) {
     ['about', 'id-card', 'About', () => about(body, ctx)],
     ['code', 'ticket', 'Guest code', () => guestCode(body, user.id)],
     ['badges', 'award', 'Badges', () => badges(body, ctx.progress)],
+    ['pet', 'paw-print', 'Pet', () => petTab(body, ctx)],
   ];
   const buttons = TABS.map(([id, ic, label, render]) => {
     const b = el('button');
@@ -273,6 +278,70 @@ async function guestCode(body: HTMLElement, me: string) {
     body.append(box, el('p', 'v2-note', 'Friends you share this with can visit as guests for 12 hours. Turn it off to stop new guests.'), fresh, status);
   };
   render();
+}
+
+// Your pet (R4): one animal that follows you around; everyone sees it. Free pets unlock at level 3, the
+// rest come with the shop (STORE.md). Cosmetic only.
+function petTab(body: HTMLElement, ctx: ProfileContext) {
+  const level = ctx.progress ? levelProgress(ctx.progress.xp).level : 0;
+  const unlocked = level >= PET_LEVEL;
+  const note = el('p', 'v2-note');
+  note.id = 'pet-note';
+  const say = () => {
+    const name = ANIMALS.find((a) => a.key === ctx.pet)?.name;
+    note.textContent = !unlocked
+      ? `Pets unlock at level ${PET_LEVEL}. You're level ${level || '…'}: keep hanging out!`
+      : name
+        ? `${name} follows you around. Everyone sees it.`
+        : 'Pick a pet to follow you around. Everyone sees it.';
+  };
+  say();
+  const grid = el('div', 'dh-picks dh-pets');
+  grid.id = 'pet-grid';
+  grid.setAttribute('role', 'radiogroup');
+  grid.setAttribute('aria-label', 'Pets');
+  let busy = false;
+  const choose = async (key: string | null) => {
+    if (busy || key === ctx.pet) return;
+    busy = true;
+    const err = await ctx.setPet(key);
+    busy = false;
+    if (err) {
+      play('error', 0.4);
+      toast({ icon: 'paw-print', id: 'pet', who: 'Couldn’t change your pet', what: err, small: true, ttl: 3000 });
+      return;
+    }
+    ctx.pet = key;
+    play('confirm', 0.4);
+    say();
+    draw();
+  };
+  const draw = () => {
+    const none = el('button', 'dh-pick r-starter');
+    none.type = 'button';
+    none.dataset.pet = '';
+    none.setAttribute('role', 'radio');
+    none.setAttribute('aria-checked', String(ctx.pet === null));
+    none.append(el('span', 'none', '—'), el('span', 'nm', 'No pet'), el('span', 'st own', ctx.pet === null ? 'Chosen' : 'Free'));
+    none.addEventListener('click', () => void choose(null));
+    const cards = ANIMALS.map((a) => {
+      const free = FREE_PETS.includes(a.key);
+      const can = free && unlocked;
+      const b = el('button', `dh-pick ${free ? 'r-starter' : 'r-common'}${can ? '' : ' locked'}`);
+      b.type = 'button';
+      b.dataset.pet = a.key;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(ctx.pet === a.key));
+      b.disabled = !can;
+      const state = ctx.pet === a.key ? 'With you' : can ? 'Free' : free ? `Level ${PET_LEVEL}` : 'Shop soon';
+      b.append(animalIcon(a.key, 48, animalFrame(a.key, false)), el('span', 'nm', a.name), el('span', `st${can ? ' own' : ''}`, state));
+      if (can) b.addEventListener('click', () => void choose(a.key));
+      return b;
+    }).sort((x, y) => Number(x.disabled) - Number(y.disabled));
+    grid.replaceChildren(none, ...cards);
+  };
+  draw();
+  body.append(note, grid);
 }
 
 function badges(body: HTMLElement, p: Progress | null) {

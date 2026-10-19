@@ -3,7 +3,9 @@ import { animKey, asSkin, type Dir, type Skin } from '../characters';
 import type { NetQuality } from '../net/netQuality';
 import { rankOf } from '../challenges/levels';
 import { makeTagIcons, micKey, netKey, type MicIcon } from './tagIcons';
-import { DEPTH, depthOf } from '../house/projection';
+import { DEPTH, depthOf, toWorld } from '../house/projection';
+import { isAnimal, type AnimalKey } from '../house/animals';
+import { PetSprite } from './animals';
 
 const PANEL = 0x2b2034;
 const EDGE = 0x0d0912;
@@ -340,7 +342,24 @@ export class Avatar {
   }
 
   // Keeps depth sorting, the ring and the name tag in step with the sprite.
+  // A pet that follows this person (cosmetic; R4). null: none.
+  private pet: PetSprite | null = null;
+  setPet(key: AnimalKey | null | undefined) {
+    const want = isAnimal(key) ? key : null;
+    if ((this.pet?.key ?? null) === want) return;
+    this.pet?.destroy();
+    this.pet = want ? new PetSprite(this.sprite.scene, want, toWorld(this.sprite.x, this.sprite.y)) : null;
+  }
+  get petKey() {
+    return this.pet?.key ?? null;
+  }
+  get petPos() {
+    return this.pet?.pos ?? null;
+  }
+
   sync() {
+    const scene = this.sprite.scene;
+    this.pet?.update(toWorld(this.sprite.x, this.sprite.y), this.facing, this.sprite.visible, scene.time.now, scene.game.loop.delta);
     const depth = depthOf(this.sprite.x, this.sprite.y);
     this.sprite.setDepth(depth);
     this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(depth - 0.5);
@@ -394,6 +413,7 @@ export class Avatar {
 
   setVisible(v: boolean) {
     this.sprite.setVisible(v);
+    this.pet?.img.setVisible(v);
     this.tag.setVisible(v && this.tagWanted);
     if (!v) this.setSpeaking(false);
   }
@@ -409,6 +429,7 @@ export class Avatar {
   }
 
   destroy() {
+    this.pet?.destroy();
     this.danceTween?.remove();
     this.pulse.remove();
     this.sprite.destroy();

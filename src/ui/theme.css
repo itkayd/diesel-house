@@ -780,3 +780,8 @@ html, body, #game, #overlay, #overlay * {
 .dh-mic-paused .left { color: var(--muted); min-width: 3ch; }
 .dh-mic-paused .x { color: var(--lamp); text-decoration: underline; text-underline-offset: 2px; }
 .dh-mic-paused:hover, .dh-mic-paused:focus-visible { box-shadow: 0 0 0 3px var(--panel-edge), inset 3px 0 0 var(--warn), inset 0 0 0 2px var(--lamp); outline: none; }
+
+/* Pets (profile → Pet) */
+.dh-pick canvas.dh-animal { width: 48px; height: 48px; image-rendering: pixelated; }
+.dh-pick .none { display: grid; place-items: center; width: 48px; height: 48px; font-size: 22px; color: var(--faint); }
+.dh-pick:disabled { cursor: default; }

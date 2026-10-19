@@ -12,6 +12,7 @@ export function addRemote(this: HouseScene, p: PlayerInfo) {
   if (p.guest) p = { ...p, character: guestSkin(p.character) };
   const avatar = new Avatar(this, 0, 0, p.character, p.name);
   avatar.setVisible(false); // shown once we know where they are
+  avatar.setPet(p.guest ? null : p.pet);
   avatar.setGuest(!!p.guest);
   avatar.setProgress(p.guest ? null : (p.lv ?? null), p.st ?? 0);
   this.showHost(p);
@@ -52,6 +53,7 @@ export function updateRemote(this: HouseScene, p: PlayerInfo) {
   if (p.guest) p = { ...p, character: guestSkin(p.character) };
   if (r.info.character !== p.character) r.avatar.setCharacter(p.character);
   if (r.info.name !== p.name) r.avatar.setName(p.name);
+  r.avatar.setPet(p.guest ? null : p.pet);
   r.avatar.setGuest(!!p.guest);
   r.avatar.setProgress(p.guest ? null : (p.lv ?? null), p.st ?? 0);
   // Levelled up while in our room: confetti.

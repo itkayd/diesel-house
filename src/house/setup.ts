@@ -3,6 +3,8 @@ import { type RoomId } from '../config';
 import { Zones } from './zones';
 import { HALL, ROOMS } from './rooms';
 import { DEFAULT_SKIN, GUEST_SKINS, STARTERS } from '../characters';
+import { HouseAnimals } from '../scenes/animals';
+import { WalkGrid, type Rect } from '../scenes/pathfind';
 import { installAudioUnlock } from '../net/audio';
 import { signOut } from '../net/auth';
 import { currentUser } from '../net/profile';
@@ -86,6 +88,12 @@ export function create(this: HouseScene) {
   doorBlocks.refresh();
   this.doorBlocks = doorBlocks;
   this.setupCritters();
+  // Animals that live in the rooms (R4): they walk the same grid as tap-to-walk, around furniture.
+  const blocked: Rect[] = [];
+  walls.forEachTile((t) => t.index !== -1 && blocked.push({ x: t.pixelX, y: t.pixelY, w: t.width, h: t.height }));
+  for (const o of this.look.solids.getChildren() as Phaser.GameObjects.Rectangle[]) blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height });
+  for (const o of doorBlocks.getChildren() as Phaser.GameObjects.Rectangle[]) blocked.push({ x: o.x, y: o.y, w: o.width, h: o.height }); // animals stay in their room
+  this.animals = new HouseAnimals(this, this.zones, new WalkGrid(walls.width, walls.height, blocked, { hw: 6, hh: 4 }));
   this.physics.add.collider(
     this.player,
     doorBlocks,

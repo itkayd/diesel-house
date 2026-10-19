@@ -49,7 +49,7 @@ export async function start(this: HouseScene) {
   const [{ Presence }, { Voice }, { Games }, { ChatPanel }] = modules;
   this.presence = new Presence(
     currentUser()?.id ?? crypto.randomUUID(),
-    { name: this.name, character: this.character, zone: this.zone, guest: !!currentUser()?.guest, ...this.rankInfo() },
+    { name: this.name, character: this.character, pet: this.pet, zone: this.zone, guest: !!currentUser()?.guest, ...this.rankInfo() },
     {
       onJoin: (p) => this.addRemote(p),
       onLeave: (id) => this.removeRemote(id),

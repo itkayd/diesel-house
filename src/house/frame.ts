@@ -67,6 +67,7 @@ export function update(this: HouseScene) {
   }
 
   this.moveRemotes();
+  this.animals?.update(this.time.now, this.game.loop.delta);
   // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
   // Standing at a game spot: "Play games · E". Walk off and an open games panel closes.
   const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;

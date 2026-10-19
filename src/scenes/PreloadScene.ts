@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import houseMap from '../../maps/house.tmj?raw';
 import { createCharacterAnims, loadCharacterSheets } from '../characters';
+import { loadAnimals } from '../house/animals';
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -15,6 +16,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('house_v3', 'assets/furniture/house_v3.png');
     this.load.tilemapTiledJSON('house', JSON.parse(houseMap));
     loadCharacterSheets(this.load);
+    loadAnimals(this.load);
     // v2 packs (UPDATE.md Phase 9, built by scripts/build-v2-assets.mjs): cards + dice, emotes, key/tap
     // prompts, and the pixel UI tiles.
     this.load.atlas('cards', 'assets/games/cards.png', 'assets/games/cards.json');

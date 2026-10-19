@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { type RoomId, type Zone } from '../config';
 import { DEFAULT_SKIN, type Skin } from '../characters';
+import type { HouseAnimals } from './animals';
 import { Zones } from '../house/zones';
 import type { MoveMsg, PlayerInfo, Presence } from '../net/presence';
 import { msgStats } from '../net/stats';
@@ -49,6 +50,7 @@ export class HouseScene extends Phaser.Scene {
   zone: Zone | null = null;
   joystick: Joystick | null = null;
   character: Skin = DEFAULT_SKIN;
+  pet: string | null = null; // your pet (src/house/animals.ts), members only
   name = '';
   canMove = false;
 
@@ -109,6 +111,7 @@ export class HouseScene extends Phaser.Scene {
   partied = false;
   boardPrompt: HTMLDivElement | null = null;
   critters: Critters | null = null;
+  animals: HouseAnimals | null = null;
   autoDoor: RoomId | null = null; // walking up to a quiet room's door: ask when we get there
   autoCheck = { t: 0, x: 0, y: 0 };
   wallLayer!: Phaser.Tilemaps.TilemapLayer;
@@ -140,6 +143,7 @@ export class HouseScene extends Phaser.Scene {
   applyIdentity = identity.applyIdentity;
   choose = identity.choose;
   tryOn = identity.tryOn;
+  setMyPet = identity.setMyPet;
   openMyProfile = identity.openMyProfile;
   showMicNote = voiceBridge.showMicNote;
   showMyMic = voiceBridge.showMyMic;

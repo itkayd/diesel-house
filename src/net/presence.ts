@@ -14,7 +14,7 @@ import { supabase } from './supabase';
 // updates per 30 s; more and it closes the channel: ClientPresenceRateLimitReached).
 // `mic`: whether others in their room can hear them (see MicState in voice.ts); shown on their name tag.
 // lv / st: level and day streak for name tags (Phase 14); members only, set once known.
-export type PlayerInfo = { id: string; name: string; character: Skin; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality; lv?: number; st?: number };
+export type PlayerInfo = { id: string; name: string; character: Skin; pet?: string | null; zone: Zone | null; guest?: boolean; mic?: 'on' | 'muted' | 'off' | 'silent'; net?: NetQuality; lv?: number; st?: number };
 // How someone is moving (Realtime broadcast). Sent only when movement changes, plus a correction every
 // 500 ms while walking, so receivers extrapolate from x,y + velocity (px/s). Zone rides along because
 // presence updates take a few seconds to spread, and voice needs to know within a second.
@@ -267,12 +267,12 @@ export class Presence {
       const m = metas.reduce((a, b) => (b.since > a.since ? b : a));
       const lv = Number.isFinite(m.lv) && m.lv! >= 1 ? Math.floor(m.lv!) : undefined;
       const st = Number.isFinite(m.st) && m.st! >= 0 ? Math.floor(m.st!) : undefined;
-      const p: PlayerInfo = { id: key, name: m.name, character: asSkin(m.skin ?? m.character), zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net, lv, st };
+      const p: PlayerInfo = { id: key, name: m.name, character: asSkin(m.skin ?? m.character), pet: m.pet ?? null, zone: m.zone, guest: !!m.guest, mic: m.mic, net: m.net, lv, st };
       seen.add(key);
       const old = this.known.get(key);
       this.known.set(key, p);
       if (!old) this.h.onJoin(p);
-      else if (old.name !== p.name || old.character !== p.character || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic || old.net !== p.net || old.lv !== p.lv || old.st !== p.st) this.h.onInfo(p);
+      else if (old.name !== p.name || old.character !== p.character || old.pet !== p.pet || old.zone !== p.zone || old.guest !== p.guest || old.mic !== p.mic || old.net !== p.net || old.lv !== p.lv || old.st !== p.st) this.h.onInfo(p);
     }
     for (const id of [...this.known.keys()]) {
       if (!seen.has(id)) {

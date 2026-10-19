@@ -1,7 +1,8 @@
 import { GUEST_SKINS, skinDef, STARTERS, type Skin } from '../characters';
 import { toast } from '../ui/toasts';
 import type { PlayerInfo } from '../net/presence';
-import { currentUser, loadProfile, saveProfile } from '../net/profile';
+import { currentUser, loadProfile, savePet, saveProfile } from '../net/profile';
+import { PET_LEVEL } from './animals';
 import { guestHosts } from '../net/guestCodes';
 import { saveCharacter, savedCharacter, saveName, savedName } from '../prefs';
 import { pickCharacter } from '../ui/picker';
@@ -24,6 +25,7 @@ export async function identify(this: HouseScene, saved: Skin | null, name: strin
     }
     if (profile) {
       this.applyIdentity(profile.character_key, profile.display_name);
+      this.setMyPet(profile.pet);
       return void this.start();
     }
     // New here: offer the picker, prefilled with anything this device remembers.
@@ -102,6 +104,13 @@ export function openMyProfile(this: HouseScene) {
     },
     progress: this.progress,
     gamesWon: () => gamesWon(user.id),
+    pet: this.pet,
+    setPet: async (pet) => {
+      const err = await savePet(user.id, pet);
+      if (err) return /level/.test(err) ? `Pets unlock at level ${PET_LEVEL}.` : err;
+      this.setMyPet(pet);
+      return null;
+    },
   });
   if (this.progress) document.getElementById('profile')?.setAttribute('data-xp', String(this.progress.xp));
 }
@@ -117,4 +126,11 @@ export function tryOn(this: HouseScene, skin: Skin) {
     this.me.setCharacter(this.character);
     toast({ icon: 'timer', id: 'try-on', who: 'Back to your own character', what: 'The shop is coming soon.', small: true, ttl: 2500 });
   }, 60_000);
+}
+
+// Your pet follows you (everyone sees it: it rides on presence, no extra messages).
+export function setMyPet(this: HouseScene, pet: string | null) {
+  this.pet = pet;
+  this.me.setPet(pet);
+  this.presence?.update({ pet });
 }

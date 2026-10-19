@@ -36,6 +36,12 @@ export class WalkGrid {
     return c >= 0 && r >= 0 && c < this.cols && r < this.rows && this.free[r * this.cols + c] === 1;
   }
 
+  // Is this point (feet) somewhere you can stand?
+  freeAt(p: Pt) {
+    const { c, r } = this.cellOf(p);
+    return this.ok(c, r);
+  }
+
   private cellOf(p: Pt) {
     return { c: Math.floor(p.x / CELL), r: Math.floor(p.y / CELL) };
   }

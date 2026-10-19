@@ -77,6 +77,18 @@
       "licence": "CC0",
       "commercial": true,
       "credit": "pixel-boy (appreciated, not required)"
+    },
+    {
+      "key": "animals",
+      "path": "public/assets/animals/animals.png",
+      "type": "spritesheet",
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "layout": "21 animals, one per row: frame 0 sitting, frame 1 moving, facing right. Built by scripts/build_animals.py; list in src/house/animals.json",
+      "source": "Ninja Adventure by pixel-boy (https://pixel-boy.itch.io/ninja-adventure-asset-pack)",
+      "licence": "CC0",
+      "commercial": true,
+      "credit": "pixel-boy (appreciated, not required)"
     }
   ],
   "sfx": {

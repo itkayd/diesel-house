@@ -40,3 +40,37 @@ insert into public.messages (room_id, text) values ('lounge', 'hello');
 select pg_temp.ok((select author_skin from public.messages where author_id = auth.uid() order by id desc limit 1) = 'ninja.oldman', 'chat messages carry the author''s character');
 select pg_temp.ok((select public.character_from_index(character_index) from public.weekly_board() where user_id = auth.uid()) = 'ninja.oldman', 'the weekly board''s character number maps back to the key');
 reset role;
+
+-- ---- Pets (20261104) ----
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+do $$ begin
+  update public.profiles set pet = 'cat' where id = auth.uid();
+  raise exception 'FAIL: a level 1 member got a pet';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: pets wait for level 3 (%)', sqlerrm;
+end $$;
+do $$ begin
+  update public.profiles set pet = 'cat', level = 9 where id = auth.uid();
+  raise exception 'FAIL: raised own level to get a pet';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: can''t raise your own level to get a pet (%)', sqlerrm;
+end $$;
+reset role;
+update public.profiles set level = 3 where id = '00000000-0000-0000-0000-0000000000f1';
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
+update public.profiles set pet = 'hamster' where id = auth.uid();
+select pg_temp.ok((select pet from public.profiles where id = auth.uid()) = 'hamster', 'at level 3 a member can have a free pet');
+do $$ begin
+  update public.profiles set pet = 'horse' where id = auth.uid();
+  raise exception 'FAIL: got a shop pet';
+exception when others then
+  if sqlerrm like 'FAIL:%' then raise; end if;
+  raise notice 'PASS: shop pets wait for the shop (%)', sqlerrm;
+end $$;
+update public.profiles set pet = null where id = auth.uid();
+select pg_temp.ok((select pet from public.profiles where id = auth.uid()) is null, 'a pet can be sent home (none)');
+reset role;

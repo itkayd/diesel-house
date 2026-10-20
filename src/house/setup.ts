@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { type RoomId } from '../config';
+import { TILE_SIZE, type RoomId } from '../config';
 import { Zones } from './zones';
 import { HALL, ROOMS } from './rooms';
 import { DEFAULT_SKIN, GUEST_SKINS, STARTERS } from '../characters';
@@ -112,7 +112,22 @@ export function create(this: HouseScene) {
   installAudioUnlock(); // first tap/key anywhere switches sound on (needed on iPhone)
 
   const cam = this.cameras.main;
-  cam.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+  // The camera stays over the house (its rooms, the hall and the porch, plus a little sky), so a phone
+  // never shows half a screen of empty stars below the porch.
+  const boxes = this.zones.ids.map((z) => this.zones.box(z)).filter((b): b is NonNullable<typeof b> => !!b);
+  const pad = 3 * TILE_SIZE;
+  const x0 = Math.max(0, Math.min(...boxes.map((b) => b.x)) - pad);
+  const y0 = Math.max(0, Math.min(...boxes.map((b) => b.y)) - pad);
+  const x1 = Math.min(map.widthInPixels, Math.max(...boxes.map((b) => b.x + b.w), spawn.x) + pad);
+  const y1 = Math.min(map.heightInPixels, Math.max(...boxes.map((b) => b.y + b.h), spawn.y + 2 * TILE_SIZE) + pad);
+  cam.setBounds(x0, y0, x1 - x0, y1 - y0);
+  // In the middle column (the hall and the porch below it) the camera stops just under the porch: the
+  // octagon's south rooms are off to the sides, so below the porch there is only sky.
+  const hall = this.zones.box('hallway');
+  if (hall) {
+    const porchBottom = Math.min(y1, spawn.y + 4 * TILE_SIZE);
+    this.camLimits = { wide: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, column: { x0: hall.x, x1: hall.x + hall.w, h: porchBottom - y0 }, tight: false };
+  }
   cam.startFollow(this.player, true, 0.15, 0.15, 0, 16);
   this.fitCamera(true);
   this.scale.on('resize', () => this.fitCamera(), this);

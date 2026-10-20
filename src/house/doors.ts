@@ -16,7 +16,7 @@ export function showPresenceStatus(this: HouseScene, s: 'connecting' | 'reconnec
   this.refreshRooms();
   if (s === 'connecting') showWhere(this.zone, 'Connecting…', 'warn');
   else if (s === 'reconnecting') showWhere(this.zone, 'Reconnecting…', 'warn');
-  else if (s === 'offline') showWhere(this.zone, 'Offline', 'off');
+  else if (s === 'offline') showWhere(this.zone, 'Offline · trying again', 'off');
   else if (this.zone && this.zone !== 'hallway') showWhere(this.zone, `${this.countIn(this.zone)} here`, 'ok');
   else showWhere(this.zone, `${this.activeCount()} in the house`, 'ok');
 }

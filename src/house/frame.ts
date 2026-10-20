@@ -15,6 +15,17 @@ import { toScreen } from './projection';
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
 
 export function update(this: HouseScene) {
+  // Under the porch is only sky: in the middle column, stop the camera there (it eases back out after).
+  const lim = this.camLimits;
+  if (lim) {
+    const x = this.player.x;
+    const tight = x > lim.column.x0 && x < lim.column.x1 && (this.zone === 'hallway' || !this.zone);
+    if (tight !== lim.tight) {
+      lim.tight = tight;
+      const w = lim.wide;
+      this.cameras.main.setBounds(w.x, w.y, w.w, tight ? Math.max(lim.column.h, this.cameras.main.height / this.cameras.main.zoom) : w.h);
+    }
+  }
   const v = this.canMove && !modalOpen() ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
   this.body.setVelocity(v.x, v.y);
 

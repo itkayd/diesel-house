@@ -9,6 +9,17 @@ import { roomDef } from '../house/rooms';
 //   bottom-left: joystick (touch)           bottom-right: [chat] [MIC]   (in a room)
 export const overlay = () => document.getElementById('overlay') as HTMLDivElement;
 
+const HUD_LABELS: [string, string][] = [
+  ['guide-button', 'Help'],
+  ['map-button', 'Map'],
+  ['challenges-button', 'Challenges'],
+  ['settings-button', 'Settings'],
+  ['chat-button', 'Chat'],
+  ['jukebox-button', 'Music'],
+  ['emote-button', 'Emotes'],
+  ['watch-button', 'Watch'],
+];
+
 type Hud = { tl: HTMLDivElement; tc: HTMLDivElement; tr: HTMLDivElement; bl: HTMLDivElement; br: HTMLDivElement; pill: HTMLDivElement };
 let hud: Hud | null = null;
 
@@ -39,6 +50,18 @@ function build(): Hud {
   tl.append(pill);
   root.append(box);
   hud = { tl, tc, tr, bl, br, pill };
+  // HUD buttons get a short name: a tooltip everywhere, and a label beside the icon on wide desktops.
+  const label = () => {
+    for (const [id, text] of HUD_LABELS) {
+      const b = document.getElementById(id);
+      if (b && !b.dataset.label) {
+        b.dataset.label = text;
+        b.title ||= text;
+      }
+    }
+  };
+  new MutationObserver(label).observe(box, { childList: true, subtree: true });
+  label();
   return hud;
 }
 
@@ -97,6 +120,7 @@ export function setNetBadge(q: NetQuality) {
 // The where-am-I pill. `sub` is the head count ("4 in the house" / "2 here") or "Connecting…"/"Offline".
 export function showWhere(zone: Zone | null, sub: string, state: 'ok' | 'warn' | 'off') {
   const { pill } = build();
+  pill.dataset.state = state;
   const inRoom = !!zone && zone !== 'hallway';
   const info = zone ? roomInfo(zone) : { name: '', dnd: false };
   const place = document.createElement('span');

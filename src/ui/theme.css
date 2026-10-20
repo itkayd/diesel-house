@@ -138,7 +138,7 @@
 .dh-pill svg { width: 16px; height: 16px; }
 .dh-pill .dh-sub { color: var(--muted); font-family: var(--font-body); font-size: var(--fs-xs); }
 .dh-dot { width: 8px; height: 8px; display: inline-block; box-shadow: 0 0 0 2px var(--panel-edge); }
-.dh-dot--ok { background: var(--ok); } .dh-dot--warn { background: var(--warn); } .dh-dot--off { background: var(--faint); }
+.dh-dot--ok { background: var(--ok); } .dh-dot--warn { background: var(--warn); } .dh-dot--off { background: var(--error); }
 
 .dh-mood {
   display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px 2px;
@@ -763,12 +763,12 @@ html, body, #game, #overlay, #overlay * {
 @media (prefers-reduced-motion: reduce) { .dh-guide-body { animation: none; } }
 
 /* Room title as you walk in (src/ui/roomBanner.ts). */
-.dh-room-banner { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); width: max-content; box-sizing: border-box; display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; z-index: 5;
+.dh-room-banner { justify-self: center; width: max-content; box-sizing: border-box; display: grid; gap: 4px; justify-items: center; text-align: center; pointer-events: none; z-index: 5;
   padding: 10px 22px 12px; background: rgba(26, 18, 32, .78); box-shadow: 0 0 0 2px var(--panel-edge), inset 0 0 0 2px var(--line); max-width: calc(100vw - 48px);
-  animation: dh-banner 2.6s ease-out both; }
+  animation: dh-banner 2.2s ease-out both; }
 .dh-room-banner b { font-family: var(--font-display); font-size: 26px; color: var(--lamp); text-shadow: 2px 2px 0 var(--panel-edge); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .dh-room-banner span { font-size: 13px; color: var(--cream); }
-@keyframes dh-banner { 0% { opacity: 0; transform: translate(-50%, 8px); } 12%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -6px); } }
+@keyframes dh-banner { 0% { opacity: 0; transform: translateY(-6px); } 12%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .dh-room-banner { animation: none; } }
 
 /* Chat extras: empty state, one-tap lines, characters left. */
@@ -969,3 +969,20 @@ html, body, #game, #overlay, #overlay * {
 .dh-quiet-acts { flex-wrap: wrap; }
 .dh-quiet-acts .dh-btn { flex: 1 1 auto; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .dh-hint { animation: none; } }
+
+/* Room banner on phones: under the top rows, never mid-floor. */
+@media (max-width: 600px) { .dh-room-banner { padding: 6px 16px 8px; } .dh-room-banner b { font-size: 20px; } }
+/* Offline: say it in red, not grey. */
+.dh-where[data-state="off"] #status { color: var(--error); }
+/* Skeletons: grey shapes while something loads. */
+.dh-skeleton { min-height: 52px; background: linear-gradient(90deg, var(--panel-edge) 0 40%, #2e2638 50%, var(--panel-edge) 60% 100%) 0 0 / 300% 100%; animation: dh-shimmer 1.4s linear infinite; }
+.v2-bar--skeleton { display: block; width: 56px; height: 8px; margin-top: 3px; background: linear-gradient(90deg, var(--panel-edge) 0 40%, #3a3046 50%, var(--panel-edge) 60% 100%) 0 0 / 300% 100%; animation: dh-shimmer 1.4s linear infinite; box-shadow: inset 0 0 0 1px var(--line); }
+@keyframes dh-shimmer { to { background-position: -150% 0; } }
+.v2-xpchip-host.stale, #xp-chip.stale { opacity: .7; }
+@media (prefers-reduced-motion: reduce) { .dh-skeleton, .v2-bar--skeleton { animation: none; } }
+/* Desktop: HUD buttons say what they are (labels on wide screens, tooltips everywhere). */
+@media (min-width: 1280px) and (pointer: fine) {
+  .dh-hud .dh-iconbtn[data-label] { width: auto; padding: 0 14px 0 12px; display: inline-flex; gap: 8px; }
+  .dh-hud .dh-iconbtn[data-label]::after { content: attr(data-label); font-family: var(--font-display); font-size: 14px; color: var(--cream); white-space: nowrap; }
+}
+#overlay .dh-hud-tc > .dh-room-banner { pointer-events: none; }

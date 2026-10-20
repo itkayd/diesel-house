@@ -43,6 +43,17 @@ export function levelChip(level: number) {
 
 // ---- HUD: the XP chip and the Challenges button ----
 
+// The level shown while your progress loads: what it was last time on this device.
+const LAST_KEY = 'diesel-house.last-progress';
+function lastProgress(): { xp: number; streak: number } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null') as { xp: number; streak: number } | null;
+    return v && Number.isFinite(v.xp) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 export class ProgressHud {
   private chip = el('button', 'v2-xp');
   private btn = el('button', 'dh-iconbtn');
@@ -75,6 +86,12 @@ export class ProgressHud {
 
   update(p: Progress | null, gained = 0) {
     this.state = p;
+    if (p)
+      try {
+        localStorage.setItem(LAST_KEY, JSON.stringify({ xp: p.xp, streak: p.streak }));
+      } catch {
+        // private browsing: no cache
+      }
     this.render();
     if (gained > 0) {
       const f = el('span', 'v2-float', `+${gained.toLocaleString()} XP`);
@@ -88,15 +105,20 @@ export class ProgressHud {
     const p = this.state;
     this.chip.replaceChildren(portrait(who.character, 30));
     const mid = el('span', 'mid');
-    if (who.guest || !p) {
-      mid.append(el('span', 'lv', who.guest ? 'Guest' : 'Lv …'));
+    // Still loading (or offline): the level from last time, dimmed, or a placeholder bar. Never a bare "…".
+    const last = who.guest || p ? null : lastProgress();
+    this.chip.classList.toggle('stale', !p && !who.guest);
+    if (who.guest || (!p && !last)) {
+      mid.append(el('span', 'lv', who.guest ? 'Guest' : 'Lv'));
+      if (!who.guest) mid.append(el('span', 'v2-bar v2-bar--skeleton'));
       this.chip.append(mid);
       this.dot.hidden = true;
       this.chip.dataset.level = '';
       this.chip.setAttribute('aria-label', 'Your profile, level and streak');
       return;
     }
-    const pr = progress(p.xp);
+    const xp = p?.xp ?? last!.xp;
+    const pr = progress(xp);
     this.chip.setAttribute('aria-label', `Your profile: level ${pr.level}, ${pr.pct}% to the next`);
     const lv = el('span', 'lv');
     lv.append(medalEl(rankMedal(rankOf(pr.level)), 16), document.createTextNode(`Lv ${pr.level.toLocaleString()}`));
@@ -105,12 +127,13 @@ export class ProgressHud {
     b.style.width = `${pr.pct}%`;
     bar.append(b);
     mid.append(lv, bar);
+    const days = p?.streak ?? last!.streak;
     const streak = el('span', 'streak');
-    streak.append(icon('flame'), document.createTextNode(String(p.streak)));
-    streak.title = `${p.streak}-day streak`;
+    streak.append(icon('flame'), document.createTextNode(String(days)));
+    streak.title = `${days}-day streak`;
     this.chip.append(mid, streak);
-    this.chip.dataset.level = String(pr.level);
-    this.dot.hidden = !p.challenges.some((c) => !c.done);
+    this.chip.dataset.level = p ? String(pr.level) : '';
+    this.dot.hidden = !p || !p.challenges.some((c) => !c.done);
   }
 }
 
@@ -136,9 +159,13 @@ export function openChallenges(p: Progress | null, guest: boolean, tab: 'day' | 
   if (!p) {
     // Still loading. If nothing comes (offline, a slow network), say so and offer to try again.
     const wait = el('p', 'dh-lede', 'Loading your challenges…');
-    panel.append(wait);
+    const ghosts = el('div', 'v2-list');
+    ghosts.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 3; i++) ghosts.append(el('div', 'v2-item dh-skeleton'));
+    panel.append(wait, ghosts);
     setTimeout(() => {
       if (!wait.isConnected) return;
+      ghosts.remove();
       wait.textContent = 'Couldn’t load your challenges. Check your connection.';
       if (!retry) return;
       const again = el('button', 'dh-btn dh-btn--quiet', 'Try again');

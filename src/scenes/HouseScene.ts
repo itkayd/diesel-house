@@ -129,6 +129,8 @@ export class HouseScene extends Phaser.Scene {
   // Doors: where each doorway is, and quiet rooms you've said you'll go into anyway (until when).
   doorSpots = new Map<RoomId, { x: number; y: number; north: boolean }>();
   spawnAt = { x: 0, y: 0 }; // the front porch (world px)
+  // Camera bounds: the whole house, or (in the hall and porch column) cut off just under the porch.
+  camLimits: { wide: { x: number; y: number; w: number; h: number }; column: { x0: number; x1: number; h: number }; tight: boolean } | null = null;
   quietOk = new Map<RoomId, number>();
   lastDoorNote = 0;
   chat: ChatPanel | null = null;

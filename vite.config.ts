@@ -28,8 +28,12 @@ function devApi(env: Record<string, string>): Plugin {
             body = Buffer.concat(chunks);
           }
           const request = new Request(`http://${req.headers.host ?? 'localhost'}/api${req.url}`, { method, headers, body: body ? new Uint8Array(body) : undefined });
+          // DH_LOCAL_DB=1: the server functions use the local test database (supabase/tests/run.sh) instead of
+          // Supabase, to try the admin page without the real secret key. This computer only.
+          const db = env.DH_LOCAL_DB === '1' && local ? (await import('./tests/api/fakeDb.mjs')).fakeDb() : undefined;
           const response: Response = await mod[API[name]](request, env, {
             allowAnonymous: local,
+            db,
           });
           res.statusCode = response.status;
           response.headers.forEach((v, k) => res.setHeader(k, v));

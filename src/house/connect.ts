@@ -32,6 +32,7 @@ import { addWhosWhereButton } from '../ui/whosWhere';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ROOMS } from './rooms';
 import { setupGuide } from '../ui/guide';
+import { modalOpen } from '../ui/modal';
 import { firstRun } from '../ui/hints';
 
 // Going online: presence, voice, chat, games, settings and the HUD buttons, once you have picked a character.
@@ -114,7 +115,8 @@ export async function start(this: HouseScene) {
   net.start();
   // New version live? Reload at once if we're not talking to anyone; otherwise offer it.
   watchForNewVersion(
-    () => (this.voice?.debug().length ?? 0) > 0,
+    // Never reload under someone: not in a call, a game, the arcade or any other pop-up.
+    () => (this.voice?.debug().length ?? 0) > 0 || modalOpen(),
     (reload) =>
       toast({ icon: 'refresh-cw', id: 'new-version', who: 'New version of the house', what: 'Reload when you are ready.', ttl: 0, actions: [{ label: 'Reload', id: 'new-version-reload', onClick: reload }] }),
   );

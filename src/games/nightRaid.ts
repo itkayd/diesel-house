@@ -12,12 +12,14 @@ import { H, NightRaid, W, type GameEvent, type Input } from './nightRaidGame';
 // critter), a new house record more again (supabase/migrations/20261107_arcade.sql).
 export type ArcadeResult =
   | { ok: true; best: number; previous: number | null; new_best: boolean; record: boolean; house_best: number; xp: number }
-  | { ok: false; why: 'guest' | 'unbelievable' | 'too_soon' | 'offline' | 'error' };
+  | { ok: false; why: 'guest' | 'unbelievable' | 'too_soon' | 'offline' | 'queued' | 'error' };
 export type ArcadeRow = { user_id: string; display_name: string; character_key: string; best: number; record: boolean };
 export type ArcadeDeps = {
   me: () => { id: string; skin: Skin; guest: boolean };
   submit: (score: number, waves: number, durationMs: number) => Promise<ArcadeResult>;
   board: () => Promise<ArcadeRow[] | null>;
+  // Your saved best (all time) from the server; null offline. Members only.
+  myBest?: () => Promise<number | null>;
   onClose?: () => void;
 };
 
@@ -117,7 +119,16 @@ export function openNightRaid(deps: ArcadeDeps) {
     const card = el('div', 'arcade-title');
     const best = el('p', 'arcade-best');
     best.id = 'arcade-best';
-    best.textContent = `Your best: ${localBest().toLocaleString()}`;
+    // Members: the best the server has saved (the device's number only ever counts saved scores).
+    // Guests and test mode: this device's best.
+    best.textContent = me.guest || !deps.myBest ? `Your best: ${localBest().toLocaleString()}` : 'Your best: …';
+    if (!me.guest && deps.myBest)
+      void deps.myBest().then((n) => {
+        if (!best.isConnected) return;
+        const shown = n ?? localBest();
+        if (n !== null) saveLocalBest(n);
+        best.textContent = `Your best: ${shown.toLocaleString()}`;
+      });
     card.append(
       el('p', 'v2-note', 'Spooks are raiding the rooftop! Move left and right; your shurikens throw themselves. Catch snacks for points, potions for magic shurikens and hearts for lives. Every 5th wave: a Giant Spirit.'),
       best,
@@ -137,11 +148,6 @@ export function openNightRaid(deps: ArcadeDeps) {
           row.append(el('span', 'rk', String(i + 1)), portrait(r.character_key, 28), el('span', 't', r.user_id === me.id ? 'You' : r.display_name), el('b', '', `${r.best.toLocaleString()}${r.record ? ' ★' : ''}`));
           board.append(row);
         });
-        const mine = rows.find((r) => r.user_id === me.id);
-        if (mine && mine.best > localBest()) {
-          saveLocalBest(mine.best);
-          best.textContent = `Your best: ${mine.best.toLocaleString()}`;
-        }
       });
     }
     const go = el('button', 'dh-btn');
@@ -336,7 +342,9 @@ export function openNightRaid(deps: ArcadeDeps) {
     if (!gm || !body.isConnected) return;
     const score = gm.score;
     const before = localBest();
-    if (score > before) saveLocalBest(score);
+    const me = deps.me();
+    // Only a saved score counts as your best (guests and test mode: this device keeps it).
+    if (me.guest && score > before) saveLocalBest(score);
     pauseBtn.hidden = true;
     const card = el('div', 'arcade-title');
     const big = el('p', 'arcade-score', score.toLocaleString());
@@ -356,6 +364,8 @@ export function openNightRaid(deps: ArcadeDeps) {
     body.replaceChildren(card);
     again.focus({ preventScroll: true });
     const r = await deps.submit(score, gm.wave, Math.round(gm.time * 1000));
+    if (r.ok && r.best > localBest()) saveLocalBest(r.best);
+    if (!r.ok && r.why === 'offline' && score > before) saveLocalBest(score);
     if (!note.isConnected) return;
     if (r.ok) {
       if (r.record && r.xp) {
@@ -371,7 +381,9 @@ export function openNightRaid(deps: ArcadeDeps) {
         r.why === 'guest' ? 'Guests’ scores aren’t saved: members get XP for bests.'
           : r.why === 'offline' ? (score > before ? 'New best on this device! (Test mode: not saved.)' : 'Test mode: not saved.')
             : r.why === 'too_soon' ? 'Saved scores are one every few seconds: that one wasn’t kept.'
-              : 'Couldn’t save that score.';
+              : r.why === 'queued' ? 'No connection right now: your score is kept on this phone and saves by itself when you’re back online.'
+                : r.why === 'unbelievable' ? 'That score couldn’t be checked, so it wasn’t saved.'
+                  : 'Couldn’t save that score.';
     }
   }
 

@@ -4,7 +4,8 @@ import { icon } from '../ui/icons';
 import { isTouchDevice } from '../ui/joystick';
 import { overlay } from '../ui/overlay';
 import { currentUser } from '../net/profile';
-import { arcadeBoard, submitArcade } from '../net/arcade';
+import { toast } from '../ui/toasts';
+import { arcadeBoard, flushPendingArcade, myArcadeBest, submitArcade } from '../net/arcade';
 import type { HouseScene } from '../scenes/HouseScene';
 
 // The arcade cabinets (any 'arcade_*' furniture in src/house/rooms.ts): stand in front of one for
@@ -53,6 +54,12 @@ export async function openArcade(this: HouseScene) {
       return r;
     },
     board: arcadeBoard,
+    myBest: () => myArcadeBest(this.presence?.id ?? ''),
     onClose: () => (this.canMove = true),
+  });
+  // Scores that couldn't be saved last time (no connection): send them now.
+  void flushPendingArcade().then((saved) => {
+    for (const r of saved) if (r.ok && r.progress) this.gotProgress(r.progress);
+    if (saved.length) toast({ icon: 'trophy', who: 'Score saved', what: `Your Night Raid score from earlier is on the board now.`, small: true, ttl: 3000 });
   });
 }

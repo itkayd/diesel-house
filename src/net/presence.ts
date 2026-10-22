@@ -24,6 +24,8 @@ export type ChatChange = { table: 'messages' | 'reactions'; type: 'INSERT' | 'DE
 // An emote (UPDATE.md Phase 11): `e` is an EmoteId; `to` when sent from the tap-a-friend menu.
 // cheer: a challenge done or a level up (friends in the same room see confetti).
 export type EmoteMsg = { from: string; e: string; to?: string; cheer?: boolean };
+// "Come and play" (U4): an invite to a games table, for a few people.
+export type InviteMsg = { from: string; to: string[]; spot: string; name: string };
 // Games (UPDATE.md Phase 12): a dice roll over someone's head, and rock-paper-scissors duel messages.
 export type DiceMsg = { from: string; v: number[]; s: number };
 // A room's shared study timer (REDESIGN.md R3, the Library): set (ms left), stop, or ask who has one.
@@ -50,6 +52,7 @@ type Handlers = {
   onDice: (m: DiceMsg) => void;
   onDuel: (m: DuelMsg) => void;
   onTimer?: (m: TimerMsg) => void;
+  onInvite?: (m: InviteMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
   // this person may see.
   onChat: (e: ChatChange) => void;
@@ -128,6 +131,11 @@ export class Presence {
     ch.on('broadcast', { event: 'emote' }, ({ payload }) => {
       countMessage('received', 'emote');
       if (!this.replaced) this.h.onEmote(payload as EmoteMsg);
+    });
+    ch.on('broadcast', { event: 'invite' }, ({ payload }) => {
+      countMessage('received', 'invite');
+      const m = payload as InviteMsg;
+      if (!this.replaced && Array.isArray(m.to) && m.to.includes(this.id) && m.from !== this.id) this.h.onInvite?.(m);
     });
     ch.on('broadcast', { event: 'timer' }, ({ payload }) => {
       countMessage('received', 'timer');
@@ -320,6 +328,13 @@ export class Presence {
     if (this.replaced || this.channel?.state !== 'joined') return;
     countMessage('sent', 'timer');
     void this.channel.send({ type: 'broadcast', event: 'timer', payload: { ...m, from: this.id } });
+  }
+
+  sendInvite(m: Omit<InviteMsg, 'from'>) {
+    if (this.replaced || this.channel?.state !== 'joined') return false;
+    countMessage('sent', 'invite');
+    void this.channel.send({ type: 'broadcast', event: 'invite', payload: { ...m, from: this.id, to: m.to.slice(0, 20) } });
+    return true;
   }
 
   sendEmote(m: Omit<EmoteMsg, 'from'>) {

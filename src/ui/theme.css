@@ -1011,3 +1011,13 @@ html, body, #game, #overlay, #overlay * {
 .dh-announce > svg { width: 18px; height: 18px; flex: none; }
 .dh-announce > span { flex: 1; overflow-wrap: anywhere; }
 .dh-announce .dh-iconbtn { width: 36px; height: 36px; min-width: 36px; background: transparent; box-shadow: none; color: var(--panel-edge); }
+
+/* U4: Block and Report in the friend menu (src/ui/friendMenu.ts). */
+.dh-friend-safety { border-top: 2px solid var(--line); padding-top: 8px; }
+.dh-friend-safety .dh-btn { color: var(--muted); }
+.dh-friend-step { display: grid; gap: 10px; }
+.dh-friend-step > b { font-family: var(--font-display); font-size: var(--fs-md); }
+.dh-friend-step .v2-note { margin: 0; }
+.dh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dh-chips .dh-chip { min-height: 40px; }
+.dh-chips .dh-chip[aria-pressed="true"] { background: var(--lamp); color: var(--panel-edge); box-shadow: none; }

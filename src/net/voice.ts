@@ -417,6 +417,7 @@ export class Voice {
     if (p.room) p.room.gain.gain.value = web ? Math.max(0, Math.min(1, person)) : 0;
     a.muted = web;
     if (!web) a.volume = mixer.voiceVolume(person);
+    if (person <= 0) a.muted = true; // blocked (or turned right down): iPhones ignore volume, so mute too
   }
 
   // The live mic stream while we're in a room (Settings → Mic meters and tests it).

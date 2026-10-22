@@ -165,6 +165,8 @@ export type GameDeps = {
   hosted?: (game: GameId, players: number) => void;
   quickDrawRound?: () => void; // we were fastest in a Quick Draw round
   arcade?: () => void; // open Night Raid (one player)
+  // U4: ping friends (or everyone in the house) to come and play here. Returns who was asked, or why not.
+  invite?: (spot: SpotId) => string;
 };
 
 export class Games {
@@ -419,7 +421,26 @@ export class Games {
       if (!b.disabled) b.addEventListener('click', () => this.show(id as Games['screen']));
       grid.append(b);
     }
-    body.append(this.whoIsHere(spot), grid);
+    body.append(this.whoIsHere(spot));
+    const invite = this.deps.invite;
+    if (invite) {
+      const b = el('button', 'dh-btn dh-btn--quiet');
+      b.type = 'button';
+      b.id = 'games-invite';
+      b.append(icon('users', { width: 18 }), document.createTextNode('Invite friends to this table'));
+      b.addEventListener('click', () => {
+        const said = invite(spot);
+        b.replaceChildren(icon('check', { width: 18 }), document.createTextNode(said));
+        b.disabled = true;
+        setTimeout(() => {
+          if (!b.isConnected) return;
+          b.replaceChildren(icon('users', { width: 18 }), document.createTextNode('Invite friends to this table'));
+          b.disabled = false;
+        }, 20_000);
+      });
+      body.append(b);
+    }
+    body.append(grid);
     // The one-player arcade game (also at the Gaming room's cabinets).
     const arcade = this.deps.arcade;
     if (arcade && arcadeOn()) {

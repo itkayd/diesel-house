@@ -21,6 +21,9 @@ export type WhoWhere = {
   critterSeconds: number; // until they wander off
   goRoom: (room: RoomId) => void;
   goTo: (id: string) => void;
+  // U4: your friends (in the house now or not) and friend requests, with Join / Accept.
+  friends?: { id: string; name: string; character: Skin | null; status: 'friends' | 'incoming' | 'outgoing'; online: boolean; zone: Zone | null; lastSeen: string | null }[];
+  answer?: (id: string, yes: boolean) => Promise<void>;
   invite?: () => void; // members: open the invite code (shown when nobody else is in)
 };
 
@@ -33,6 +36,54 @@ export function addWhosWhereButton(get: () => WhoWhere) {
   b.addEventListener('click', () => openWhosWhere(get));
   hudButtons().prepend(b);
 }
+
+// Friends first: requests to answer, then friends (Join the ones in the house), then requests you sent.
+function friendRows(w: WhoWhere, close: () => void, get: () => WhoWhere) {
+  const box = el('div', 'v2-list');
+  box.id = 'friends-list';
+  box.append(el('div', 'dh-label', 'Friends'));
+  const order = { incoming: 0, friends: 1, outgoing: 2 } as const;
+  const list = [...(w.friends ?? [])].sort((a, b) => order[a.status] - order[b.status] || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
+  for (const f of list) {
+    const row = el('div', 'v2-item');
+    row.dataset.friend = f.id;
+    const txt = el('span');
+    txt.style.cssText = 'display:grid;gap:2px;min-width:0;flex:1';
+    const where = f.online ? (!f.zone || f.zone === 'hallway' ? 'In the Great Hall' : `In ${w.label(f.zone)}`) : f.lastSeen ? `Last on ${lastOn(f.lastSeen)}` : 'Not in the house';
+    const sub = f.status === 'incoming' ? 'Wants to be friends' : f.status === 'outgoing' ? 'Request sent' : where;
+    txt.append(el('span', 't', f.name), el('span', 's', sub));
+    const btn = (label: string, ic: Parameters<typeof icon>[0], go: () => void, id: string, quiet = true) => {
+      const b = el('button', quiet ? 'dh-btn dh-btn--quiet' : 'dh-btn');
+      b.type = 'button';
+      b.dataset.act = id;
+      b.append(icon(ic, { width: 18 }), document.createTextNode(label));
+      b.addEventListener('click', go);
+      return b;
+    };
+    const iconOnly = (label: string, go: () => void, id: string) => {
+      const b = el('button', 'dh-iconbtn');
+      b.type = 'button';
+      b.dataset.act = id;
+      b.setAttribute('aria-label', label);
+      b.title = label;
+      b.append(icon('x'));
+      b.addEventListener('click', go);
+      return b;
+    };
+    const answer = (yes: boolean) => () => void w.answer?.(f.id, yes).catch(() => {});
+    const acts: HTMLElement[] =
+      f.status === 'incoming' ? [btn('Accept', 'check', answer(true), 'accept', false), iconOnly('Not now', answer(false), 'decline')]
+        : f.status === 'outgoing' ? [btn('Cancel', 'x', answer(false), 'cancel')]
+          : f.online ? [btn('Join', 'footprints', () => (close(), get().goTo(f.id)), 'join', false)] : [];
+    row.append(f.character ? portrait(f.character, 32) : icon('user-round', { width: 32 }), txt, ...acts);
+    box.append(row);
+  }
+  return box;
+}
+const lastOn = (iso: string) => {
+  const d = (Date.now() - new Date(iso).getTime()) / 86400_000;
+  return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 14 ? `${Math.floor(d)} days ago` : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
 
 export function openWhosWhere(get: () => WhoWhere) {
   const ui = openModal('whos-where', { dismissable: true, label: 'whos-where-title', onDismiss: () => clearInterval(timer) });
@@ -141,10 +192,12 @@ export function openWhosWhere(get: () => WhoWhere) {
     me.style.top = pct(w.me.y - 6, w.size.h);
     dots.append(me);
     // The list only when someone moved zone (so a Go button isn't rebuilt under a finger).
-    const key = w.people.map((p) => `${p.id}:${p.zone}:${p.talking}`).join('|');
+    const key = w.people.map((p) => `${p.id}:${p.zone}:${p.talking}`).join('|') + '#' + (w.friends ?? []).map((f) => `${f.id}:${f.status}:${f.online}:${f.zone}`).join('|');
     if (key === lastList) return;
     lastList = key;
     list.replaceChildren();
+    const friendIds = new Set((w.friends ?? []).filter((f) => f.status === 'friends').map((f) => f.id));
+    if (w.friends?.length) list.append(friendRows(w, close, get));
     if (!w.people.length) {
       list.append(el('p', 'v2-note', 'Nobody else is in the house right now.'));
       if (w.invite) {
@@ -160,13 +213,14 @@ export function openWhosWhere(get: () => WhoWhere) {
         list.append(inv);
       }
     }
-    for (const p of w.people) {
+    if (w.people.length && w.friends?.length) list.append(el('div', 'dh-label', 'Everyone in the house'));
+    for (const p of [...w.people].sort((a, b) => Number(friendIds.has(b.id)) - Number(friendIds.has(a.id)))) {
       const row = el('div', 'v2-item');
       row.dataset.person = p.id;
       const txt = el('span');
       txt.style.cssText = 'display:grid;gap:2px;min-width:0';
       const where = !p.zone || p.zone === 'hallway' ? 'Great Hall' : w.label(p.zone);
-      txt.append(el('span', 't', p.name || 'Someone'), el('span', 's', where + (p.talking ? ' · in a voice chat' : '')));
+      txt.append(el('span', 't', (friendIds.has(p.id) ? '★ ' : '') + (p.name || 'Someone')), el('span', 's', where + (p.talking ? ' · in a voice chat' : '')));
       const go = el('button', 'dh-btn dh-btn--quiet');
       go.type = 'button';
       go.dataset.walk = p.id;

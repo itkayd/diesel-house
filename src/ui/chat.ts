@@ -1,4 +1,5 @@
 import type { Skin } from '../characters';
+import { isBlocked } from '../net/social';
 import type { RoomId } from '../config';
 import { deleteMessage, loadChat, MAX_LENGTH, postMessage, setReaction, type Message, type Reaction } from '../net/chat';
 import type { ChatChange } from '../net/presence';
@@ -207,6 +208,16 @@ export class ChatPanel {
     this.openBar = null;
   }
 
+  // Draw again (someone was blocked or unblocked).
+  refresh() {
+    this.render();
+  }
+
+  // Someone's last few lines here, for a report (what the reporter could see).
+  linesBy(id: string) {
+    return this.messages.filter((m) => m.author_id === id && m.kind !== 'roll').slice(-8).map((m) => ({ at: m.created_at, text: m.text.slice(0, 300) }));
+  }
+
   // A live change from the database (any room you may see).
   event(e: ChatChange) {
     if (e.table === 'messages') {
@@ -215,7 +226,7 @@ export class ChatPanel {
         if (m.room_id !== this.room || this.messages.some((x) => x.id === m.id)) return;
         this.messages.push(m);
         if (this.messages.length > 200) this.messages.shift();
-        if (!this.sheet && m.author_id !== this.me().id) this.dot.hidden = false;
+        if (!this.sheet && m.author_id !== this.me().id && !isBlocked(m.author_id)) this.dot.hidden = false;
       } else {
         this.messages = this.messages.filter((x) => x.id !== m.id);
         this.reactions.delete(m.id);
@@ -256,6 +267,7 @@ export class ChatPanel {
     let lastDay = '';
     let prev: Message | null = null;
     for (const m of this.messages) {
+      if (isBlocked(m.author_id)) continue; // someone you blocked (src/net/social.ts)
       const when = new Date(m.created_at);
       const day = when.toDateString();
       if (day !== lastDay) {

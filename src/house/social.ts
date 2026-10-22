@@ -1,5 +1,5 @@
 import { type RoomId } from '../config';
-import type { DiceMsg, EmoteMsg } from '../net/presence';
+import type { DiceMsg, EmoteMsg, InviteMsg } from '../net/presence';
 import { Duel, type DuelMsg } from '../games/rps';
 import { rollText, type Roll } from '../games/dice';
 import { randomSeed } from '../games/fair';
@@ -13,6 +13,9 @@ import { showFriendMenu } from '../ui/friendMenu';
 import { EMOTE_EVERY, isEmote, type EmoteId } from '../ui/emotes';
 import { WHISPER } from '../scenes/hallway';
 import type { HouseScene } from '../scenes/HouseScene';
+import { currentUser } from '../net/profile';
+import { addFriend, answerFriend, friendOf, isBlocked, isFriend, reportPlayer, setBlock } from '../net/social';
+import type { SpotId } from '../games/table';
 
 // Being together: the tap-a-friend menu, emotes, dice over your head, and rock-paper-scissors duels.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -50,7 +53,38 @@ export function tapAvatar(this: HouseScene, id: string) {
     onEmote: (e) => this.sendEmote(e, id),
     duel: this.duel || this.duelInvite ? undefined : () => this.startDuel(id),
     duelOff: 'You’re already in a duel',
+    social: {
+      // Friends are members (guests come and go).
+      friend: currentUser()?.guest || r.info.guest ? null : (friendOf(id)?.status ?? 'none'),
+      onFriend: async () => {
+        const was = friendOf(id)?.status;
+        if (was === 'incoming') {
+          await answerFriend(id, true);
+          return 'You’re friends now.';
+        }
+        const now = await addFriend(id, name, r.info.character);
+        return now === 'friends' ? 'You’re friends now.' : 'Friend request sent. They’ll see it in Who’s where.';
+      },
+      onBlock: async () => {
+        await setBlock(id, name, true);
+        this.blockChanged(id);
+      },
+      onReport: (reason, details) =>
+        reportPlayer(id, reason, details, {
+          zone: this.zone,
+          their_zone: r.info.zone ?? null,
+          near: Math.round(Math.hypot(r.avatar.sprite.x - this.body.center.x, r.avatar.sprite.y - this.body.bottom)),
+          their_chat: this.chat?.linesBy(id) ?? [],
+          at: new Date().toISOString(),
+        }),
+    },
   });
+}
+
+// Someone was blocked or unblocked: their voice goes quiet (or comes back) straight away, and chat redraws.
+export function blockChanged(this: HouseScene, id: string) {
+  this.voice?.setVolume(id, isBlocked(id) ? 0 : savedVolume(id));
+  this.chat?.refresh();
 }
 
 // Emotes (UPDATE.md Phase 11): over our head for everyone who can see us, at most one per 2 s.
@@ -66,7 +100,7 @@ export function sendEmote(this: HouseScene, e: EmoteId, to?: string) {
 
 export function receiveEmote(this: HouseScene, m: EmoteMsg) {
   const r = this.remotes.get(m.from);
-  if (!r || !isEmote(m.e)) return;
+  if (!r || !isEmote(m.e) || isBlocked(m.from)) return;
   // Same cap on the way in, so a modified client can't flood everyone's screen.
   const now = Date.now();
   if (now - (this.lastEmoteFrom.get(m.from) ?? 0) < EMOTE_EVERY - 300) return;
@@ -93,7 +127,7 @@ export function rollDice(this: HouseScene, r: Roll) {
 
 export function receiveDice(this: HouseScene, m: DiceMsg) {
   const r = this.remotes.get(m.from);
-  if (!r || !Array.isArray(m.v) || m.v.length < 1 || m.v.length > 6) return;
+  if (!r || !Array.isArray(m.v) || m.v.length < 1 || m.v.length > 6 || isBlocked(m.from)) return;
   const sides = Math.max(2, Math.min(100, Number(m.s) || 6));
   const v = m.v.map((x) => Math.max(1, Math.min(sides, Math.round(Number(x) || 1))));
   r.avatar.showDice(v, sides);
@@ -173,6 +207,8 @@ export function receiveDuel(this: HouseScene, m: DuelMsg) {
   if (!r || !this.presence) return;
   const me = this.presence.id;
   if (m.k === 'invite') {
+    // Someone you blocked: a plain "not now" (they aren't told why).
+    if (isBlocked(m.from)) return this.presence.sendDuel({ k: 'decline', id: m.id, from: me, to: m.from });
     if (this.duel || this.duelInvite) return this.presence.sendDuel({ k: 'decline', id: m.id, from: me, to: m.from, busy: true });
     play('powerup', 0.5);
     const answer = (yes: boolean) => {
@@ -203,4 +239,47 @@ export function receiveDuel(this: HouseScene, m: DuelMsg) {
   }
   if (m.k === 'quit' && !this.duel) document.getElementById('duel-invite')?.remove();
   this.duel?.onMessage(m);
+}
+
+// "Invite friends to this table" (U4): friends in the house get a ping; with none about, everyone in the
+// house (but never someone you blocked). At most one invite every 20 s.
+export function inviteToTable(this: HouseScene, spot: SpotId) {
+  if (!this.presence) return 'You’re offline';
+  const now = Date.now();
+  if (now - this.lastInvite < 20_000) return 'Invited just now';
+  const here = [...this.remotes.values()].filter((r) => r.active && !isBlocked(r.info.id));
+  const friends = here.filter((r) => isFriend(r.info.id));
+  const ask = friends.length ? friends : here;
+  if (!ask.length) return 'Nobody else is in the house yet';
+  if (!this.presence.sendInvite({ to: ask.map((r) => r.info.id), spot, name: this.name })) return 'You’re offline';
+  this.lastInvite = now;
+  const names = ask.map((r) => r.info.name);
+  return names.length <= 2 ? `Invited ${names.join(' and ')}` : `Invited ${names.length} people`;
+}
+
+export function receiveInvite(this: HouseScene, m: InviteMsg) {
+  const r = this.remotes.get(m.from);
+  if (!r || isBlocked(m.from)) return;
+  const spot = this.spots.spots.find((s) => s.id === m.spot);
+  if (!spot) return;
+  const where = m.spot === 'hall' ? 'the Great Hall table' : `the ${zoneLabel(m.spot as RoomId)} table`;
+  play('powerup', 0.5);
+  toast({
+    icon: 'dices',
+    id: 'table-invite',
+    who: `${r.info.name} wants to play`,
+    what: `Come to ${where}.`,
+    ttl: 20_000,
+    actions: [
+      {
+        label: 'Go',
+        id: 'table-invite-go',
+        onClick: () => {
+          document.getElementById('table-invite')?.remove();
+          if (this.walkTo(spot.x, spot.y)) toast({ icon: 'footprints', who: 'On your way', what: 'Move any way to stop.', small: true, ttl: 1600 });
+        },
+      },
+      { label: 'Not now', id: 'table-invite-no', onClick: () => document.getElementById('table-invite')?.remove() },
+    ],
+  });
 }

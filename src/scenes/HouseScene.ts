@@ -92,6 +92,7 @@ export class HouseScene extends Phaser.Scene {
   quietRooms = new Map<string, Hallway>(); // rooms heard by distance (the Library), same rules as whispering
   walkie: WalkieButton | null = null;
   lastEmote = 0; // when we last sent one
+  lastInvite = 0; // when we last asked people to a games table (U4)
   lastEmoteFrom = new Map<string, number>(); // when each person's last emote was shown
   spots!: GameSpots;
   games: Games | null = null;
@@ -188,6 +189,9 @@ export class HouseScene extends Phaser.Scene {
   sendMove = players.sendMove;
   moveRemotes = players.moveRemotes;
   tapAvatar = social.tapAvatar;
+  blockChanged = social.blockChanged;
+  inviteToTable = social.inviteToTable;
+  receiveInvite = social.receiveInvite;
   sendEmote = social.sendEmote;
   receiveEmote = social.receiveEmote;
   rollDice = social.rollDice;

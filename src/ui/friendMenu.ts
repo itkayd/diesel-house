@@ -4,6 +4,8 @@ import { icon } from './icons';
 import { el } from './modal';
 import { overlay } from './overlay';
 import { portrait } from './portrait';
+import { toast } from './toasts';
+import type { ReportReason } from '../net/social';
 
 let pop: HTMLDivElement | null = null;
 
@@ -18,7 +20,22 @@ export type FriendMenu = {
   // Rock-paper-scissors (UPDATE.md Phase 12). Without it the button says why not.
   duel?: () => void;
   duelOff?: string;
+  // U4: friends, block, report. `friend` null: not possible here (guests can't have friends).
+  social?: {
+    friend: 'none' | 'friends' | 'incoming' | 'outgoing' | null;
+    onFriend: () => Promise<string>; // ask / say yes; returns what to say
+    onBlock: () => Promise<void>;
+    onReport: (reason: ReportReason, details: string) => Promise<void>;
+  };
 };
+
+const REASONS: [ReportReason, string][] = [
+  ['harassment', 'Bullying or harassment'],
+  ['hate', 'Hate or threats'],
+  ['spam', 'Spamming'],
+  ['cheating', 'Cheating'],
+  ['other', 'Something else'],
+];
 
 // Tap a friend (or press Q next to them), UPDATE.md Phase 11 / design/game/v2.html `friendMenu`:
 // face and name, their volume (in a call) or where they are, emotes, Duel (rock paper scissors).
@@ -85,7 +102,45 @@ export function showFriendMenu(m: FriendMenu) {
       startDuel();
     });
   acts.append(duel);
+  const soc = m.social;
+  if (soc?.friend !== null && soc?.friend !== undefined) {
+    const f = el('button', 'dh-btn dh-btn--quiet');
+    f.type = 'button';
+    f.id = 'friend-add';
+    const label = { none: 'Add friend', friends: 'Friends', incoming: 'Accept friend', outgoing: 'Request sent' }[soc.friend];
+    f.append(icon(soc.friend === 'friends' ? 'check' : 'user-round', { width: 18 }), document.createTextNode(label));
+    f.disabled = soc.friend === 'friends' || soc.friend === 'outgoing';
+    f.addEventListener('click', () => {
+      f.disabled = true;
+      soc.onFriend().then(
+        (said) => {
+          closeFriendMenu();
+          toast({ icon: 'users', who: m.name, what: said, small: true, ttl: 3000 });
+        },
+        (e) => {
+          f.disabled = false;
+          toast({ icon: 'info', who: 'Not sent', what: (e as Error).message, small: true, ttl: 3500 });
+        },
+      );
+    });
+    acts.append(f);
+  }
   pop.append(acts);
+  if (soc) {
+    const safety = el('div', 'acts dh-friend-safety');
+    const block = el('button', 'dh-btn dh-btn--quiet');
+    block.type = 'button';
+    block.id = 'friend-block';
+    block.append(icon('volume-x', { width: 18 }), document.createTextNode('Block'));
+    block.addEventListener('click', () => confirmBlock(m.name, soc.onBlock));
+    const report = el('button', 'dh-btn dh-btn--quiet');
+    report.type = 'button';
+    report.id = 'friend-report';
+    report.append(icon('info', { width: 18 }), document.createTextNode('Report'));
+    report.addEventListener('click', () => reportForm(m.name, soc.onReport));
+    safety.append(block, report);
+    pop.append(safety);
+  }
   // Why Duel is greyed out, said where a phone user can see it (a title only shows on hover).
   if (!startDuel && m.duelOff) {
     const why = el('p', 'v2-note', m.duelOff);
@@ -95,6 +150,98 @@ export function showFriendMenu(m: FriendMenu) {
   overlay().appendChild(pop);
   // Close on the next tap outside the card (after this tap has finished).
   setTimeout(() => window.addEventListener('pointerdown', outside, true), 0);
+}
+
+// "Block Sam?" in place of the menu: what it does, then Block or Cancel.
+function confirmBlock(name: string, go: () => Promise<void>) {
+  if (!pop) return;
+  const box = el('div', 'dh-friend-step');
+  box.id = 'block-confirm';
+  const yes = el('button', 'dh-btn');
+  yes.type = 'button';
+  yes.id = 'block-yes';
+  yes.append(icon('volume-x', { width: 18 }), document.createTextNode(`Block ${name}`));
+  const no = el('button', 'dh-btn dh-btn--quiet', 'Cancel');
+  no.type = 'button';
+  no.addEventListener('click', closeFriendMenu);
+  yes.addEventListener('click', () => {
+    yes.disabled = true;
+    go().then(
+      () => {
+        closeFriendMenu();
+        toast({ icon: 'volume-x', who: `${name} is blocked`, what: 'You won’t hear them or see their chat. Settings → More → Blocked people to undo.', ttl: 4500 });
+      },
+      (e) => {
+        yes.disabled = false;
+        toast({ icon: 'info', who: 'Not blocked', what: (e as Error).message, small: true, ttl: 3500 });
+      },
+    );
+  });
+  box.append(
+    el('b', '', `Block ${name}?`),
+    el('p', 'v2-note', 'You won’t hear them, see their chat, or get their emotes, duels and game invites. They aren’t told. You can undo it any time.'),
+    yes,
+    no,
+  );
+  swap(box);
+  yes.focus();
+}
+
+// "Report Sam": why (one tap), a few words, Send. Goes to Diesel with where you are and their last lines.
+function reportForm(name: string, send: (reason: ReportReason, details: string) => Promise<void>) {
+  if (!pop) return;
+  const box = el('div', 'dh-friend-step');
+  box.id = 'report-form';
+  let reason: ReportReason | null = null;
+  const chips = el('div', 'dh-chips');
+  const go = el('button', 'dh-btn');
+  go.type = 'button';
+  go.id = 'report-send-player';
+  go.disabled = true;
+  go.append(icon('send', { width: 18 }), document.createTextNode('Send to Diesel'));
+  for (const [id, label] of REASONS) {
+    const c = el('button', 'dh-chip', label);
+    c.type = 'button';
+    c.dataset.reason = id;
+    c.setAttribute('aria-pressed', 'false');
+    c.addEventListener('click', () => {
+      reason = id;
+      for (const x of chips.children) x.setAttribute('aria-pressed', String((x as HTMLElement).dataset.reason === id));
+      go.disabled = false;
+    });
+    chips.append(c);
+  }
+  const text = el('textarea', 'dh-input dh-report-text');
+  text.id = 'report-details';
+  text.rows = 3;
+  text.maxLength = 1000;
+  text.placeholder = 'What happened? (optional)';
+  const cancel = el('button', 'dh-btn dh-btn--quiet', 'Cancel');
+  cancel.type = 'button';
+  cancel.addEventListener('click', closeFriendMenu);
+  go.addEventListener('click', () => {
+    if (!reason) return;
+    go.disabled = true;
+    send(reason, text.value.trim()).then(
+      () => {
+        closeFriendMenu();
+        toast({ icon: 'check', who: 'Report sent', what: `Thanks. Diesel will look at it. You can also block ${name}.`, ttl: 4000 });
+      },
+      (e) => {
+        go.disabled = false;
+        toast({ icon: 'info', who: 'Not sent', what: (e as Error).message, small: true, ttl: 3500 });
+      },
+    );
+  });
+  box.append(el('b', '', `Report ${name}`), el('p', 'v2-note', 'What’s wrong? It goes to Diesel with where you are and their last chat lines. They aren’t told.'), chips, text, go, cancel);
+  swap(box);
+}
+
+// Replace the menu's contents (keeps the header with ✕).
+function swap(box: HTMLElement) {
+  if (!pop) return;
+  const head = pop.firstElementChild;
+  pop.replaceChildren(...(head ? [head] : []), box);
 }
 
 function outside(e: PointerEvent) {

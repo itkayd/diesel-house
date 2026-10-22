@@ -34,6 +34,8 @@ import { ROOMS } from './rooms';
 import { setupGuide } from '../ui/guide';
 import { addReportProblem } from '../ui/reportProblem';
 import { startHouseSettings } from '../net/houseSettings';
+import { friendList, isBlocked, loadSocial } from '../net/social';
+import { addBlockedSettings } from '../ui/blockedSettings';
 import { startAnnouncements } from '../ui/announcement';
 import { setLogFacts } from '../net/errors';
 import { modalOpen } from '../ui/modal';
@@ -48,6 +50,25 @@ export async function start(this: HouseScene) {
   setupGuide(true); // the ? button, and the guide itself on a first visit
   addReportProblem(); // Settings → More: "Report a problem"
   void startHouseSettings(); // the admin page's switches, live (src/net/houseSettings.ts)
+  // Friends and blocks (src/net/social.ts): now, and every 2 minutes for new friend requests.
+  const askedBefore = new Set<string>();
+  const checkFriends = () =>
+    void loadSocial().then(() => {
+      const asking = friendList().filter((f) => f.status === 'incoming' && !askedBefore.has(f.id));
+      for (const f of asking) askedBefore.add(f.id);
+      if (!asking.length) return;
+      toast({
+        icon: 'users',
+        id: 'friend-requests',
+        who: asking.length === 1 ? `${asking[0].name ?? 'Someone'} wants to be friends` : `${asking.length} friend requests`,
+        what: 'Say yes in Who’s where.',
+        ttl: 8000,
+        actions: [{ label: 'See', id: 'friend-requests-see', onClick: () => document.getElementById('map-button')?.click() }],
+      });
+    });
+  checkFriends();
+  setInterval(checkFriends, 120_000);
+  addBlockedSettings((id) => this.blockChanged(id)); // Settings → More: unblock
   startAnnouncements();
   // What the game was doing, added to every device log (src/net/errors.ts).
   setLogFacts(() => ({
@@ -116,6 +137,7 @@ export async function start(this: HouseScene) {
       onDice: (m) => this.receiveDice(m),
       onTimer: (m) => this.receiveTimer(m),
       onDuel: (m) => this.receiveDuel(m),
+      onInvite: (m) => this.receiveInvite(m),
       onChat: (e) => {
         this.chat?.event(e);
         // Short new messages pop up over the sender's head.
@@ -187,7 +209,7 @@ export async function start(this: HouseScene) {
       askMic: (cancelled, space) => (space === 'hallway' ? micAlreadyAllowed() : askForMic(cancelled)),
       policyFor: (space) => (space === 'hallway' ? hall : (this.quietRooms.get(space) ?? null)),
       onWalkie: (m) => hall.onMessage(m),
-      volumeFor: (id) => savedVolume(id),
+      volumeFor: (id) => (isBlocked(id) ? 0 : savedVolume(id)), // blocked: silent (src/net/social.ts)
       onMicState: (s) => {
         this.myMic = s;
         this.sendMove(true);
@@ -299,6 +321,7 @@ export async function start(this: HouseScene) {
     hosted: (_game, players) => players >= 4 && this.tracker.emit('host_game_4'),
     quickDrawRound: () => this.tracker.emit('qd_round_won'),
     arcade: () => void this.openArcade(),
+    invite: (spot) => this.inviteToTable(spot),
   });
   this.chat.onActivity = (k, room) => this.tracker.emit(k === 'chat' ? 'chat_sent' : 'reaction_sent', k === 'chat' ? { u: room } : {});
   this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);

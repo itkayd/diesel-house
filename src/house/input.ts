@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { answerFriend, friendList } from '../net/social';
+import type { Skin } from '../characters';
 import { TILE_SIZE, type RoomId, type Zone } from '../config';
 import { zoneLabel } from '../ui/overlay';
 import { toast } from '../ui/toasts';
@@ -96,6 +98,13 @@ export function whosWhere(this: HouseScene) {
     critters: (this.critters?.current ?? []).map((s) => ({ id: s.id, name: critterById(s.id)!.name, x: s.x, y: s.y, zone: this.zoneOf(s.x, s.y) })),
     critterSeconds: this.critters?.secondsLeft ?? 0,
     goRoom: (room: RoomId) => this.walkToRoom(room),
+    // Friends (src/net/social.ts): in the house now (and where), or when they were last on.
+    friends: friendList().map((f) => {
+      const r = this.remotes.get(f.id);
+      const on = !!r?.active;
+      return { id: f.id, name: f.name ?? r?.info.name ?? 'A friend', character: (r?.info.character ?? f.character ?? null) as Skin | null, status: f.status, online: on, zone: on ? here(r!) : null, lastSeen: f.last_seen };
+    }),
+    answer: (id: string, yes: boolean) => answerFriend(id, yes),
     invite: currentUser() && !currentUser()!.guest ? () => void openSettings('more') : undefined,
     goTo: (id: string) => {
       const r = this.remotes.get(id);

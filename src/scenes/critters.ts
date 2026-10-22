@@ -65,6 +65,13 @@ export class Critters {
     }
   }
 
+  // Switched off on the admin page: they all wander off; when it's back on, the next update brings this
+  // slot's critters back.
+  clear() {
+    for (const idx of [...this.shown.keys()]) this.hide(idx, false);
+    this.slot = -1;
+  }
+
   // Try that one again (e.g. the database couldn't be reached).
   retry(slot: number, idx: number) {
     this.given.delete(key(slot, idx));

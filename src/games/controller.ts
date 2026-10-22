@@ -16,6 +16,7 @@ import { SketchHost, SketchView } from './sketch';
 import { topScorers } from './kit';
 import { QuickDrawHost, QuickDrawView, type QDState } from './quickDraw';
 import { ALL_GAMES, gamesFor, type GameId } from './catalog';
+import { arcadeOn, gameOn } from '../net/houseSettings';
 import { openRules, rulesFold } from './rules';
 import { GameTable, type Names, type Recorder, type Snapshot, type SpotId, type Table, type TableHost, type TableView } from './table';
 
@@ -401,7 +402,8 @@ export class Games {
     const playing = this.running(spot) ? t?.snap?.game : null;
     for (const id of ALL_GAMES.filter((g) => here.includes(g))) {
       const g = GAMES[id];
-      const off = allowed !== null && !allowed.includes(id);
+      const houseOff = !gameOn(id);
+      const off = houseOff || (allowed !== null && !allowed.includes(id));
       const b = el('button', 'v2-game' + (off ? ' soon' : '') + (playing === id ? ' live' : ''));
       b.type = 'button';
       b.dataset.game = id;
@@ -413,14 +415,14 @@ export class Games {
       tag.setAttribute('aria-label', playing === id ? 'Being played now' : `${g.players} players`);
       if (playing !== id) tag.prepend(icon('users', { width: 12 }));
       top.append(gi, tag);
-      b.append(top, el('b', '', g.title), el('span', '', off ? 'Off in this room' : g.sub));
+      b.append(top, el('b', '', g.title), el('span', '', houseOff ? 'Switched off for now' : off ? 'Off in this room' : g.sub));
       if (!b.disabled) b.addEventListener('click', () => this.show(id as Games['screen']));
       grid.append(b);
     }
     body.append(this.whoIsHere(spot), grid);
     // The one-player arcade game (also at the Gaming room's cabinets).
     const arcade = this.deps.arcade;
-    if (arcade) {
+    if (arcade && arcadeOn()) {
       const a = el('button', 'v2-game v2-game--wide');
       a.type = 'button';
       a.id = 'games-arcade';

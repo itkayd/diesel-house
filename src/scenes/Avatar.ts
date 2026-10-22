@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { petsOn } from '../net/houseSettings';
 import { animKey, asSkin, type Dir, type Skin } from '../characters';
 import type { NetQuality } from '../net/netQuality';
 import { rankOf } from '../challenges/levels';
@@ -359,7 +360,7 @@ export class Avatar {
 
   sync() {
     const scene = this.sprite.scene;
-    this.pet?.update(toWorld(this.sprite.x, this.sprite.y), this.facing, this.sprite.visible, scene.time.now, scene.game.loop.delta);
+    this.pet?.update(toWorld(this.sprite.x, this.sprite.y), this.facing, this.sprite.visible && petsOn(), scene.time.now, scene.game.loop.delta);
     const depth = depthOf(this.sprite.x, this.sprite.y);
     this.sprite.setDepth(depth);
     this.ring.setPosition(this.sprite.x, this.sprite.y - 1).setDepth(depth - 0.5);

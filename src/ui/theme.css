@@ -1001,3 +1001,13 @@ html, body, #game, #overlay, #overlay * {
 @keyframes arcade-ult { to { box-shadow: 0 0 0 3px var(--panel-edge), 0 0 18px 4px rgba(158,201,255,.75); } }
 @media (prefers-reduced-motion: reduce) { .arcade-ult.ready { animation: none; box-shadow: 0 0 0 3px var(--panel-edge), 0 0 0 6px var(--radio); } }
 .dh-report-text { resize: vertical; min-height: 72px; font-size: 15px; line-height: 1.4; }
+
+/* The admin's announcement (src/ui/announcement.ts): a banner at the top until it runs out. */
+.dh-announce {
+  display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
+  background: var(--lamp); color: var(--panel-edge); box-shadow: var(--frame-drop);
+  font-family: var(--font-body); font-weight: 700; font-size: var(--fs-sm); line-height: 1.35;
+}
+.dh-announce > svg { width: 18px; height: 18px; flex: none; }
+.dh-announce > span { flex: 1; overflow-wrap: anywhere; }
+.dh-announce .dh-iconbtn { width: 36px; height: 36px; min-width: 36px; background: transparent; box-shadow: none; color: var(--panel-edge); }

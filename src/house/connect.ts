@@ -33,6 +33,8 @@ import type { HouseScene } from '../scenes/HouseScene';
 import { ROOMS } from './rooms';
 import { setupGuide } from '../ui/guide';
 import { addReportProblem } from '../ui/reportProblem';
+import { startHouseSettings } from '../net/houseSettings';
+import { startAnnouncements } from '../ui/announcement';
 import { setLogFacts } from '../net/errors';
 import { modalOpen } from '../ui/modal';
 import { firstRun } from '../ui/hints';
@@ -45,6 +47,8 @@ export async function start(this: HouseScene) {
   this.canMove = true;
   setupGuide(true); // the ? button, and the guide itself on a first visit
   addReportProblem(); // Settings → More: "Report a problem"
+  void startHouseSettings(); // the admin page's switches, live (src/net/houseSettings.ts)
+  startAnnouncements();
   // What the game was doing, added to every device log (src/net/errors.ts).
   setLogFacts(() => ({
     zone: this.zone,

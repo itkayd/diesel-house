@@ -7,6 +7,7 @@ import { currentUser } from '../net/profile';
 import { toast } from '../ui/toasts';
 import { arcadeBoard, flushPendingArcade, myArcadeBest, startRun, submitArcade } from '../net/arcade';
 import type { HouseScene } from '../scenes/HouseScene';
+import { arcadeOn } from '../net/houseSettings';
 
 // The arcade cabinets (any 'arcade_*' furniture in src/house/rooms.ts): stand in front of one for
 // "Play Night Raid" (E). The game loads only when it's first opened. (Part of the house scene.)
@@ -42,6 +43,7 @@ export function showArcadePrompt(this: HouseScene, on: boolean) {
 }
 
 export async function openArcade(this: HouseScene) {
+  if (!arcadeOn()) return void toast({ icon: 'gamepad-2', who: 'Night Raid', what: 'The arcade is switched off for now.', small: true, ttl: 3000 });
   const { openNightRaid } = await import('../games/nightRaid');
   this.body.setVelocity(0, 0);
   this.canMove = false;

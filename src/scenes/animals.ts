@@ -3,6 +3,7 @@ import { AMBIENT, animalFrame, type AnimalKey } from '../house/animals';
 import { depthOf, toScreen } from '../house/projection';
 import type { Zones } from '../house/zones';
 import type { Pt, WalkGrid } from './pathfind';
+import { animalsOn } from '../net/houseSettings';
 
 // Animals that live in the house (REDESIGN.md R4): each room's animals (src/house/animals.ts AMBIENT)
 // sit for a while, then wander to another free spot in their room along the walking grid, and sit again.
@@ -49,6 +50,10 @@ export class HouseAnimals {
 
   update(now: number, dt: number) {
     for (const w of this.list) {
+      // Switched off on the admin page (everywhere, or this room): out of sight until it's back on.
+      const on = animalsOn(w.room);
+      if (w.img.visible !== on) w.img.setVisible(on);
+      if (!on) continue;
       if (!w.path.length) {
         w.img.setFrame(animalFrame(w.key, false));
         if (now < w.until) continue;

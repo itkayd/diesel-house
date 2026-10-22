@@ -2,6 +2,7 @@ import type { ArcadeResult, ArcadeRow } from '../games/nightRaid';
 import { devTest } from './mode';
 import type { Recorded } from './progress';
 import { supabase } from './supabase';
+import { logIssue } from './errors';
 
 // Arcade scores (supabase/migrations/20261107_arcade.sql): the database checks the score is believable,
 // keeps your best and pays XP for new bests.
@@ -10,6 +11,7 @@ export async function submitArcade(score: number, waves: number, durationMs: num
   const r = await send(score, waves, durationMs);
   // No connection (or the server didn't answer): keep it on this phone and try again later.
   if (!r.ok && r.why === 'error') {
+    logIssue('problem', 'Night Raid score could not be sent (kept on the phone to retry)', { extra: { score, waves, ms: durationMs } });
     queue({ score, waves, ms: durationMs, at: Date.now() });
     return { ok: false, why: 'queued' };
   }

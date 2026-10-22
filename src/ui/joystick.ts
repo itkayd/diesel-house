@@ -1,3 +1,4 @@
+import { crumb, logIssue } from '../net/errors';
 import { hudBottomLeft } from './overlay';
 
 const MAX = 36; // px the knob can travel from the centre
@@ -44,7 +45,7 @@ export class Joystick {
       'pointerdown',
       (e) => {
         e.preventDefault();
-        if (this.pointerId !== null && this.pointerId !== e.pointerId) this.release();
+        if (this.pointerId !== null && this.pointerId !== e.pointerId) this.release('taken over: the last touch never ended');
         this.pointerId = e.pointerId;
         this.touchId = null; // learnt from the touchstart that follows (pointer events come first)
         try {
@@ -53,6 +54,7 @@ export class Joystick {
           // already gone (a very quick tap): the move/up listeners below still work
         }
         this.base.classList.add('on');
+        crumb('joystick down');
         this.startWatchdog();
         this.move(e.clientX, e.clientY);
       },
@@ -80,12 +82,15 @@ export class Joystick {
     const track = (e: TouchEvent) => {
       this.fingers = e.touches.length;
       if (this.pointerId === null) return;
+      const ending = e.type === 'touchend' || e.type === 'touchcancel';
+      // Our own finger lifting: a normal release.
+      if (ending && (this.touchId === null ? e.touches.length === 0 : [...e.changedTouches].some((t) => t.identifier === this.touchId))) return void this.release();
       if (this.touchId !== null) {
         const ours = [...e.touches].find((t) => t.identifier === this.touchId);
-        if (!ours) return void this.release();
+        if (!ours) return void this.release('our touch was gone from the screen');
         this.lastEvent = Date.now();
         if (e.type === 'touchmove') this.move(ours.clientX, ours.clientY);
-      } else if (e.touches.length === 0) this.release();
+      } else if (e.touches.length === 0) this.release('no finger on the screen');
     };
     for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) document.addEventListener(type, track, { passive: true, capture: true });
 
@@ -102,7 +107,7 @@ export class Joystick {
         } finally {
           // Only after a slow request (a permission sheet you had to tap): a quick, already-allowed mic
           // must not stop someone holding the joystick steady as they walk into a room.
-          if (Date.now() - asked > 700) for (const j of sticks) if (j.active && j.lastEvent < asked) j.release();
+          if (Date.now() - asked > 700) for (const j of sticks) if (j.active && j.lastEvent < asked) j.release('a mic permission sheet swallowed the touch');
         }
       };
       (wrapped as { dhWrapped?: boolean }).dhWrapped = true;
@@ -120,7 +125,12 @@ export class Joystick {
     return this.pointerId !== null;
   }
 
-  release() {
+  // `why`: set when a safety net let go (not a normal lift of the finger): logged for the admin page.
+  release(why?: string) {
+    if (this.pointerId !== null) {
+      crumb('joystick up', why);
+      if (why) logIssue('warning', `Joystick let go: ${why}`, { extra: { vector: { ...this.vector } } });
+    }
     if (this.pointerId !== null)
       try {
         if (this.base.hasPointerCapture?.(this.pointerId)) this.base.releasePointerCapture(this.pointerId);
@@ -143,7 +153,7 @@ export class Joystick {
     this.watchdog = setInterval(() => {
       if (this.pointerId === null) return;
       const touchy = navigator.maxTouchPoints > 0;
-      if (touchy && this.fingers === 0 && Date.now() - this.lastEvent > 600) this.release();
+      if (touchy && this.fingers === 0 && Date.now() - this.lastEvent > 600) this.release('watchdog: held with no finger down');
     }, 300);
   }
 

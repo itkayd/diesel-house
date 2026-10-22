@@ -32,6 +32,8 @@ import { addWhosWhereButton } from '../ui/whosWhere';
 import type { HouseScene } from '../scenes/HouseScene';
 import { ROOMS } from './rooms';
 import { setupGuide } from '../ui/guide';
+import { addReportProblem } from '../ui/reportProblem';
+import { setLogFacts } from '../net/errors';
 import { modalOpen } from '../ui/modal';
 import { firstRun } from '../ui/hints';
 
@@ -42,6 +44,18 @@ import { firstRun } from '../ui/hints';
 export async function start(this: HouseScene) {
   this.canMove = true;
   setupGuide(true); // the ? button, and the guide itself on a first visit
+  addReportProblem(); // Settings → More: "Report a problem"
+  // What the game was doing, added to every device log (src/net/errors.ts).
+  setLogFacts(() => ({
+    zone: this.zone,
+    canMove: this.canMove,
+    connection: this.presenceState,
+    others: [...this.remotes.values()].filter((r) => r.active).length,
+    joystick: this.joystick ? { active: this.joystick.active, x: +this.joystick.vector.x.toFixed(2), y: +this.joystick.vector.y.toFixed(2) } : null,
+    pos: { x: Math.round(this.player.x), y: Math.round(this.player.y) },
+    guest: !!currentUser()?.guest,
+    fps: Math.round(this.game.loop.actualFps),
+  }));
   // One-time tips for the first minutes, and a card when nobody else is in (src/ui/hints.ts).
   firstRun.begin({
     zone: () => this.zone,

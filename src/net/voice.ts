@@ -7,6 +7,7 @@ import { devTest } from './mode';
 import { countMessage } from './stats';
 import { net } from './netQuality';
 import { supabase } from './supabase';
+import { logIssue } from './errors';
 
 // Voice for one "space" at a time: a room, or the hallway. Peer-to-peer WebRTC (max 8 people), signalled
 // over a Supabase Realtime channel per space (voice:room_0N, voice:hallway). ICE: Google STUN + Twilio
@@ -539,6 +540,7 @@ export class Voice {
       return await navigator.mediaDevices.getUserMedia({ audio: MIC, video: false });
     } catch (e) {
       console.warn('Microphone unavailable — joining to listen only', e);
+      logIssue('problem', `Microphone unavailable: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
       const name = e instanceof DOMException ? e.name : '';
       this.micProblem =
         name === 'NotAllowedError' || name === 'SecurityError' ? 'denied'
@@ -562,6 +564,7 @@ export class Voice {
       this.ice = { servers: [...STUN, ...body.iceServers], turn: true, expires: Date.now() + (body.ttl - 300) * 1000 };
     } catch (e) {
       console.warn('TURN unavailable, using STUN only', e);
+      logIssue('problem', `Voice relay (TURN) unavailable: ${e instanceof Error ? e.message : String(e)}`);
       this.ice = { servers: STUN, turn: false, expires: Date.now() + 60_000 };
     }
     return this.ice;
@@ -847,6 +850,7 @@ export class Voice {
       const state = pc.connectionState;
       if (state === 'connected') clearTimeout(peer.timer);
       if (state === 'failed' && this.peers.get(id) === peer) {
+        if (relay) logIssue('problem', 'Voice could not connect, even through the relay (TURN)', { extra: { turn: !!this.ice?.turn } });
         if (initiator) void this.retry(peer);
         else this.closePeer(id, true);
       }

@@ -4,6 +4,7 @@ import { ROOM_IDS, type RoomId, type Zone } from '../config';
 import { roomDef } from './rooms';
 import { loadRooms as fetchRooms, setDnd, type Room } from '../net/rooms';
 import { play } from '../ui/sounds';
+import { crumb } from '../net/errors';
 import { setRoomInfo, showWhere, zoneLabel } from '../ui/overlay';
 import { toast } from '../ui/toasts';
 import type { HouseScene } from '../scenes/HouseScene';
@@ -12,6 +13,7 @@ import type { HouseScene } from '../scenes/HouseScene';
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
 
 export function showPresenceStatus(this: HouseScene, s: 'connecting' | 'reconnecting' | 'online' | 'offline') {
+  if (s !== this.presenceState) crumb('connection', s);
   this.presenceState = s;
   this.refreshRooms();
   if (s === 'connecting') showWhere(this.zone, 'Connecting…', 'warn');

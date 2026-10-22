@@ -1,5 +1,6 @@
 import { overlay } from './overlay';
 import { play } from './sounds';
+import { crumb } from '../net/errors';
 
 // A pixel card over a dimmed scrim (design/game/mvp.html `modal()`): picker, settings, mic card, credits.
 // On phones the theme turns it into a bottom sheet. Tapping the scrim closes it if `dismissable`, and so
@@ -29,6 +30,7 @@ export function openModal(id: string, opts: { dismissable?: boolean; onDismiss?:
     close: () => {
       if (!scrim.isConnected) return;
       scrim.remove();
+      crumb('closed', id);
       const i = stack.indexOf(entry);
       if (i >= 0) stack.splice(i, 1);
       if (entry.back instanceof HTMLElement && entry.back.isConnected) entry.back.focus({ preventScroll: true });
@@ -43,6 +45,7 @@ export function openModal(id: string, opts: { dismissable?: boolean; onDismiss?:
     });
   overlay().append(scrim);
   stack.push(entry);
+  crumb('opened', id);
   if (!opts.quiet) play('click', 0.3);
   // Into the card once it has its contents (they're added straight after this returns).
   queueMicrotask(() => {

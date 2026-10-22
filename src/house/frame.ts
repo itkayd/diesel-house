@@ -4,6 +4,7 @@ import { type Dir } from '../characters';
 import { play } from '../ui/sounds';
 import { zoneLabel } from '../ui/overlay';
 import { roomBanner } from '../ui/roomBanner';
+import { crumb, logIssue } from '../net/errors';
 import { trackName } from './jukebox';
 import { nearArcade } from './arcade';
 import { modalOpen } from '../ui/modal';
@@ -29,7 +30,10 @@ function unfreeze(scene: HouseScene, dt: number) {
   if (frozenFor > 1.5) {
     scene.canMove = true;
     frozenFor = 0;
-    if (!healed) console.warn('Movement was off with nothing open: switched it back on');
+    if (!healed) {
+      console.warn('Movement was off with nothing open: switched it back on');
+      logIssue('warning', 'Movement was off with nothing open: switched it back on');
+    }
     healed = true;
   }
 }
@@ -83,6 +87,7 @@ export function update(this: HouseScene) {
   if (zone !== this.zone) {
     const was = this.zone;
     this.zone = zone;
+    crumb('walked into', zone ?? 'outside');
     this.tidyQuiet(was, zone);
     this.showPresenceStatus(this.presenceState);
     if (zone && zone !== 'hallway') this.tracker.emit('room_enter', { u: zone });

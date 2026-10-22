@@ -1,6 +1,7 @@
 -- Just enough of Supabase for the migrations to run on a plain local Postgres (supabase/tests/run.sh):
 -- the API roles, auth.users + auth.uid() (who's "signed in" comes from a setting), and realtime stubs.
-create extension if not exists pgcrypto;
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions; -- where Supabase keeps it
 do $$ begin
   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
 exception when duplicate_object then null; end $$;

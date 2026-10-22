@@ -63,6 +63,27 @@ await cdp2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] 
 await page.waitForTimeout(200);
 const after2 = await page.evaluate(() => window.__house.joystick.active);
 check('a second finger tapping elsewhere doesn’t stop the joystick; lifting both does', { two, after2 }, two.active && two.x > 0.5 && !after2);
+// Walking into a room asks for the mic; if the finger went quiet meanwhile (iPhone permission sheet or
+// audio switch), the joystick lets go.
+const micCase = await page.evaluate(async () => {
+  const j = window.__house.joystick;
+  const hold = () => { j.pointerId = 997; j.touchId = 9; j.fingers = 1; j.vector.x = 1; j.lastEvent = Date.now() - 50; };
+  // A quick, already-allowed mic (walking into a room): keep walking.
+  hold();
+  await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+  const quick = j.active;
+  // A slow one (a permission sheet you had to tap): the clock jumps a second while it's open.
+  hold();
+  const realNow = Date.now;
+  const p = navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+  Date.now = () => realNow() + 1000;
+  await p;
+  Date.now = realNow;
+  const slow = { active: j.active, x: j.vector.x };
+  j.release();
+  return { quick, slow };
+});
+check('mic requests: a quick one keeps you walking; a slow one (permission sheet) that swallowed the touch lets go', micCase, micCase.quick && !micCase.slow.active && micCase.slow.x === 0);
 // Movement switched off by mistake with nothing open: it comes back by itself.
 await page.evaluate(() => { window.__house.starting = true; window.__house.canMove = false; });
 await page.waitForTimeout(2500);

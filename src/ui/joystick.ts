@@ -3,6 +3,8 @@ import { hudBottomLeft } from './overlay';
 const MAX = 36; // px the knob can travel from the centre
 const DEADZONE = 6; // px
 
+const sticks = new Set<Joystick>();
+
 export const isTouchDevice = () => window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
 // On-screen joystick for phones (a faint ring that lights up while held). `vector` is -1..1 on each axis;
@@ -23,7 +25,7 @@ export class Joystick {
   private pointerId: number | null = null;
   private touchId: number | null = null; // the matching Touch identifier (iPhone)
   private fingers = 0; // touches on the screen right now (from document touch events)
-  private lastEvent = 0;
+  lastEvent = 0; // when our finger was last heard from (ms)
   private watchdog: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -81,10 +83,32 @@ export class Joystick {
       if (this.touchId !== null) {
         const ours = [...e.touches].find((t) => t.identifier === this.touchId);
         if (!ours) return void this.release();
+        this.lastEvent = Date.now();
         if (e.type === 'touchmove') this.move(ours.clientX, ours.clientY);
       } else if (e.touches.length === 0) this.release();
     };
     for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) document.addEventListener(type, track, { passive: true, capture: true });
+
+    // Asking for the microphone (walking into a room) can bring up the iPhone's permission sheet, and the
+    // touch on the joystick may never hear its end. If the request took long enough to have shown the
+    // sheet and nothing was heard from our finger meanwhile, let go (one tap takes it back).
+    const md = navigator.mediaDevices;
+    if (md?.getUserMedia && !(md.getUserMedia as { dhWrapped?: boolean }).dhWrapped) {
+      const real = md.getUserMedia.bind(md);
+      const wrapped = async (c?: MediaStreamConstraints) => {
+        const asked = Date.now();
+        try {
+          return await real(c);
+        } finally {
+          // Only after a slow request (a permission sheet you had to tap): a quick, already-allowed mic
+          // must not stop someone holding the joystick steady as they walk into a room.
+          if (Date.now() - asked > 700) for (const j of sticks) if (j.active && j.lastEvent < asked) j.release();
+        }
+      };
+      (wrapped as { dhWrapped?: boolean }).dhWrapped = true;
+      md.getUserMedia = wrapped;
+    }
+    sticks.add(this);
 
     // Never stay stuck: let go when the app is switched, the phone sleeps or the page goes away.
     addEventListener('blur', () => this.release());

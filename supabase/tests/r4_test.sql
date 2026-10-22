@@ -154,41 +154,54 @@ select public.set_room_media('lounge', null, null, null, false);
 select pg_temp.ok((select media_kind is null and media_id is null and media_at is null from public.rooms where id = 'lounge'), 'stop clears the screen');
 reset role;
 
--- ---- Arcade (20261107) ----
+-- ---- Arcade (20261107, replay-checked since 20261113) ----
+-- A run: the player starts it (gets a seed), the server records its verdict after replaying it.
+create or replace function pg_temp.arcade_run(who uuid, email text, score int, ok boolean default true) returns jsonb language plpgsql as $$
+declare run uuid; r jsonb;
+begin
+  execute 'set role authenticated';
+  perform pg_temp.sign_in(who, email);
+  run := (public.arcade_start('nightraid') ->> 'run')::uuid;
+  execute 'reset role';
+  execute 'set role service_role';
+  r := public.arcade_record(run, score, score, 2, 3600, 61000, ok, case when ok then null else 'replay mismatch' end);
+  execute 'reset role';
+  return r;
+end $$;
+grant execute on all functions in schema pg_temp to anon, authenticated, service_role;
 set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
-select pg_temp.ok((public.submit_arcade('nightraid', 999999, 3, 20000) ->> 'why') = 'unbelievable', 'an unbelievable score (too many points for the time) is refused');
-select pg_temp.ok((public.submit_arcade('nightraid', 500, 50, 20000) ->> 'why') = 'unbelievable', 'too many waves for the time is refused');
-select pg_temp.ok((public.submit_arcade('nightraid', 1200, 3, 60000) ->> 'xp')::int = 150, 'the first real score is a house record: 150 XP');
-select pg_temp.ok((public.submit_arcade('nightraid', 1300, 3, 60000) ->> 'why') = 'too_soon', 'one score every 8 s');
+do $$ begin
+  perform public.submit_arcade('nightraid', 1000, 3, 60000);
+  raise exception 'FAIL: a phone sent its own score';
+exception when insufficient_privilege then raise notice 'PASS: phones can''t send a score themselves any more';
+end $$;
+do $$ begin
+  perform public.arcade_record(gen_random_uuid(), 1, 1, 1, 1, 1, true);
+  raise exception 'FAIL: a phone recorded a verdict';
+exception when insufficient_privilege then raise notice 'PASS: only the server records a verdict';
+end $$;
+select pg_temp.ok((public.arcade_start('nightraid') ->> 'seed')::bigint between 0 and 2147483647, 'a run starts with a random seed');
 reset role;
-update public.arcade_scores set created_at = now() - interval '1 minute' where user_id = '00000000-0000-0000-0000-0000000000f1';
-set role authenticated;
-select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid');
-select pg_temp.ok((public.submit_arcade('nightraid', 900, 2, 60000) ->> 'xp')::int = 0, 'a score below your best pays nothing');
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid', 999999, false) ->> 'why') = 'rejected', 'a run whose replay doesn''t match is rejected');
+select pg_temp.ok((select count(*) from public.arcade_scores where user_id = '00000000-0000-0000-0000-0000000000f1') = 0, 'a rejected run saves nothing');
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid', 1200) ->> 'xp')::int = 150, 'the first real score is a house record: 150 XP');
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid', 5000000) ->> 'ok')::boolean, 'no cap on scores: a pro''s 5,000,000 is kept when the replay proves it');
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f1', 'r4@members.diesel-house.invalid', 900) ->> 'xp')::int = 0, 'a score below your best pays nothing');
+set role service_role;
+select pg_temp.ok((public.arcade_record((select id from public.arcade_runs where status = 'verified' limit 1), 1, 1, 1, 1, 1, true) ->> 'why') = 'used', 'a run id works once');
 reset role;
-update public.arcade_scores set created_at = now() - interval '1 minute' where user_id = '00000000-0000-0000-0000-0000000000f1';
+delete from public.arcade_scores where score = 5000000;
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid') on conflict do nothing;
 insert into public.allowed_emails (email) values ('r4b@members.diesel-house.invalid') on conflict do nothing;
 insert into public.profiles (id, display_name) values ('00000000-0000-0000-0000-0000000000f2', 'Ana') on conflict do nothing;
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid', 800) ->> 'xp')::int = 50, 'someone else''s first best (not a record) pays 50 XP: more than any critter');
 set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid');
-select pg_temp.ok((public.submit_arcade('nightraid', 800, 2, 60000) ->> 'xp')::int = 50, 'someone else''s first best (not a record) pays 50 XP: more than any critter');
 select pg_temp.ok((select count(*) from public.arcade_board('nightraid')) = 2 and (select record from public.arcade_board('nightraid') where best = 1200), 'the board lists this week''s bests and marks the house record');
 reset role;
-update public.arcade_scores set created_at = now() - interval '1 minute';
-set role authenticated;
-select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid');
-select public.submit_arcade('nightraid', 850, 2, 60000);
-reset role;
-update public.arcade_scores set created_at = now() - interval '1 minute';
-set role authenticated;
-select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid');
-select public.submit_arcade('nightraid', 870, 2, 60000);
-reset role;
-update public.arcade_scores set created_at = now() - interval '1 minute';
-set role authenticated;
-select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid');
-select pg_temp.ok((public.submit_arcade('nightraid', 880, 2, 60000) ->> 'xp')::int = 0, 'at most 3 paid bests a day');
-select pg_temp.ok((select sum(amount) from public.xp_ledger where user_id = auth.uid() and reason like 'arcade:%') = 150, 'arcade XP adds up: 3 × 50 (challenge XP from playing is separate)');
-reset role;
+select pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid', 850);
+select pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid', 870);
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid', 880) ->> 'xp')::int = 0, 'at most 3 paid bests a day');
+select pg_temp.ok((select sum(amount) from public.xp_ledger where user_id = '00000000-0000-0000-0000-0000000000f2' and reason like 'arcade:%') = 150, 'arcade XP adds up: 3 × 50 (challenge XP from playing is separate)');
+select pg_temp.ok((pg_temp.arcade_run('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid', 100) -> 'progress' ->> 'level') is not null, 'a recorded run counts for challenges as that player');

@@ -5,19 +5,23 @@ import { el, openModal } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play, type Sfx } from '../ui/sounds';
 import atlas from './nightraid.json';
-import { H, NightRaid, W, type GameEvent, type Input } from './nightRaidGame';
+import { decodeInput, encodeInput, H, NightRaid, RunLog, TICK, W, type GameEvent, type Input } from './nightRaidGame';
 
 // Night Raid (the arcade cabinet in the Gaming room, or Games → Arcade): a one-player shooter in the
 // house's own look (Ninja Adventure spooks, your own character on the rooftop). The title card shows
 // your best, the house record and this week's top scores; a new personal best pays XP (more than any
-// critter), a new house record more again (supabase/migrations/20261107_arcade.sql).
+// critter), a new house record more again (supabase/migrations/20261107_arcade.sql). Scores are proven by
+// replaying the run on the server (20261113_arcade_verified.sql): no score limits, no made-up scores.
 export type ArcadeResult =
   | { ok: true; best: number; previous: number | null; new_best: boolean; record: boolean; house_best: number; xp: number }
-  | { ok: false; why: 'guest' | 'unbelievable' | 'too_soon' | 'offline' | 'queued' | 'error' };
+  | { ok: false; why: 'guest' | 'rejected' | 'used' | 'unsaved' | 'offline' | 'queued' | 'error' };
 export type ArcadeRow = { user_id: string; display_name: string; character_key: string; best: number; record: boolean };
 export type ArcadeDeps = {
   me: () => { id: string; skin: Skin; guest: boolean };
-  submit: (score: number, waves: number, durationMs: number) => Promise<ArcadeResult>;
+  // A run id + seed from the server before each game (null: guests, offline: the score isn't saved).
+  startRun?: () => Promise<{ run: string; seed: number } | null>;
+  // Game over: the run's record, replayed by the server to get the score it saves.
+  submit: (run: { run: string; seed: number; log: number[]; score: number; waves: number; ticks: number }) => Promise<ArcadeResult>;
   board: () => Promise<ArcadeRow[] | null>;
   // Your saved best (all time) from the server; null offline. Members only.
   myBest?: () => Promise<number | null>;
@@ -86,6 +90,17 @@ export function openNightRaid(deps: ArcadeDeps) {
   let last = 0;
   let paused = false;
   const input: Input = { left: false, right: false, targetX: null };
+  // The game steps 60 times a second whatever the screen's refresh rate, and records what you did.
+  let acc = 0;
+  let ticks = 0;
+  let ultQueued = false;
+  let rec = new RunLog();
+  let ticket: { run: string; seed: number } | null = null;
+  let nextTicket: Promise<{ run: string; seed: number } | null> | null = null;
+  const fetchTicket = () => {
+    if (deps.me().guest || !deps.startRun) return;
+    nextTicket = deps.startRun().catch(() => null);
+  };
   let sheet: HTMLImageElement | null = null;
   let skins: HTMLImageElement | null = null;
   void image('assets/arcade/nightraid.png').then((im) => (sheet = im));
@@ -120,6 +135,7 @@ export function openNightRaid(deps: ArcadeDeps) {
   function titleCard() {
     cancelAnimationFrame(raf);
     game = null;
+    if (!nextTicket) fetchTicket(); // ready by the time Play is pressed
     pauseBtn.hidden = true;
     const me = deps.me();
     const card = el('div', 'arcade-title');
@@ -182,8 +198,9 @@ export function openNightRaid(deps: ArcadeDeps) {
     ult();
   });
   function ult() {
-    if (!game || paused || game.over) return;
-    if (game.useUlt()) navigator.vibrate?.([30, 40, 60]);
+    if (!game || paused || game.over || !game.ultReady) return;
+    ultQueued = true; // used on the next step (so a replay does exactly the same)
+    navigator.vibrate?.([30, 40, 60]);
   }
   function showUlt() {
     if (!game) return;
@@ -236,9 +253,23 @@ export function openNightRaid(deps: ArcadeDeps) {
     canvas.height = Math.round(H * scale * dpr);
   }
 
-  function start() {
+  let starting = false;
+  async function start() {
+    if (starting) return;
+    starting = true;
     play('confirm', 0.5);
-    game = new NightRaid(Date.now(), (e) => {
+    // The seed comes from the server (members), so a run can't be planned in advance. Waits a moment at
+    // most; without one the game still plays but its score can't be saved.
+    const waiting = nextTicket;
+    nextTicket = null;
+    ticket = waiting ? await Promise.race([waiting, new Promise<null>((ok) => setTimeout(() => ok(null), 4000))]) : null;
+    starting = false;
+    if (!body.isConnected) return;
+    rec = new RunLog();
+    ticks = 0;
+    acc = 0;
+    ultQueued = false;
+    game = new NightRaid(ticket?.seed ?? (Date.now() & 0x7fffffff), (e) => {
       const s = SOUND[e];
       if (s) play(s[0], s[1]);
       if (e === 'hurt') navigator.vibrate?.(80);
@@ -267,9 +298,20 @@ export function openNightRaid(deps: ArcadeDeps) {
 
   function loop(t: number) {
     if (!game || paused) return;
-    const dt = (t - last) / 1000;
+    acc += Math.min(0.25, Math.max(0, (t - last) / 1000)); // a long stall doesn't fast-forward
     last = t;
-    game.step(dt, input);
+    while (acc >= TICK && !game.over) {
+      acc -= TICK;
+      const code = encodeInput(input);
+      rec.input(ticks, code);
+      if (ultQueued) {
+        ultQueued = false;
+        rec.ult(ticks);
+        game.useUlt();
+      }
+      game.step(TICK, decodeInput(code));
+      ticks++;
+    }
     draw();
     showUlt();
     if (game.over) return void setTimeout(() => void finish(), 700);
@@ -423,7 +465,12 @@ export function openNightRaid(deps: ArcadeDeps) {
     card.append(el('div', 'dh-label', `Game over · wave ${gm.waveNumber}`), big, note, again, back);
     body.replaceChildren(card);
     again.focus({ preventScroll: true });
-    const r = await deps.submit(score, gm.wave, Math.round(gm.time * 1000));
+    const r: ArcadeResult =
+      me.guest ? { ok: false, why: 'guest' }
+        : ticket ? await deps.submit({ run: ticket.run, seed: ticket.seed, log: rec.log, score, waves: gm.wave, ticks })
+          : devTest ? { ok: false, why: 'offline' } : { ok: false, why: 'unsaved' };
+    ticket = null;
+    fetchTicket(); // for "Play again"
     if (r.ok && r.best > localBest()) saveLocalBest(r.best);
     if (!r.ok && r.why === 'offline' && score > before) saveLocalBest(score);
     if (!note.isConnected) return;
@@ -440,9 +487,9 @@ export function openNightRaid(deps: ArcadeDeps) {
       note.textContent =
         r.why === 'guest' ? 'Guests’ scores aren’t saved: members get XP for bests.'
           : r.why === 'offline' ? (score > before ? 'New best on this device! (Test mode: not saved.)' : 'Test mode: not saved.')
-            : r.why === 'too_soon' ? 'Saved scores are one every few seconds: that one wasn’t kept.'
-              : r.why === 'queued' ? 'No connection right now: your score is kept on this phone and saves by itself when you’re back online.'
-                : r.why === 'unbelievable' ? 'That score couldn’t be checked, so it wasn’t saved.'
+            : r.why === 'queued' ? 'No connection right now: your score is kept on this phone and saves by itself when you’re back online.'
+              : r.why === 'unsaved' ? 'No connection when this game started, so its score can’t be saved. The next one will be.'
+                : r.why === 'rejected' ? 'That run didn’t check out when the server played it back, so it wasn’t saved.'
                   : 'Couldn’t save that score.';
     }
   }

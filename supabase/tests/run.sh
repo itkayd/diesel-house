@@ -12,3 +12,7 @@ psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/r1_test.sql 2>&1 | grep 
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/r3_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/games_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/r4_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
+psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/admin_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
+node tests/api/admin-api.mjs 2>&1 | grep -E "PASS|FAIL|Error"
+node tests/api/arcade-api.mjs 2>&1 | grep -E "PASS|FAIL|Error"
+node tests/unit/nightraid-replay.mjs 2>&1 | grep -E "PASS|FAIL|Error"

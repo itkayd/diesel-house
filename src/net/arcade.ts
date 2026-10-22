@@ -4,28 +4,54 @@ import type { Recorded } from './progress';
 import { supabase } from './supabase';
 import { logIssue } from './errors';
 
-// Arcade scores (supabase/migrations/20261107_arcade.sql): the database checks the score is believable,
-// keeps your best and pays XP for new bests.
-export async function submitArcade(score: number, waves: number, durationMs: number): Promise<ArcadeResult & { progress?: Recorded }> {
+// Arcade scores (supabase/migrations/20261113_arcade_verified.sql): each run starts with a seed from the
+// database; at game over the record of what you did goes to /api/arcade, which plays the run again and
+// saves the score it gets. Any score a real game can reach counts (no limits for pro players), and
+// nothing else does.
+export type RunTicket = { run: string; seed: number };
+export type RunRecord = { run: string; seed: number; log: number[]; score: number; waves: number; ticks: number };
+
+// A run id + seed from the database. null: a guest, test mode, or no connection (the game still plays).
+export async function startRun(): Promise<RunTicket | null> {
+  if (!supabase || devTest) return null;
+  try {
+    const { data, error } = await supabase.rpc('arcade_start', { game: 'nightraid' });
+    if (error) {
+      logIssue('problem', 'Night Raid run could not start (its score can’t be saved)', { extra: { error: error.message } });
+      return null;
+    }
+    const r = data as { ok: boolean; run?: string; seed?: number };
+    return r.ok && r.run ? { run: r.run, seed: Number(r.seed) } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function submitArcade(rec: RunRecord): Promise<ArcadeResult & { progress?: Recorded }> {
   if (!supabase || devTest) return { ok: false, why: 'offline' };
-  const r = await send(score, waves, durationMs);
+  const r = await send(rec);
   // No connection (or the server didn't answer): keep it on this phone and try again later.
   if (!r.ok && r.why === 'error') {
-    logIssue('problem', 'Night Raid score could not be sent (kept on the phone to retry)', { extra: { score, waves, ms: durationMs } });
-    queue({ score, waves, ms: durationMs, at: Date.now() });
+    logIssue('problem', 'Night Raid score could not be sent (kept on the phone to retry)', { extra: { score: rec.score, waves: rec.waves, ticks: rec.ticks } });
+    queue({ ...rec, at: Date.now() });
     return { ok: false, why: 'queued' };
   }
+  if (!r.ok && r.why === 'rejected') logIssue('warning', 'Night Raid run did not replay to the same score', { extra: { score: rec.score, ticks: rec.ticks } });
   return r;
 }
 
-async function send(score: number, waves: number, durationMs: number): Promise<ArcadeResult & { progress?: Recorded }> {
+async function send(rec: RunRecord): Promise<ArcadeResult & { progress?: Recorded }> {
   try {
-    const { data, error } = await supabase!.rpc('submit_arcade', { game: 'nightraid', score, waves, duration_ms: durationMs });
-    if (error) {
-      console.warn('Could not save the score', error.message);
-      return { ok: false, why: 'error' };
-    }
-    const r = data as ArcadeResult & { progress?: Recorded };
+    const { data } = await supabase!.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, why: 'error' };
+    const res = await fetch('/api/arcade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(rec),
+    });
+    if (res.status >= 500 || res.status === 429) return { ok: false, why: 'error' };
+    const r = (await res.json()) as ArcadeResult & { progress?: Recorded };
     if (r.ok && r.progress) r.progress = { ...r.progress, xp: Number(r.progress.xp), week_xp: Number(r.progress.week_xp) };
     return r;
   } catch (e) {
@@ -34,15 +60,14 @@ async function send(score: number, waves: number, durationMs: number): Promise<A
   }
 }
 
-// Scores that couldn't be sent (a dropped connection, the page closing) wait on this phone, for up to a
-// week, and go to the server one at a time the next time the arcade opens. The server checks them like
-// any other score.
-const PENDING = 'diesel-house.arcade-pending';
-type Pending = { score: number; waves: number; ms: number; at: number };
+// Runs that couldn't be sent (a dropped connection, the page closing) wait on this phone, for up to a
+// week, and go to the server the next time the arcade opens. The server replays them like any other run.
+const PENDING = 'diesel-house.arcade-runs-pending';
+type Pending = RunRecord & { at: number };
 function pending(): Pending[] {
   try {
     const all = JSON.parse(localStorage.getItem(PENDING) ?? '[]') as Pending[];
-    return all.filter((p) => Date.now() - p.at < 7 * 86_400_000);
+    return all.filter((p) => Date.now() - p.at < 7 * 86_400_000 && Array.isArray(p.log));
   } catch {
     return [];
   }
@@ -51,7 +76,7 @@ function savePending(list: Pending[]) {
   try {
     localStorage.setItem(PENDING, JSON.stringify(list.slice(-3)));
   } catch {
-    // private browsing: nothing kept
+    // private browsing or full: nothing kept
   }
 }
 function queue(p: Pending) {
@@ -61,14 +86,19 @@ function queue(p: Pending) {
 // Send what's waiting (best first). Returns the results that were saved, for XP and toasts.
 export async function flushPendingArcade(): Promise<(ArcadeResult & { progress?: Recorded })[]> {
   if (!supabase || devTest) return [];
+  try {
+    localStorage.removeItem('diesel-house.arcade-pending'); // the old kind (a bare score) can't be checked
+  } catch {
+    // nothing to tidy
+  }
   const list = pending().sort((a, b) => b.score - a.score);
+  if (!list.length) return [];
   const saved: (ArcadeResult & { progress?: Recorded })[] = [];
   const left: Pending[] = [];
-  for (const [i, p] of list.entries()) {
-    if (i > 0) await new Promise((ok) => setTimeout(ok, 8_500)); // the server keeps one score per 8 s
-    const r = await send(p.score, p.waves, p.ms);
+  for (const p of list) {
+    const r = await send(p);
     if (r.ok) saved.push(r);
-    else if (r.why === 'error' || r.why === 'too_soon') left.push(p); // try again another time
+    else if (r.why === 'error') left.push(p); // try again another time
   }
   savePending(left);
   return saved;

@@ -5,7 +5,7 @@ import { isTouchDevice } from '../ui/joystick';
 import { overlay } from '../ui/overlay';
 import { currentUser } from '../net/profile';
 import { toast } from '../ui/toasts';
-import { arcadeBoard, flushPendingArcade, myArcadeBest, submitArcade } from '../net/arcade';
+import { arcadeBoard, flushPendingArcade, myArcadeBest, startRun, submitArcade } from '../net/arcade';
 import type { HouseScene } from '../scenes/HouseScene';
 
 // The arcade cabinets (any 'arcade_*' furniture in src/house/rooms.ts): stand in front of one for
@@ -47,8 +47,9 @@ export async function openArcade(this: HouseScene) {
   this.canMove = false;
   openNightRaid({
     me: () => ({ id: this.presence?.id ?? '', skin: this.character, guest: !!currentUser()?.guest }),
-    submit: async (score, waves, ms) => {
-      const r = await submitArcade(score, waves, ms);
+    startRun,
+    submit: async (run) => {
+      const r = await submitArcade(run);
       if (r.ok && r.progress) this.gotProgress(r.progress);
       if (r.ok && r.record && r.xp) this.cheer(); // "!" over your head for everyone
       return r;

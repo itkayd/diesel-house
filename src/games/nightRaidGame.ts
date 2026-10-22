@@ -5,6 +5,11 @@
 // Kills in quick succession build a combo (up to +30% points). Kills, snacks and boss hits charge the Ult:
 // Shuriken Storm hits every spook on screen, wipes out their fireballs and takes a fifth off a boss.
 // World: 180 × 320 logical px, y down. Times in seconds.
+//
+// Runs are checked by replaying them on the server (api/arcade.ts, supabase/migrations/20261113): the game
+// steps exactly 60 times a second (TICK), the server's seed decides every random thing, and the phone
+// records what the player did on each step (RunLog). The same steps with the same moves give the same score
+// on any phone or server, so a score that doesn't come out of a real game can't get in.
 
 export const W = 180;
 export const H = 320;
@@ -61,6 +66,69 @@ export type GameEvent = 'shoot' | 'hit' | 'kill' | 'hurt' | 'snack' | 'power' | 
 
 export type Input = { left: boolean; right: boolean; targetX: number | null }; // targetX: a finger's x (follow it)
 
+export const TICK = 1 / 60;
+
+// Math.sin can differ in its last digit between browsers (and the server). The game uses its own, made of
+// plain arithmetic, which every JavaScript engine does identically.
+const TWO_PI = 2 * Math.PI;
+export function dsin(x: number) {
+  x -= Math.floor(x / TWO_PI) * TWO_PI;
+  if (x > Math.PI) x -= TWO_PI;
+  if (x > Math.PI / 2) x = Math.PI - x;
+  else if (x < -Math.PI / 2) x = -Math.PI - x;
+  const x2 = x * x;
+  return x * (1 - (x2 / 6) * (1 - (x2 / 20) * (1 - (x2 / 42) * (1 - (x2 / 72) * (1 - (x2 / 110) * (1 - (x2 / 156) * (1 - x2 / 210)))))));
+}
+
+// What the player did, as one number a step: a finger's x (0–180, whole pixels), or the keys. ULT is a
+// press of Shuriken Storm on that step.
+export const NONE = 200;
+export const LEFT = 201;
+export const RIGHT = 202;
+export const ULT = 203;
+export function encodeInput(i: Input) {
+  if (i.targetX !== null) return Math.max(0, Math.min(W, Math.round(i.targetX)));
+  return i.left && !i.right ? LEFT : i.right && !i.left ? RIGHT : NONE;
+}
+export function decodeInput(code: number): Input {
+  if (code <= W) return { left: false, right: false, targetX: code };
+  return { left: code === LEFT, right: code === RIGHT, targetX: null };
+}
+
+// The record of a run: [step, code, step, code, …], one pair each time the input changes (and for each Ult).
+export class RunLog {
+  log: number[] = [];
+  private last = -1;
+  input(tick: number, code: number) {
+    if (code === this.last) return;
+    this.last = code;
+    this.log.push(tick, code);
+  }
+  ult(tick: number) {
+    this.log.push(tick, ULT);
+  }
+}
+
+// Plays a recorded run again from its seed (the server does this to check a score). Stops at game over,
+// or after `maxTicks` steps.
+export function replay(seed: number, log: number[], maxTicks: number) {
+  const g = new NightRaid(seed);
+  let input = decodeInput(NONE);
+  let i = 0;
+  let ticks = 0;
+  while (!g.over && ticks < maxTicks) {
+    while (i + 1 < log.length && log[i] === ticks) {
+      const code = log[i + 1];
+      if (code === ULT) g.useUlt();
+      else input = decodeInput(code);
+      i += 2;
+    }
+    g.step(TICK, input);
+    ticks++;
+  }
+  return { score: g.score, waves: g.wave, ticks, over: g.over, bestCombo: g.bestCombo, unread: log.length - i };
+}
+
 // Seeded random numbers (mulberry32) so a test can replay a game.
 export function rng(seed: number) {
   let a = seed >>> 0;
@@ -103,7 +171,10 @@ export class NightRaid {
   private nextId = 1;
   private r: () => number;
 
-  constructor(seed = Date.now(), private on: (e: GameEvent) => void = () => {}) {
+  private on: (e: GameEvent) => void;
+
+  constructor(seed = Date.now(), on: (e: GameEvent) => void = () => {}) {
+    this.on = on;
     this.r = rng(seed);
     this.startWave();
   }
@@ -174,7 +245,7 @@ export class NightRaid {
     // The formation: flies in, then sways and creeps down; now and then one dives at you.
     this.enter = Math.max(0, this.enter - dt);
     this.sway += dt;
-    const swayX = Math.sin(this.sway * 0.9) * 22;
+    const swayX = dsin(this.sway * 0.9) * 22;
     const creep = Math.min(60, this.sway * (0.6 + n * 0.12));
     for (const e of this.enemies) {
       e.hit = Math.max(0, e.hit - dt);
@@ -183,7 +254,7 @@ export class NightRaid {
         d.t += dt;
         const speed = 95 + n * 6;
         e.y = d.fromY + d.t * speed;
-        e.x = d.fromX + Math.sin(d.t * 2.4) * 40 * d.side + (this.x - d.fromX) * Math.min(1, d.t / 2);
+        e.x = d.fromX + dsin(d.t * 2.4) * 40 * d.side + (this.x - d.fromX) * Math.min(1, d.t / 2);
         if (e.y > H + 20) {
           e.dive = null;
           e.y = -20;

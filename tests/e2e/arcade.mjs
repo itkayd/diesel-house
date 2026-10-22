@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
-// Night Raid (the arcade): the game engine plays fair (a scripted player clears waves; scores stay under
-// what the database accepts as believable), the boss comes on wave 5, hits cost lives and the game ends;
+// Night Raid (the arcade): the game engine plays fair (a scripted player clears waves; the server's replay
+// of each run gets the same score), the boss comes on wave 5, hits cost lives and the game ends;
 // the cabinet in the Gaming room and Games → Arcade open it; Escape pauses; game over shows the result.
 // Dev test mode (scores aren't saved).
 const browser = await chromium.launch({ ...(process.env.DH_CHROMIUM ? { executablePath: process.env.DH_CHROMIUM } : { channel: 'msedge' }), headless: true });
@@ -19,26 +19,37 @@ page.on('pageerror', (e) => errors.push(e.message));
 await page.goto('http://localhost:5173/?test');
 await page.waitForFunction(() => !!window.__house?.player && window.__house.canMove, null, { timeout: 30000 });
 
-// 1. The engine: a simple player (chase the nearest spook, step away from fireballs) for 3 minutes.
+// 1. The engine: a simple player (chase the nearest spook, step away from fireballs) until it loses (up to 20 minutes), played
+// in the browser the way the game does (60 steps a second, moves recorded). The server replays each run
+// (Node, like Vercel) and must get exactly the same score: that's how scores are checked, with no limits.
 const sim = await page.evaluate(() =>
-  import('/src/games/nightRaidGame.ts').then(({ NightRaid, H }) => {
+  import('/src/games/nightRaidGame.ts').then(({ NightRaid, H, RunLog, TICK, encodeInput, decodeInput }) => {
     const out = [];
     for (const seed of [1, 2, 3]) {
       const g = new NightRaid(seed);
-      let t = 0;
-      while (!g.over && t < 180) {
+      const rec = new RunLog();
+      let ticks = 0;
+      while (!g.over && ticks < 1200 * 60) {
         const near = g.fire.find((f) => f.y > H - 90 && Math.abs(f.x - g.x) < 12);
-        const target = near ? g.x + (near.x < g.x ? 30 : -30) : g.boss ? g.boss.x : g.enemies.reduce((b, e) => (!b || e.y > b.y ? e : b), null)?.x ?? g.x;
-        g.step(1 / 60, { left: false, right: false, targetX: target });
-        if (g.ultReady) g.useUlt(); // fire the Ult as soon as it's ready (the most points a second)
-        t += 1 / 60;
+        const target = near ? g.x + (near.x < g.x ? 30.4 : -29.7) : g.boss ? g.boss.x : g.enemies.reduce((b, e) => (!b || e.y > b.y ? e : b), null)?.x ?? g.x;
+        const code = encodeInput({ left: false, right: false, targetX: target });
+        rec.input(ticks, code);
+        if (g.ultReady) {
+          rec.ult(ticks); // fire the Ult as soon as it's ready (the most points a second)
+          g.useUlt();
+        }
+        g.step(TICK, decodeInput(code));
+        ticks++;
       }
-      out.push({ seed, score: g.score, waves: g.wave, time: Math.round(g.time), over: g.over, believable: g.score <= Math.floor(g.time) * 250 + 2000 && g.wave <= Math.floor((g.time * 1000) / 5000) + 1 });
+      out.push({ seed, score: g.score, waves: g.wave, ticks, over: g.over, log: rec.log });
     }
     return out;
   }),
 );
-check('a scripted player clears waves and scores; every score is one the database calls believable', sim, sim.every((s) => s.believable) && sim.some((s) => s.waves >= 2) && sim.every((s) => s.score > 0));
+const { replay } = await import('../../src/games/nightRaidGame.ts');
+const replays = sim.map((s) => ({ seed: s.seed, browser: s.score, server: s.over ? replay(s.seed, s.log, s.ticks + 1).score : null, waves: s.waves }));
+check('a scripted player clears waves and scores; the server’s replay of each run gets exactly the browser’s score', replays,
+  sim.some((s) => s.waves >= 2) && sim.every((s) => s.score > 0) && replays.every((r) => r.server === r.browser));
 
 // 2. Wave 5 is the Giant Spirit; hits cost lives; the game ends.
 const rules = await page.evaluate(() =>

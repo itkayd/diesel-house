@@ -36,6 +36,8 @@ import { addReportProblem } from '../ui/reportProblem';
 import { startHouseSettings } from '../net/houseSettings';
 import { friendList, isBlocked, loadSocial } from '../net/social';
 import { addBlockedSettings } from '../ui/blockedSettings';
+import { startDms } from '../net/dms';
+import { addMessagesButton } from '../ui/messages';
 import { startAnnouncements } from '../ui/announcement';
 import { setLogFacts } from '../net/errors';
 import { modalOpen } from '../ui/modal';
@@ -69,6 +71,8 @@ export async function start(this: HouseScene) {
   checkFriends();
   setInterval(checkFriends, 120_000);
   addBlockedSettings((id) => this.blockChanged(id)); // Settings → More: unblock
+  // Private messages (src/net/dms.ts): the Messages button and pop-ups for new ones.
+  addMessagesButton(this.messagesDeps());
   startAnnouncements();
   // What the game was doing, added to every device log (src/net/errors.ts).
   setLogFacts(() => ({
@@ -151,6 +155,7 @@ export async function start(this: HouseScene) {
     },
     { lagMs: import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('lag')) || 0 : 0 },
   );
+  void startDms(this.presence.id); // private messages to us (src/net/dms.ts)
   this.presence.connect();
   net.start();
   // New version live? Reload at once if we're not talking to anyone; otherwise offer it.
@@ -323,6 +328,7 @@ export async function start(this: HouseScene) {
     arcade: () => void this.openArcade(),
     invite: (spot) => this.inviteToTable(spot),
   });
+  this.chat.onProfile = (id, name) => this.openProfileOf(id, name);
   this.chat.onActivity = (k, room) => this.tracker.emit(k === 'chat' ? 'chat_sent' : 'reaction_sent', k === 'chat' ? { u: room } : {});
   this.chat.setRoom(this.zone && this.zone !== 'hallway' ? (this.zone as RoomId) : null);
   addVoiceSettings(this.voice, this.voiceControls, () => {

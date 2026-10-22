@@ -190,6 +190,8 @@ export class HouseScene extends Phaser.Scene {
   moveRemotes = players.moveRemotes;
   tapAvatar = social.tapAvatar;
   blockChanged = social.blockChanged;
+  openProfileOf = social.openProfileOf;
+  messagesDeps = social.messagesDeps;
   inviteToTable = social.inviteToTable;
   receiveInvite = social.receiveInvite;
   sendEmote = social.sendEmote;

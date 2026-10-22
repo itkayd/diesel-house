@@ -1021,3 +1021,28 @@ html, body, #game, #overlay, #overlay * {
 .dh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .dh-chips .dh-chip { min-height: 40px; }
 .dh-chips .dh-chip[aria-pressed="true"] { background: var(--lamp); color: var(--panel-edge); box-shadow: none; }
+
+/* Anyone's profile (src/ui/playerProfile.ts) and private messages (src/ui/messages.ts). */
+.v2-pp { display: grid; gap: 14px; }
+.v2-pp-name { font-family: var(--font-display); font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-pp-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.v2-pp-acts .dh-btn { min-height: 44px; font-size: 14px; }
+.dh-iconbtn { position: relative; }
+.dh-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; background: var(--error); color: var(--panel-edge); font: 700 11px/1 var(--font-body); box-shadow: 0 0 0 2px var(--panel-edge); }
+.dm-thread { width: 100%; border: 0; cursor: pointer; color: inherit; font: inherit; }
+.dm-side { display: grid; justify-items: end; gap: 4px; }
+.dm-side .dh-count { position: static; }
+.dm-panel { display: grid; grid-template-rows: auto 1fr auto auto; gap: 10px; max-height: min(640px, 86dvh); }
+.dm-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 180px; padding: 4px 2px; }
+.dm-msg { max-width: 80%; align-self: flex-start; display: grid; gap: 2px; padding: 8px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dm-msg.mine { align-self: flex-end; background: #3d2f1c; box-shadow: inset 0 0 0 2px var(--lamp-deep); }
+.dm-msg .tx { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+.dm-msg .tm { font-size: 11px; color: var(--faint); justify-self: end; }
+.dm-note { margin: 0; font-size: 12px; }
+.dm-form { display: grid; grid-template-columns: 1fr 48px; gap: 8px; align-items: end; }
+.dm-form .dh-input { resize: none; min-height: 44px; max-height: 120px; }
+.dm-form .dh-btn { min-height: 44px; padding: 0; }
+.dh-linkname { border: 0; background: none; padding: 0; color: inherit; cursor: pointer; text-align: left; }
+.dh-linkname:hover, .dh-linkname:focus-visible { color: var(--lamp); text-decoration: underline; }
+.dh-facebtn { border: 0; padding: 0; background: none; cursor: pointer; line-height: 0; }
+.dh-facebtn:focus-visible { outline: 3px solid var(--lamp); }

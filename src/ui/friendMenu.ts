@@ -17,6 +17,7 @@ export type FriendMenu = {
   // Otherwise a line on where they are ("In Diesel's room. Walk in to hear them.").
   where?: string;
   onEmote: (id: EmoteId) => void;
+  profile?: () => void; // open their profile (src/ui/playerProfile.ts)
   // Rock-paper-scissors (UPDATE.md Phase 12). Without it the button says why not.
   duel?: () => void;
   duelOff?: string;
@@ -61,6 +62,18 @@ export function showFriendMenu(m: FriendMenu) {
   x.addEventListener('click', closeFriendMenu);
   head.append(who, x);
   pop.append(head);
+  if (m.profile) {
+    const go = m.profile;
+    const pb = el('button', 'dh-btn dh-btn--quiet');
+    pb.type = 'button';
+    pb.id = 'friend-profile';
+    pb.append(icon('user-round', { width: 18 }), document.createTextNode('Profile · Message'));
+    pb.addEventListener('click', () => {
+      closeFriendMenu();
+      go();
+    });
+    pop.append(pb);
+  }
   if (m.volume) {
     const row = el('div');
     row.style.cssText = 'display:flex;gap:10px;align-items:center';

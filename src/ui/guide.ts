@@ -87,7 +87,8 @@ function steps(): Step[] {
     {
       id: 'friends', icon: 'smile-plus', chip: 'Friends', title: 'Friends and emotes',
       lines: [
-        'Tap a friend for their menu: send them an emote, start a duel, or change how loud they are to you (slide it to 0 to mute them, just for you).',
+        'Tap someone for their menu: send an emote, start a duel, Add friend, or open their Profile to see their level and medals and send them a private Message.',
+        'The speech-bubble button at the top is your messages. Friends show first in the map, with Join to walk over to them.',
         phone ? 'The smiley button sends an emote everyone near you can see.' : 'The smiley button sends an emote; keys 1–6 are quick emotes, Q opens the menu for whoever is next to you.',
         'Faces on a door sign show who’s inside that room. The map (top right) shows everyone in the house.',
       ],

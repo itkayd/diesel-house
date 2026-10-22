@@ -16,6 +16,8 @@ import type { HouseScene } from '../scenes/HouseScene';
 import { currentUser } from '../net/profile';
 import { addFriend, answerFriend, friendOf, isBlocked, isFriend, reportPlayer, setBlock } from '../net/social';
 import type { SpotId } from '../games/table';
+import { openPlayerProfile } from '../ui/playerProfile';
+import { openConversation, type MessagesDeps } from '../ui/messages';
 
 // Being together: the tap-a-friend menu, emotes, dice over your head, and rock-paper-scissors duels.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
@@ -51,6 +53,7 @@ export function tapAvatar(this: HouseScene, id: string) {
       : undefined,
     where,
     onEmote: (e) => this.sendEmote(e, id),
+    profile: () => this.openProfileOf(id, name),
     duel: this.duel || this.duelInvite ? undefined : () => this.startDuel(id),
     duelOff: 'You’re already in a duel',
     social: {
@@ -282,4 +285,38 @@ export function receiveInvite(this: HouseScene, m: InviteMsg) {
       { label: 'Not now', id: 'table-invite-no', onClick: () => document.getElementById('table-invite')?.remove() },
     ],
   });
+}
+
+// Anyone's profile (src/ui/playerProfile.ts), with Message, Report and Block.
+export function openProfileOf(this: HouseScene, id: string, name: string) {
+  const me = this.presence?.id ?? '';
+  if (id === me) return this.openMyProfile();
+  openPlayerProfile(id, name, {
+    where: (who) => {
+      const r = this.remotes.get(who);
+      if (!r?.active) return null;
+      return !r.info.zone || r.info.zone === 'hallway' ? 'In the Great Hall now' : `In ${zoneLabel(r.info.zone as RoomId)} now`;
+    },
+    message: (who, n, character) => openConversation(who, n, character, this.messagesDeps()),
+    reportContext: (who) => ({ zone: this.zone, their_zone: this.remotes.get(who)?.info.zone ?? null, their_chat: this.chat?.linesBy(who) ?? [], from: 'profile', at: new Date().toISOString() }),
+    blocked: (who) => this.blockChanged(who),
+    amGuest: !!currentUser()?.guest,
+    // Test mode: their profile from what the house knows.
+    fake: (who) => {
+      const r = this.remotes.get(who);
+      if (!r) return null;
+      return { id: who, name: r.info.name, character: r.info.character, pet: r.info.pet ?? null, member: !r.info.guest, me: false, level: r.info.lv ?? 1, xp: 0, streak: r.info.st ?? 0, best_streak: r.info.st ?? 0, joined: new Date().toISOString(), last_on: null, host: null, medals: ['rank_visitor'], arcade_best: 0, games_won: 0, critters: 0, friends: 0, friend: friendOf(who)?.status ?? 'none', blocked: isBlocked(who), banned: false };
+    },
+  });
+}
+
+export function messagesDeps(this: HouseScene): MessagesDeps {
+  return {
+    me: () => this.presence?.id ?? '',
+    nameOf: (who) => {
+      const r = this.remotes.get(who);
+      return r ? { name: r.info.name, character: r.info.character } : null;
+    },
+    profile: (who, n) => this.openProfileOf(who, n),
+  };
 }

@@ -208,6 +208,9 @@ export class ChatPanel {
     this.openBar = null;
   }
 
+  // Tapping someone's name opens their profile (set by the house).
+  onProfile: ((id: string, name: string) => void) | null = null;
+
   // Draw again (someone was blocked or unblocked).
   refresh() {
     this.render();
@@ -289,8 +292,21 @@ export class ChatPanel {
       row.dataset.message = String(m.id);
       row.tabIndex = 0;
       const meta = el('div', 'meta');
+      const label = !m.author_guest ? m.author_name : m.author_host ? `${m.author_name} · friend of ${m.author_host}` : `${m.author_name} · guest`;
+      let nameEl: HTMLElement = el('span', 'name', label);
+      const openProfile = this.onProfile;
+      if (openProfile && m.author_id && m.author_id !== me) {
+        const author = m.author_id;
+        nameEl = el('button', 'name dh-linkname', label);
+        (nameEl as HTMLButtonElement).type = 'button';
+        nameEl.setAttribute('aria-label', `${m.author_name}’s profile`);
+        nameEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openProfile(author, m.author_name);
+        });
+      }
       meta.append(
-        el('span', 'name', !m.author_guest ? m.author_name : m.author_host ? `${m.author_name} · friend of ${m.author_host}` : `${m.author_name} · guest`),
+        nameEl,
         el('span', 'time', when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })),
       );
       const text = el('div', 'text', m.text);

@@ -24,6 +24,7 @@ export type WhoWhere = {
   // U4: your friends (in the house now or not) and friend requests, with Join / Accept.
   friends?: { id: string; name: string; character: Skin | null; status: 'friends' | 'incoming' | 'outgoing'; online: boolean; zone: Zone | null; lastSeen: string | null }[];
   answer?: (id: string, yes: boolean) => Promise<void>;
+  profile?: (id: string, name: string) => void; // tap a face: their profile
   invite?: () => void; // members: open the invite code (shown when nobody else is in)
 };
 
@@ -75,11 +76,27 @@ function friendRows(w: WhoWhere, close: () => void, get: () => WhoWhere) {
       f.status === 'incoming' ? [btn('Accept', 'check', answer(true), 'accept', false), iconOnly('Not now', answer(false), 'decline')]
         : f.status === 'outgoing' ? [btn('Cancel', 'x', answer(false), 'cancel')]
           : f.online ? [btn('Join', 'footprints', () => (close(), get().goTo(f.id)), 'join', false)] : [];
-    row.append(f.character ? portrait(f.character, 32) : icon('user-round', { width: 32 }), txt, ...acts);
+    row.append(faceButton(f.id, f.name, f.character ? portrait(f.character, 32) : icon('user-round', { width: 32 }), w, close), txt, ...acts);
     box.append(row);
   }
   return box;
 }
+// A face you can tap for their profile (when the house offers profiles).
+function faceButton(id: string, name: string, face: Element, w: WhoWhere, close: () => void) {
+  const open = w.profile;
+  if (!open) return face;
+  const b = el('button', 'dh-facebtn');
+  b.type = 'button';
+  b.dataset.profile = id;
+  b.setAttribute('aria-label', `${name}’s profile`);
+  b.append(face);
+  b.addEventListener('click', () => {
+    close();
+    open(id, name);
+  });
+  return b;
+}
+
 const lastOn = (iso: string) => {
   const d = (Date.now() - new Date(iso).getTime()) / 86400_000;
   return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 14 ? `${Math.floor(d)} days ago` : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -229,7 +246,7 @@ export function openWhosWhere(get: () => WhoWhere) {
         close();
         get().goTo(p.id);
       });
-      row.append(portrait(p.character, 32), txt, go);
+      row.append(faceButton(p.id, p.name, portrait(p.character, 32), w, close), txt, go);
       list.append(row);
     }
   };

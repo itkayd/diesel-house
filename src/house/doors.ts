@@ -125,7 +125,7 @@ export function replaced(this: HouseScene) {
     icon: 'user-round',
     id: 'replaced-toast',
     who: 'You opened Diesel House somewhere else',
-    what: 'This tab has gone quiet.',
+    what: 'This tab has gone quiet: you can’t move or talk here. Tap “Use it here” to carry on in this tab.',
     ttl: 0,
     actions: [
       {

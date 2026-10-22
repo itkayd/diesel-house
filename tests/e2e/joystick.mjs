@@ -63,6 +63,11 @@ await cdp2.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] 
 await page.waitForTimeout(200);
 const after2 = await page.evaluate(() => window.__house.joystick.active);
 check('a second finger tapping elsewhere doesn’t stop the joystick; lifting both does', { two, after2 }, two.active && two.x > 0.5 && !after2);
+// Movement switched off by mistake with nothing open: it comes back by itself.
+await page.evaluate(() => { window.__house.starting = true; window.__house.canMove = false; });
+await page.waitForTimeout(2500);
+const healed = await page.evaluate(() => window.__house.canMove);
+check('movement switched off with nothing open comes back by itself', { healed }, healed);
 // Desktop: no joystick
 const dp = await browser.newPage({ viewport: { width: 1366, height: 768 } }); await dp.addInitScript(() => (localStorage.setItem('diesel-house.character', '17'), localStorage.setItem('diesel-house.name', 'Phone')));
 await dp.goto('http://localhost:5173/?test'); await dp.waitForFunction(() => window.__house?.player);

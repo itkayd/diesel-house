@@ -14,7 +14,28 @@ import { toScreen } from './projection';
 // Every frame: your movement and facing, which zone you are in, others' movement, and the prompts underfoot.
 // (Part of the house scene, split out in REDESIGN.md R1; `this` is the HouseScene.)
 
+// Safety net for "I can't move at all": movement is switched off while the character picker or the
+// arcade is open, or when this tab has handed over to another one. If none of those is the case for more
+// than a moment, something forgot to switch it back on: do it, and log it once.
+let frozenFor = 0;
+let healed = false;
+function unfreeze(scene: HouseScene, dt: number) {
+  if (scene.canMove || !scene.starting) {
+    frozenFor = 0;
+    return;
+  }
+  const legit = !!document.querySelector('#picker, #arcade') || !!scene.replacedToast;
+  frozenFor = legit ? 0 : frozenFor + dt;
+  if (frozenFor > 1.5) {
+    scene.canMove = true;
+    frozenFor = 0;
+    if (!healed) console.warn('Movement was off with nothing open: switched it back on');
+    healed = true;
+  }
+}
+
 export function update(this: HouseScene) {
+  unfreeze(this, this.game.loop.delta / 1000);
   // Under the porch is only sky: in the middle column, stop the camera there (it eases back out after).
   const lim = this.camLimits;
   if (lim) {

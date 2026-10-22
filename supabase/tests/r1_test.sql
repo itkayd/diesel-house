@@ -50,8 +50,11 @@ select pg_temp.ok((select dnd and dnd_set_by = auth.uid() and dnd_at is not null
 select public.set_dnd('lounge', false);
 select pg_temp.ok((select not dnd and dnd_set_by is null from public.rooms where id = 'lounge'), 'and off again');
 do $$ begin
-  update public.rooms set name = 'Mine now' where id = 'gaming';
-  if found then raise exception 'FAIL: renamed a room directly'; end if;
+  begin
+    update public.rooms set name = 'Mine now' where id = 'gaming';
+    if found then raise exception 'FAIL: renamed a room directly'; end if;
+  exception when insufficient_privilege then null; -- refused outright since 20261109
+  end;
   raise notice 'PASS: rooms can''t be renamed directly (no owners)';
 end $$;
 

@@ -31,7 +31,7 @@ set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-00000000000a', 'a@members.diesel-house.invalid');
 
 -- Nobody can write their own XP.
-update public.profiles set xp = 999999, level = 99, streak_days = 50 where id = auth.uid();
+do $$ begin update public.profiles set xp = 999999, level = 99, streak_days = 50 where id = auth.uid(); exception when insufficient_privilege then null; end $$; -- refused outright since 20261110
 select pg_temp.ok((select xp = 0 and level = 1 and streak_days = 0 from public.profiles where id = auth.uid()), 'a member can''t set their own xp / level / streak');
 do $$ begin
   insert into public.xp_ledger (user_id, amount, reason) values (auth.uid(), 1000, 'cheat');

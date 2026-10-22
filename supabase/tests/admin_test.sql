@@ -122,3 +122,27 @@ do $$ begin
 exception when sqlstate '28000' then raise notice 'PASS: signing out ends the session';
 end $$;
 reset role;
+
+-- ---- The switches hold in the database too (20261114) ----
+set role service_role;
+create temp table t2 as select public.admin_login('diesel', 'a brand new passphrase') ->> 'token' as token;
+grant all on t2 to service_role;
+select public.admin_setting_set((select token from t2), 'critters', '{"enabled": false}');
+select public.admin_setting_set((select token from t2), 'arcade', '{"enabled": false}');
+select public.admin_setting_set((select token from t2), 'games_off', '["quiz"]');
+reset role;
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000a1', 'adm@members.diesel-house.invalid');
+select pg_temp.ok((select count(*) from generate_series(0, 200) s where public.critter_at(s, 0) is not null) = 0, 'critters switched off: none turn up, so none can be caught');
+select pg_temp.ok(public.arcade_start('nightraid') ->> 'why' = 'off', 'Night Raid switched off: no run can start');
+select pg_temp.ok(public.record_game('quiz', 'lounge', array[auth.uid()], array[auth.uid()], '{}') is null and not exists (select 1 from public.game_results where game = 'quiz' and auth.uid() = any (players)), 'a game switched off records no result');
+reset role;
+set role service_role;
+select public.admin_setting_set((select token from t2), 'critters', '{"enabled": true}');
+select public.admin_setting_set((select token from t2), 'arcade', '{"enabled": true}');
+select public.admin_setting_set((select token from t2), 'games_off', '[]');
+reset role;
+set role authenticated;
+select pg_temp.sign_in('00000000-0000-0000-0000-0000000000a1', 'adm@members.diesel-house.invalid');
+select pg_temp.ok((select count(*) from generate_series(0, 200) s where public.critter_at(s, 0) is not null) > 0, 'switched back on: critters turn up again');
+reset role;

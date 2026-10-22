@@ -96,6 +96,11 @@ const ACTIONS: Record<string, [string, (b: Body) => Record<string, unknown>]> = 
     'admin_log_resolve',
     (b) => ({ ids: Array.isArray(b.ids) ? b.ids.filter((i) => typeof i === 'number').slice(0, 500) : [], note: str(b.note, 300) ?? null, reopen: bool(b.reopen) }),
   ],
+  reports: ['admin_reports', (b) => ({ open_only: b.open !== false })],
+  'reports-resolve': [
+    'admin_report_resolve',
+    (b) => ({ ids: Array.isArray(b.ids) ? b.ids.filter((i) => typeof i === 'number').slice(0, 500) : [], note: str(b.note, 300) ?? null, reopen: bool(b.reopen) }),
+  ],
   'logs-clear': ['admin_logs_clear', (b) => ({ older_than_days: num(b.days) ?? 30 })],
   audit: ['admin_audit_list', () => ({})],
   accounts: ['admin_accounts_list', () => ({})],

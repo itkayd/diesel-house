@@ -9,7 +9,8 @@
   SHA-256 is stored. 5 wrong passwords lock a username for 15 minutes (10 per network). Requests from
   other sites are refused. Every change goes in the audit log with who made it.
 - **Sections:** Dashboard · Players (any level/XP, coins, gems, streak, pet, ban, password, remove,
-  history) · Invites & guests · Rooms · House switches (games, Night Raid, animals per room, pets,
+  history) · Player reports (from Report in the tap-a-friend menu: why, their last chat lines, Ban) ·
+  Invites & guests · Rooms · House switches (games, Night Raid, animals per room, pets,
   critters, announcement) · Critters & challenges · Games & scores · Device logs · Admins & audit.
 - **House switches** are read live by the game (`src/net/houseSettings.ts`) and enforced by the database
   (`20261114_house_switches.sql`).

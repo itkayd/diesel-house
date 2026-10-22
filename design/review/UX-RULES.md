@@ -28,7 +28,7 @@ Before a stage ships, every new or changed screen is checked against this list o
 3. Keep private things private: addresses, phone numbers, photos, passwords.
 4. Respect quiet: Do not disturb doors and the Library.
 5. Play fair: no spamming, no trying to break games.
-6. Someone bothering you: turn them down to 0, walk away, tell Diesel. Breaking the rules can cost someone their invite or guest code.
+6. Someone bothering you: tap them, then Block (you won't hear them or see their chat) or Report (it reaches Diesel's admin page). Breaking the rules can cost someone their invite or guest code.
 
 **Needed before the house is truly public** (stage U4 below): a Block and a Report button in every friend menu, a word filter on names, chat and guesses, a report queue for Diesel, and an age rule in the sign-up text (to be decided with Diesel: 13+ or 16+). Until those exist, keep entry to member invites and guest codes.
 
@@ -50,7 +50,7 @@ Each step needs one test in `tests/e2e/` that walks it at phone size.
 | **U1 · Help and rules** (done 19 Oct) | Game handbook (`src/games/rules.ts`): a ? in the games panel, rules folded in every lobby, the handbook from the guide and Settings. Guide: Having fun, Inviting, House rules | Every game's rules reachable in 1 tap from its lobby; guide tests pass |
 | **U2 · First run** (done 19 Oct: `src/ui/hints.ts`, `tests/e2e/first-run.mjs`) | Section 3's path: a welcome hint system (one-time, dismissable), an empty-house mode (arcade, critters, "invite a friend" card), and clearer front-door copy | A new phone user reaches a game lobby in under 60 s without help |
 | **U3 · HUD and navigation** (done 20 Oct, except the wallet row, which arrives with S2) | The top bar from `design/store/store.html` (zone, Map, Store, Settings; then XP + wallet). Labels and tooltips on desktop. The open items from `UI-REVIEW.md` (U1 camera void, U2 XP skeleton, U3 top bar, U5 banner, U6 name tag, U8 skeleton rows, U10 offline pill, U11 labels) | No item left open in UI-REVIEW §2 |
-| **U4 · Social and safety** | Block / Report in the friend menu, a filter on names, chat and guesses, a report queue for Diesel, a friends list with "join them", and "Invite to table" (ping friends to a game) | A blocked person can't be heard, seen chatting or invite you; reports reach Diesel |
+| **U4 · Social and safety** (done 22 Oct: `src/net/social.ts`, `20261115_social.sql`, `tests/e2e/social.mjs`) | Block / Report in the friend menu, a report queue for Diesel (admin page → Player reports), a friends list with "Join" (in Who's where), and "Invite friends to this table". No word filter: the house is 18+ (Diesel, 22 Oct) | A blocked person can't be heard, seen chatting or invite you; reports reach Diesel |
 | **U5 · Games polish** | A "Ready" step in lobbies, rematch with the same players, end-of-game stats, spectator chat, sound passes per game | Each game feels finished: a start, a middle, a clear end, and an easy "again" |
 | **U6 · Accessibility and speed** | An audit against rule 10, screen-reader pass, bigger-text setting, load time under 3 s on 4G, bundle budget | An axe-core scan is clean on the main screens; Lighthouse mobile is 90 or more |
 | **S2 · Store** | Per `STORE.md` (VIP passes with gems, no subscription) and `store.html` | Per `STORE.md` |

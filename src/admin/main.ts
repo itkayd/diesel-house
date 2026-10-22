@@ -13,13 +13,14 @@ import { house } from './sections/house';
 import { critters } from './sections/critters';
 import { scores } from './sections/scores';
 import { logs } from './sections/logs';
+import { reports } from './sections/reports';
 import { audit } from './sections/audit';
 
 // The admin page (/admin.html): everything in the house in one place. Admins sign in with their own
 // username + password (api/admin.ts); the very first one is made with the setup passcode.
 
 export type Section = { id: string; label: string; icon: Icon; render: (main: HTMLElement, go: (id: string) => void) => Promise<void> | void };
-const SECTIONS: Section[] = [dashboard, players, invites, rooms, house, critters, scores, logs, audit];
+const SECTIONS: Section[] = [dashboard, players, reports, invites, rooms, house, critters, scores, logs, audit];
 
 const root = document.getElementById('admin')!;
 let me = '';
@@ -113,8 +114,9 @@ export function show(id: string) {
 // The little red numbers in the menu: open device logs, rejected Night Raid runs this week.
 export async function refreshCounts() {
   try {
-    const o = await api<{ logs_open: number; rejected_week: number }>('overview');
+    const o = await api<{ logs_open: number; rejected_week: number; player_reports_open?: number }>('overview');
     setCount('logs', o.logs_open);
+    setCount('reports', o.player_reports_open ?? 0);
     setCount('scores', o.rejected_week ?? 0);
   } catch {
     // shown again next time

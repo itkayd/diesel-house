@@ -124,7 +124,7 @@ function steps(): Step[] {
         'Keep private things private: don’t share anyone’s address, phone number, photos or passwords (or your own).',
         'Respect quiet: a moon on a door means Do not disturb, and the Library is for low voices. Mute your mic when it’s noisy where you are.',
         'Play fair: no spamming chat or emotes, and no trying to break the games.',
-        'Someone bothering you? Turn them down to 0 in their menu, walk to another room, and tell Diesel. Breaking the rules can lose someone their invite or guest code.',
+        'Someone bothering you? Tap them and choose Block (you won’t hear them or see their chat) or Report (it goes to Diesel). Breaking the rules can lose someone their invite or guest code.',
       ],
     },
   ];

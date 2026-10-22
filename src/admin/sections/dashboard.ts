@@ -4,7 +4,7 @@ import { api, btn, card, h, n, sectionHead, skeleton } from '../kit';
 type Overview = {
   members: number; guests_now: number; banned: number; active_today: number; logs_open: number; logs_24h: number; reports_open: number;
   games_week: number; arcade_week: number; arcade_record: number | null; rejected_week?: number; xp_today: number; catches_today: number;
-  chat_today: number; logs_by_day: { day: string; n: number }[];
+  chat_today: number; player_reports_open?: number; friendships?: number; logs_by_day: { day: string; n: number }[];
 };
 
 // The house at a glance: who's around, what needs a look (problems, reports, rejected scores), activity.
@@ -20,17 +20,18 @@ export const dashboard: Section = {
       to ? h('button', { type: 'button', class: `adm-tile ${tone}`, onclick: () => go(to) }, h('b', {}, n(value)), h('span', {}, label)) : h('div', { class: `adm-tile ${tone}` }, h('b', {}, n(value)), h('span', {}, label));
 
     const needs = [
+      o.player_reports_open ? tile('player reports to look at', o.player_reports_open, 'reports', 'bad') : null,
       o.reports_open ? tile('problem reports from players', o.reports_open, 'logs', 'bad') : null,
       o.logs_open ? tile('open device logs', o.logs_open, 'logs', 'warn') : null,
       o.rejected_week ? tile('Night Raid runs rejected this week', o.rejected_week, 'scores', 'bad') : null,
     ].filter(Boolean) as HTMLElement[];
 
     main.append(
-      needs.length ? card('Needs a look', 'warn', h('div', { class: 'adm-tiles' }, ...needs)) : card('All clear', 'circle-check', h('p', { class: 'adm-hint' }, 'No open problem reports, device logs or rejected scores.')),
+      needs.length ? card('Needs a look', 'warn', h('div', { class: 'adm-tiles' }, ...needs)) : card('All clear', 'circle-check', h('p', { class: 'adm-hint' }, 'No open player reports, problem reports, device logs or rejected scores.')),
       card(
         'People',
         'users',
-        h('div', { class: 'adm-tiles' }, tile('members', o.members, 'players'), tile('in the house today', o.active_today, 'players', 'good'), tile('guests visiting now', o.guests_now, 'invites'), tile('banned', o.banned, 'players', o.banned ? 'bad' : '')),
+        h('div', { class: 'adm-tiles' }, tile('members', o.members, 'players'), tile('in the house today', o.active_today, 'players', 'good'), tile('guests visiting now', o.guests_now, 'invites'), tile('banned', o.banned, 'players', o.banned ? 'bad' : ''), tile('friendships', o.friendships ?? 0)),
       ),
       card(
         'Activity',

@@ -60,10 +60,12 @@ export function manualVelocity(this: HouseScene) {
   let vx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
   let vy = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
 
-  // Mouse: hold to walk towards the pointer. Touch uses the joystick instead.
+  // Mouse: hold to walk towards the pointer. Touch uses the joystick instead, and on touch screens this
+  // is off altogether: phones also send "mouse" events after taps, and one whose release went missing
+  // kept the character walking towards an old tap with no way to stop it (iPhone Chrome).
   const p = this.input.activePointer;
   if (!p.isDown) this.tappedAvatar = false;
-  if (!vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !friendMenuOpen()) {
+  if (!this.joystick && !vx && !vy && p.isDown && !p.wasTouch && !this.tappedAvatar && !friendMenuOpen()) {
     const tap = toWorld(p.worldX, p.worldY);
     const dx = tap.x - this.player.x;
     const dy = tap.y - (this.player.y - 8);

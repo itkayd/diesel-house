@@ -1,7 +1,9 @@
 // Night Raid: the game itself (no drawing, no DOM), so it can be stepped in tests. Your character stands
 // on the rooftop and throws shurikens at night spooks that drift down in waves, swaying in formation and
 // diving at you; they drop fireballs. Snacks they drop are bonus points; a potion gives magic shurikens
-// for 10 s; a heart is an extra life. Every 5th wave a Giant Spirit. 3 lives.
+// for 10 s; a shield blocks the next hit; a heart is an extra life. Every 5th wave a Giant Spirit. 3 lives.
+// Kills in quick succession build a combo (up to +30% points). Kills, snacks and boss hits charge the Ult:
+// Shuriken Storm hits every spook on screen, wipes out their fireballs and takes a fifth off a boss.
 // World: 180 × 320 logical px, y down. Times in seconds.
 
 export const W = 180;
@@ -14,6 +16,12 @@ const POWER_TIME = 10;
 const INVULNERABLE = 1.6;
 const ENTER_TIME = 1.6; // a wave flies in before it attacks
 const BANNER_TIME = 1.2;
+const COMBO_TIME = 1.4; // a kill within this keeps the combo going
+const COMBO_MAX = 10; // combo steps that count (+3% each)
+const ULT_PER_KILL = 0.035;
+const ULT_PER_SNACK = 0.08;
+const ULT_PER_BOSS_HIT = 0.006;
+const ULT_TIME = 1.1; // the storm on screen (and you can't be hit)
 
 export type EnemyKind = 'bat' | 'bat2' | 'skull' | 'skull2' | 'spirit' | 'lantern' | 'eye' | 'flam' | 'octopus' | 'dragon';
 const KINDS: Record<EnemyKind, { hp: number; pts: number }> = {
@@ -46,10 +54,10 @@ export const SNACKS = ['onigiri', 'cookie', 'noodle', 'meat'] as const;
 
 export type Enemy = { id: number; kind: EnemyKind; hp: number; slotX: number; slotY: number; x: number; y: number; dive: null | { t: number; fromX: number; fromY: number; side: number }; hit: number };
 export type Shot = { x: number; y: number; vx: number; vy: number; magic: boolean };
-export type Drop = { x: number; y: number; vy: number; kind: (typeof SNACKS)[number] | 'potion' | 'heart' };
+export type Drop = { x: number; y: number; vy: number; kind: (typeof SNACKS)[number] | 'potion' | 'heart' | 'shield' };
 export type Boss = { x: number; y: number; hp: number; max: number; dir: number; fire: number; hit: number };
 export type Boom = { x: number; y: number; t: number; big: boolean };
-export type GameEvent = 'shoot' | 'hit' | 'kill' | 'hurt' | 'snack' | 'power' | 'life' | 'wave' | 'boss' | 'bossdown' | 'over';
+export type GameEvent = 'shoot' | 'hit' | 'kill' | 'hurt' | 'snack' | 'power' | 'life' | 'wave' | 'boss' | 'bossdown' | 'over' | 'ultready' | 'ult' | 'guard' | 'block' | 'combo';
 
 export type Input = { left: boolean; right: boolean; targetX: number | null }; // targetX: a finger's x (follow it)
 
@@ -82,6 +90,12 @@ export class NightRaid {
   hurt = 0; // invulnerable left (s)
   banner = 0; // "Wave N" left (s)
   enter = 0; // wave flying in (s)
+  ult = 0; // Ult charge, 0..1 (full: Shuriken Storm is ready)
+  ultFx = 0; // the storm on screen (s)
+  guard = false; // a shield: the next hit is blocked
+  combo = 0; // kills in quick succession
+  bestCombo = 0;
+  private comboT = 0;
   private fireIn = 0;
   private diveIn = 3;
   private shootIn = 2;
@@ -138,6 +152,9 @@ export class NightRaid {
     this.power = Math.max(0, this.power - dt);
     this.hurt = Math.max(0, this.hurt - dt);
     this.banner = Math.max(0, this.banner - dt);
+    this.ultFx = Math.max(0, this.ultFx - dt);
+    this.comboT = Math.max(0, this.comboT - dt);
+    if (this.comboT === 0) this.combo = 0;
 
     // Shurikens fly by themselves.
     this.fireIn -= dt;
@@ -233,13 +250,8 @@ export class NightRaid {
         b.hp -= s.magic ? 2 : 1;
         b.hit = 0.1;
         this.on('hit');
-        if (b.hp <= 0) {
-          this.score += 1000 + n * 50;
-          this.booms.push({ x: b.x, y: b.y, t: 0, big: true });
-          this.drops.push({ x: b.x, y: b.y, vy: 60, kind: 'heart' }, { x: b.x - 14, y: b.y, vy: 60, kind: 'potion' });
-          this.boss = null;
-          this.on('bossdown');
-        }
+        this.charge(ULT_PER_BOSS_HIT);
+        if (b.hp <= 0) this.bossDown();
       }
     }
     this.shots = this.shots.filter((s) => s.y > -50);
@@ -255,8 +267,12 @@ export class NightRaid {
         } else if (d.kind === 'heart') {
           this.lives = Math.min(5, this.lives + 1);
           this.on('life');
+        } else if (d.kind === 'shield') {
+          this.guard = true;
+          this.on('guard');
         } else {
           this.score += 50;
+          this.charge(ULT_PER_SNACK);
           this.on('snack');
         }
       }
@@ -264,12 +280,21 @@ export class NightRaid {
     this.drops = this.drops.filter((d) => d.y < H + 20);
 
     // Being hit (by a fireball or a diving spook).
-    if (this.hurt === 0) {
+    if (this.hurt === 0 && this.ultFx === 0) {
       const f = this.fire.find((f) => Math.abs(f.x - this.x) < 6 && Math.abs(f.y - PLAYER_Y) < 8);
       const e = this.enemies.find((e) => Math.abs(e.x - this.x) < 10 && Math.abs(e.y - PLAYER_Y) < 10);
-      if (f || e) {
+      if ((f || e) && this.guard) {
+        // The shield takes it.
         if (f) f.y = H + 100;
         if (e) this.kill(e, false);
+        this.guard = false;
+        this.hurt = 1;
+        this.booms.push({ x: this.x, y: PLAYER_Y - 6, t: 0, big: false });
+        this.on('block');
+      } else if (f || e) {
+        if (f) f.y = H + 100;
+        if (e) this.kill(e, false);
+        this.combo = 0;
         this.lives--;
         this.hurt = INVULNERABLE;
         this.power = 0;
@@ -299,11 +324,64 @@ export class NightRaid {
     this.enemies = this.enemies.filter((x) => x !== e);
     this.booms.push({ x: e.x, y: e.y, t: 0, big: false });
     if (!scored) return;
-    this.score += Math.round(KINDS[e.kind].pts * (1 + this.wave * 0.1));
+    this.combo = this.comboT > 0 ? this.combo + 1 : 1;
+    this.comboT = COMBO_TIME;
+    this.bestCombo = Math.max(this.bestCombo, this.combo);
+    if (this.combo === 5 || this.combo === 10) this.on('combo');
+    this.score += Math.round(KINDS[e.kind].pts * (1 + this.wave * 0.1) * this.comboBonus);
     this.on('kill');
+    if (this.ultFx === 0) this.charge(ULT_PER_KILL);
     const roll = this.r();
     if (roll < 0.015) this.drops.push({ x: e.x, y: e.y, vy: 55, kind: 'heart' });
     else if (roll < 0.055) this.drops.push({ x: e.x, y: e.y, vy: 55, kind: 'potion' });
-    else if (roll < 0.17) this.drops.push({ x: e.x, y: e.y, vy: 60, kind: SNACKS[Math.floor(this.r() * SNACKS.length)] });
+    else if (roll < 0.08 && !this.guard) this.drops.push({ x: e.x, y: e.y, vy: 55, kind: 'shield' });
+    else if (roll < 0.19) this.drops.push({ x: e.x, y: e.y, vy: 60, kind: SNACKS[Math.floor(this.r() * SNACKS.length)] });
+  }
+
+  // The points multiplier from the combo: +3% a step after the first kill, up to +30%.
+  get comboBonus() {
+    return 1 + Math.min(Math.max(0, this.combo - 1), COMBO_MAX) * 0.03;
+  }
+
+  get ultReady() {
+    return this.ult >= 1;
+  }
+
+  private charge(x: number) {
+    const was = this.ult;
+    this.ult = Math.min(1, this.ult + x);
+    if (was < 1 && this.ult >= 1) this.on('ultready');
+  }
+
+  // Shuriken Storm: every spook on screen takes 4 hits, their fireballs vanish, a boss loses a fifth of
+  // its strength, and you can't be hurt while it lasts. Needs a full charge.
+  useUlt() {
+    if (this.over || this.ult < 1) return false;
+    this.ult = 0;
+    this.ultFx = ULT_TIME;
+    this.fire = [];
+    for (const e of [...this.enemies]) {
+      if (e.y < -10) continue; // still flying in from off the screen
+      e.hp -= 4;
+      e.hit = 0.2;
+      if (e.hp <= 0) this.kill(e);
+    }
+    const b = this.boss;
+    if (b && b.y >= 0) {
+      b.hp -= Math.ceil(b.max * 0.2);
+      b.hit = 0.3;
+      if (b.hp <= 0) this.bossDown();
+    }
+    this.on('ult');
+    return true;
+  }
+
+  private bossDown() {
+    const b = this.boss!;
+    this.score += 1000 + this.waveNumber * 50;
+    this.booms.push({ x: b.x, y: b.y, t: 0, big: true });
+    this.drops.push({ x: b.x, y: b.y, vy: 60, kind: 'heart' }, { x: b.x - 14, y: b.y, vy: 60, kind: 'potion' });
+    this.boss = null;
+    this.on('bossdown');
   }
 }

@@ -986,3 +986,17 @@ html, body, #game, #overlay, #overlay * {
   .dh-hud .dh-iconbtn[data-label]::after { content: attr(data-label); font-family: var(--font-display); font-size: 14px; color: var(--cream); white-space: nowrap; }
 }
 #overlay .dh-hud-tc > .dh-room-banner { pointer-events: none; }
+
+/* Night Raid's Ult button: a ring that fills with charge, glowing when Shuriken Storm is ready. */
+.dh-arcade .arcade-stage { width: max-content; max-width: 100%; margin: 0 auto; }
+.arcade-ult { position: absolute; right: 10px; bottom: 30px; width: 64px; height: 64px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; touch-action: none;
+  display: grid; place-items: center; color: var(--cream); font: inherit;
+  background: conic-gradient(var(--radio) var(--charge, 0%), rgba(13,9,18,.75) 0); box-shadow: 0 0 0 3px var(--panel-edge); }
+.arcade-ult .fill { position: absolute; inset: 6px; border-radius: 50%; background: rgba(26,18,32,.92); }
+.arcade-ult b { position: relative; font-family: var(--font-display); font-size: 15px; letter-spacing: .04em; color: var(--muted); }
+.arcade-ult.ready { animation: arcade-ult 0.8s ease-in-out infinite alternate; }
+.arcade-ult.ready .fill { background: #2b4a77; }
+.arcade-ult.ready b { color: #fff; }
+.arcade-ult:not(.ready) { pointer-events: none; } /* touches go to the game until it is ready */
+@keyframes arcade-ult { to { box-shadow: 0 0 0 3px var(--panel-edge), 0 0 18px 4px rgba(158,201,255,.75); } }
+@media (prefers-reduced-motion: reduce) { .arcade-ult.ready { animation: none; box-shadow: 0 0 0 3px var(--panel-edge), 0 0 0 6px var(--radio); } }

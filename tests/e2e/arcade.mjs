@@ -30,9 +30,10 @@ const sim = await page.evaluate(() =>
         const near = g.fire.find((f) => f.y > H - 90 && Math.abs(f.x - g.x) < 12);
         const target = near ? g.x + (near.x < g.x ? 30 : -30) : g.boss ? g.boss.x : g.enemies.reduce((b, e) => (!b || e.y > b.y ? e : b), null)?.x ?? g.x;
         g.step(1 / 60, { left: false, right: false, targetX: target });
+        if (g.ultReady) g.useUlt(); // fire the Ult as soon as it's ready (the most points a second)
         t += 1 / 60;
       }
-      out.push({ seed, score: g.score, waves: g.wave, time: Math.round(g.time), over: g.over, believable: g.score <= Math.floor(g.time) * 150 + 1000 && g.wave <= Math.floor((g.time * 1000) / 5000) + 1 });
+      out.push({ seed, score: g.score, waves: g.wave, time: Math.round(g.time), over: g.over, believable: g.score <= Math.floor(g.time) * 250 + 2000 && g.wave <= Math.floor((g.time * 1000) / 5000) + 1 });
     }
     return out;
   }),
@@ -61,6 +62,38 @@ const rules = await page.evaluate(() =>
   }),
 );
 check('wave 5 brings the Giant Spirit; a fireball costs a life; the last life ends the game', rules, rules.boss && rules.lost === 1 && rules.over && rules.events.includes('boss') && rules.events.includes('over'));
+
+// 2b. The Ult, the shield and the combo.
+const extras = await page.evaluate(() =>
+  import('/src/games/nightRaidGame.ts').then(({ NightRaid, H }) => {
+    const events = [];
+    const g = new NightRaid(11, (e) => events.push(e));
+    for (let i = 0; i < 120; i++) g.step(1 / 30, { left: false, right: false, targetX: null }); // the wave flies in
+    const before = g.enemies.length;
+    const notReady = g.useUlt();
+    g.ult = 0.99;
+    g.fire.push({ x: 50, y: 100, vx: 0, vy: 0, magic: false });
+    g['charge'](0.02);
+    const ready = g.ultReady;
+    const used = g.useUlt();
+    const after = { enemies: g.enemies.length, fire: g.fire.length, ult: g.ult, fx: g.ultFx > 0 };
+    // Shield: a fireball on you is blocked, no life lost.
+    const s = new NightRaid(12, (e) => events.push(e));
+    s.guard = true;
+    const lives = s.lives;
+    s.fire.push({ x: s.x, y: H - 30, vx: 0, vy: 0, magic: false });
+    s.step(0.016, { left: false, right: false, targetX: null });
+    const shield = { lives: s.lives === lives, guard: s.guard };
+    // Combo: quick kills raise the bonus, capped at +30%.
+    const c = new NightRaid(13);
+    c.combo = 25;
+    const cap = c.comboBonus;
+    return { before, notReady, ready, used, after, shield, cap, events: [...new Set(events)] };
+  }),
+);
+check('Ult: only when charged; Shuriken Storm wipes fireballs and knocks out spooks; a shield blocks a hit; combo bonus caps at +30%', extras,
+  !extras.notReady && extras.ready && extras.used && extras.after.fire === 0 && extras.after.enemies < extras.before && extras.after.ult === 0 && extras.after.fx &&
+  extras.shield.lives && !extras.shield.guard && Math.abs(extras.cap - 1.3) < 1e-9 && ['ultready', 'ult', 'block'].every((e) => extras.events.includes(e)));
 
 // 3. The cabinet: stand in front of one in the Gaming room.
 const spot = await page.evaluate(() => import('/src/house/arcade.ts').then((m) => m.ARCADE_SPOTS[0]));

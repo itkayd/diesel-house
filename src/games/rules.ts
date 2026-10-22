@@ -95,11 +95,12 @@ export function rulesFor(id: RulesId): Rules {
       how: [
         isTouchDevice() ? 'Drag left and right to move.' : 'Move with ← → or A and D. P or Esc pauses.',
         'Your shurikens throw themselves. Dodge the fireballs.',
-        'Catch snacks for points, potions for magic shurikens and hearts for lives. Every 5th wave a Giant Spirit appears.',
+        'Catch snacks for points, potions for magic shurikens, shields (a blue ring that blocks one hit) and hearts for lives. Every 5th wave a Giant Spirit appears.',
+        `Kills and snacks fill the ULT ring. When it glows, ${isTouchDevice() ? 'tap ULT' : 'press Space (or tap ULT)'} for Shuriken Storm: it hits every spook on screen, wipes out their fireballs and takes a fifth off a Giant Spirit.`,
         'Play at the arcade cabinets in the Gaming room, or Games → Night Raid at any table.',
       ],
-      points: ['A new personal best (300 points or more): 50 XP. A new house record: 150 XP. Up to 3 paid bests a day.'],
-      tips: ['Stay low and keep moving. Clear the fast bats first.'],
+      points: ['Quick kills in a row build a combo: up to +30% points.', 'A new personal best (300 points or more): 50 XP. A new house record: 150 XP. Up to 3 paid bests a day.'],
+      tips: ['Save the Ult for a Giant Spirit or when the fireballs pile up.', 'Keep the combo going: fewer misses, more points.'],
     },
   };
   return R[id];

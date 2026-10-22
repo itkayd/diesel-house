@@ -1,5 +1,6 @@
 import { skinFrame, type Skin } from '../characters';
 import { icon } from '../ui/icons';
+import { devTest } from '../net/mode';
 import { el, openModal } from '../ui/modal';
 import { portrait } from '../ui/portrait';
 import { play, type Sfx } from '../ui/sounds';
@@ -35,6 +36,11 @@ const SOUND: Partial<Record<GameEvent, [Sfx, number]>> = {
   boss: ['dice_shake', 0.6],
   bossdown: ['win', 0.8],
   over: ['lose', 0.7],
+  ultready: ['challenge', 0.6],
+  ult: ['levelup', 0.7],
+  guard: ['powerup', 0.6],
+  block: ['chips', 0.7],
+  combo: ['coin', 0.5],
 };
 
 const images = new Map<string, Promise<HTMLImageElement>>();
@@ -130,7 +136,7 @@ export function openNightRaid(deps: ArcadeDeps) {
         best.textContent = `Your best: ${shown.toLocaleString()}`;
       });
     card.append(
-      el('p', 'v2-note', 'Spooks are raiding the rooftop! Move left and right; your shurikens throw themselves. Catch snacks for points, potions for magic shurikens and hearts for lives. Every 5th wave: a Giant Spirit.'),
+      el('p', 'v2-note', 'Spooks are raiding the rooftop! Move left and right; your shurikens throw themselves. Quick kills build a combo for extra points. Catch snacks, potions (magic shurikens), shields (block a hit) and hearts. Fill the ULT meter and unleash Shuriken Storm. Every 5th wave: a Giant Spirit.'),
       best,
       el('p', 'v2-note', me.guest ? 'Guests can play; scores and XP are for members.' : 'A new personal best: +50 XP. A new house record: +150 XP (3 paid bests a day).'),
     );
@@ -164,6 +170,29 @@ export function openNightRaid(deps: ArcadeDeps) {
   const canvas = el('canvas', 'arcade-canvas');
   canvas.id = 'arcade-canvas';
 
+  // The Ult button: a ring that fills as you charge it, glowing when Shuriken Storm is ready.
+  const ultBtn = el('button', 'arcade-ult');
+  ultBtn.type = 'button';
+  ultBtn.id = 'arcade-ult';
+  ultBtn.setAttribute('aria-label', 'Shuriken Storm (Ult)');
+  ultBtn.append(el('span', 'fill'), el('b', '', 'ULT'));
+  ultBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    ult();
+  });
+  function ult() {
+    if (!game || paused || game.over) return;
+    if (game.useUlt()) navigator.vibrate?.([30, 40, 60]);
+  }
+  function showUlt() {
+    if (!game) return;
+    const pct = Math.round(game.ult * 100);
+    ultBtn.style.setProperty('--charge', `${pct}%`);
+    ultBtn.classList.toggle('ready', game.ultReady);
+    ultBtn.setAttribute('aria-disabled', String(!game.ultReady));
+  }
+
   const toLogical = (e: PointerEvent) => {
     const r = canvas.getBoundingClientRect();
     return ((e.clientX - r.left) / r.width) * W;
@@ -182,6 +211,7 @@ export function openNightRaid(deps: ArcadeDeps) {
     if (!game) return;
     if (['ArrowLeft', 'a', 'A'].includes(e.key)) input.left = on;
     else if (['ArrowRight', 'd', 'D'].includes(e.key)) input.right = on;
+    else if (on && (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W')) ult();
     else if (on && (e.key === 'p' || e.key === 'P')) setPaused(!paused);
     else if (on && e.key === 'Escape' && !game.over && !paused) setPaused(true); // Escape pauses first; again closes
     else return;
@@ -214,8 +244,9 @@ export function openNightRaid(deps: ArcadeDeps) {
       if (e === 'hurt') navigator.vibrate?.(80);
     });
     paused = false;
+    if (devTest) (window as unknown as { __raid?: NightRaid }).__raid = game; // automated checks
     const wrap = el('div', 'arcade-stage');
-    wrap.append(canvas);
+    wrap.append(canvas, ultBtn);
     pauseBtn.hidden = false;
     body.replaceChildren(wrap);
     fit();
@@ -240,6 +271,7 @@ export function openNightRaid(deps: ArcadeDeps) {
     last = t;
     game.step(dt, input);
     draw();
+    showUlt();
     if (game.over) return void setTimeout(() => void finish(), 700);
     raf = requestAnimationFrame(loop);
   }
@@ -294,7 +326,7 @@ export function openNightRaid(deps: ArcadeDeps) {
       g.fillStyle = '#ff8f7a';
       g.fillRect(31, 23, (W - 62) * (b.hp / b.max), 3);
     }
-    for (const d of gm.drops) sprite(g, d.kind, d.x, d.y);
+    for (const d of gm.drops) sprite(g, d.kind === 'shield' ? `shield_${Math.floor(t * 8) % 6}` : d.kind, d.x, d.y);
     for (const s of gm.shots) sprite(g, `${s.magic ? 'magic' : 'shuriken'}_${Math.floor(t * 12) % 2}`, s.x, s.y);
     for (const f of gm.fire) sprite(g, `fire_${Math.floor(t * 10) % 4}`, f.x, f.y);
     for (const bm of gm.booms) sprite(g, `boom_${Math.min(8, Math.floor((bm.t / 0.6) * 9))}`, bm.x, bm.y);
@@ -306,7 +338,25 @@ export function openNightRaid(deps: ArcadeDeps) {
       const sx = (fr.frame % cols) * 16;
       const sy = Math.floor(fr.frame / cols) * 16;
       g.drawImage(skins, sx, sy, 16, 16, Math.round(gm.x - 8), H - 30 - 8, 16, 16);
-      if (gm.power > 0) sprite(g, `shield_${Math.floor(t * 10) % 6}`, gm.x, H - 30);
+      if (gm.power > 0) sprite(g, `magic_${Math.floor(t * 12) % 2}`, gm.x + 9, H - 40);
+      if (gm.guard) {
+        g.strokeStyle = 'rgba(158,201,255,.85)';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.arc(gm.x, H - 31, 11 + Math.sin(t * 6) * 0.8, 0, Math.PI * 2);
+        g.stroke();
+      }
+    }
+    // Shuriken Storm: a flash, then shurikens spiralling out from you across the screen.
+    if (gm.ultFx > 0) {
+      const k = 1 - gm.ultFx / 1.1;
+      g.fillStyle = `rgba(255,244,224,${Math.max(0, 0.45 - k * 0.6)})`;
+      g.fillRect(0, 0, W, H);
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2 + k * 4;
+        const r = 10 + k * 260;
+        sprite(g, `magic_${Math.floor(t * 12 + i) % 2}`, gm.x + Math.cos(a) * r, H - 30 + Math.sin(a) * r * 0.9);
+      }
     }
     // Score, wave, lives.
     g.font = '8px "Pixelify Sans", monospace';
@@ -318,6 +368,16 @@ export function openNightRaid(deps: ArcadeDeps) {
     g.fillText(`Wave ${gm.waveNumber}`, W / 2, 6);
     g.textAlign = 'left';
     for (let i = 0; i < gm.lives; i++) sprite(g, 'heart', W - 12 - i * 13, 10);
+    if (gm.combo >= 3) {
+      g.fillStyle = gm.combo >= 10 ? '#ffd36b' : '#f4b860';
+      g.fillText(`x${gm.combo} combo  +${Math.round((gm.comboBonus - 1) * 100)}%`, 6, 17);
+    }
+    if (gm.ultReady && !gm.ultFx && Math.floor(t * 3) % 2) {
+      g.textAlign = 'center';
+      g.fillStyle = '#9ec9ff';
+      g.fillText('ULT ready!', W / 2, 17);
+      g.textAlign = 'left';
+    }
     if (gm.banner > 0) {
       g.textAlign = 'center';
       g.font = '16px "Pixelify Sans", monospace';

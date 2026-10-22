@@ -190,5 +190,5 @@ update public.arcade_scores set created_at = now() - interval '1 minute';
 set role authenticated;
 select pg_temp.sign_in('00000000-0000-0000-0000-0000000000f2', 'r4b@members.diesel-house.invalid');
 select pg_temp.ok((public.submit_arcade('nightraid', 880, 2, 60000) ->> 'xp')::int = 0, 'at most 3 paid bests a day');
-select pg_temp.ok((select xp from public.profiles where id = auth.uid()) = 150, 'XP adds up: 3 × 50');
+select pg_temp.ok((select sum(amount) from public.xp_ledger where user_id = auth.uid() and reason like 'arcade:%') = 150, 'arcade XP adds up: 3 × 50 (challenge XP from playing is separate)');
 reset role;

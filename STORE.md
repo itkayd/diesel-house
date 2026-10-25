@@ -207,6 +207,7 @@ season_progress(user_id, season_id, xp, premium bool, claimed int[] , primary ke
 ## 7. Build order (a new phase "S", after the licence clean-up)
 1. **S1** Licence clean-up (`LICENSES.md` §6) + Ninja characters + the `character_key` migration.
 2. **S2** Wallet, ledger, catalog, `buy_item`, coin earning; the shop UI with coins only; tests from §5.4.
+   **Done 25 Oct 2026:** `20261118_store.sql` (catalogue of the 80 non-starter characters: Common 2,000 coins, Rare 400 gems, Epic 800 gems; `inventory`; `buy_item` with wallet lock, catalogue price, free gems before paid, idempotency key; `my_store`; wearing = starter or owned; coins from playing by triggers on `xp_ledger` / `profiles` / `game_results` under `economy_config` caps, only from the player's own play) and `20261119_admin_shop.sql` (admin Shop section: prices, on sale, earn rates, gifts). Tests: `supabase/tests/store_test.sql`, `store_race.sh` (both §5.4 races), `tests/e2e/store.mjs`. In the game: coins + gems beside the level open the Shop (the character picker with prices, the maths card and one gold Buy). Gem packs (S3) still to come, so gems only come from the admin for now.
 3. **S3** Stripe (web) gem packs + webhooks + refunds. Test mode first: Stripe test keys only, Diesel adds live keys himself.
 4. **S4** VIP Passes + free/VIP catch caps + houses for everyone (1 room free, 3 VIP).
 5. **S5** Season Pass.

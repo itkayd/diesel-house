@@ -43,11 +43,13 @@ await page.waitForTimeout(600);
 await page.screenshot({ path: 'tests/e2e/output/text-biggest-hud.png' });
 const hudFits = await page.evaluate(() => {
   const r = (s) => document.querySelector(s)?.getBoundingClientRect();
-  const pill = r('#overlay .dh-hud-tl');
+  const pill = r('#overlay .dh-hud-tl > :first-child');
+  const row2 = r('#overlay .v2-progress');
   const btns = r('#overlay .dh-hud-tr');
-  return { pillRight: Math.round(pill?.right ?? 0), buttonsLeft: Math.round(btns?.left ?? 0), width: innerWidth, scrollW: document.documentElement.scrollWidth };
+  return { pillRight: Math.round(pill?.right ?? 0), buttonsLeft: Math.round(btns?.left ?? 0), row2Top: Math.round(row2?.top ?? 0), row2Right: Math.round(row2?.right ?? 0), buttonsBottom: Math.round(btns?.bottom ?? 0), width: innerWidth, scrollW: document.documentElement.scrollWidth };
 });
-check('HUD at Biggest: the pill and the top-right buttons don’t overlap, no sideways scroll', hudFits, hudFits.pillRight <= hudFits.buttonsLeft + 1 && hudFits.scrollW <= hudFits.width);
+check('HUD at Biggest: the pill fits beside the top-right buttons, the level / wallet row sits below them, no sideways scroll', hudFits,
+  hudFits.pillRight <= hudFits.buttonsLeft + 1 && hudFits.row2Top >= hudFits.buttonsBottom - 1 && hudFits.row2Right <= hudFits.width && hudFits.scrollW <= hudFits.width);
 await page.evaluate(() => {
   const h = window.__house;
   const s = h.spots.spots.find((x) => x.id === 'hall');

@@ -1,11 +1,12 @@
-import { GUEST_SKINS, skinDef, STARTERS, type Skin } from '../characters';
+import { GUEST_SKINS, skinDef, type Skin } from '../characters';
 import { toast } from '../ui/toasts';
 import type { PlayerInfo } from '../net/presence';
 import { currentUser, loadProfile, savePet, saveProfile } from '../net/profile';
 import { PET_LEVEL } from './animals';
 import { guestHosts } from '../net/guestCodes';
 import { saveCharacter, savedCharacter, saveName, savedName } from '../prefs';
-import { pickCharacter } from '../ui/picker';
+import { pickCharacter, type PickerShop } from '../ui/picker';
+import { buy, coinsToday, currentWallet, fmtAmount, loadStore, ownedSkins, ownsItem, shopItem } from '../net/store';
 import { openProfile } from '../ui/profile';
 import { gamesWon } from '../net/games';
 import type { HouseScene } from '../scenes/HouseScene';
@@ -59,15 +60,31 @@ export function applyIdentity(this: HouseScene, character: Skin, name: string) {
   this.progressHud?.render();
 }
 
-// `mustPick`: first visit, no way to close without choosing.
-export async function choose(this: HouseScene, mustPick = false) {
+// `mustPick`: first visit, no way to close without choosing. `shop`: opened from the wallet (Shop first).
+export async function choose(this: HouseScene, mustPick = false, shopFirst = false) {
   this.canMove = false;
   this.body.setVelocity(0, 0);
   const guest = !!currentUser()?.guest;
   const remembered = savedCharacter();
-  const wearable = guest ? GUEST_SKINS : STARTERS;
-  const current = remembered !== null && wearable.includes(remembered) ? remembered : null;
-  const choice = await pickCharacter(this.textures, current, savedName(), mustPick ? false : undefined, wearable, guest);
+  // What you can wear: the free starters and anything you've bought (the server's list).
+  const stocked = await loadStore(guest);
+  const wearable = guest ? GUEST_SKINS : ownedSkins();
+  const current = remembered !== null && (wearable.includes(remembered) || remembered === this.character) ? remembered : null;
+  const shop: PickerShop | null = guest || !stocked
+    ? null
+    : {
+        price: (key) => {
+          const it = shopItem(key);
+          return it ? { coins: it.coins, gems: it.gems } : null;
+        },
+        owns: ownsItem,
+        wallet: currentWallet,
+        buy: (key) => buy(key),
+        earned: coinsToday,
+        fmt: fmtAmount,
+        start: shopFirst,
+      };
+  const choice = await pickCharacter(this.textures, current, savedName(), mustPick ? false : undefined, wearable, guest, shop);
   if (!choice) {
     this.canMove = true; // closed without changes
     void this.start(); // still join the house (does nothing if already in)
@@ -124,7 +141,7 @@ export function tryOn(this: HouseScene, skin: Skin) {
   toast({ icon: 'timer', id: 'try-on', who: `Trying on ${skinDef(skin)?.name ?? 'a character'}`, what: 'For 60 s. Only you see it.', small: true, ttl: 4000 });
   tryOnTimer = window.setTimeout(() => {
     this.me.setCharacter(this.character);
-    toast({ icon: 'timer', id: 'try-on', who: 'Back to your own character', what: 'The shop is coming soon.', small: true, ttl: 2500 });
+    toast({ icon: 'timer', id: 'try-on', who: 'Back to your own character', what: 'Like it? It’s in the shop (tap your coins).', small: true, ttl: 3000 });
   }, 60_000);
 }
 

@@ -66,6 +66,13 @@ const ACTIONS: Record<string, [string, (b: Body) => Record<string, unknown>]> = 
   critters: ['admin_critters', () => ({})],
   'critter-update': ['admin_critter_update', (b) => ({ critter: str(b.critter, 32), xp: num(b.xp), weight: num(b.weight) })],
   'challenge-update': ['admin_challenge_update', (b) => ({ challenge: str(b.challenge, 64), goal: num(b.goal), xp: num(b.xp), title: str(b.title, 80) ?? null })],
+  shop: ['admin_shop', () => ({})],
+  'shop-item': [
+    'admin_shop_item',
+    (b) => ({ item: str(b.item, 64), price_coins: num(b.coins) ?? null, price_gems: num(b.gems) ?? null, active: b.active !== false }),
+  ],
+  'econ-set': ['admin_econ_set', (b) => ({ setting: str(b.setting, 40), amount: num(b.amount) })],
+  'give-item': ['admin_give_item', (b) => ({ member: uuid(b.member), item: str(b.item, 64) })],
   scores: ['admin_scores', () => ({})],
   'score-delete': ['admin_score_delete', (b) => ({ score_id: num(b.id) })],
   'score-flags': ['admin_score_flags', () => ({})],

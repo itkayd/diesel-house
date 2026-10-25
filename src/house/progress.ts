@@ -10,6 +10,8 @@ import { canRecord, weeklyBoard, type Recorded } from '../net/progress';
 import { firstRun } from '../ui/hints';
 import { challengeToast, confettiAt, levelUpOverlay, medalToast, openChallenges, openNoticeboard, ProgressHud } from '../ui/progressUi';
 import { catchBoard } from '../net/critters';
+import { loadStore, refreshWallet } from '../net/store';
+import { addWalletChips } from '../ui/walletUi';
 import type { HouseScene } from '../scenes/HouseScene';
 
 // Challenges, XP and levels in the house (UPDATE.md Phase 14): the HUD, toasts, the noticeboard and what counts.
@@ -24,6 +26,11 @@ export function setupProgress(this: HouseScene) {
     () => this.openMyChallenges(),
     () => this.openMyProfile(),
   );
+  // Coins and gems beside the level (members); tapping them opens the shop.
+  if (!guest) {
+    addWalletChips(() => void this.choose(false, true));
+    void loadStore(false);
+  }
   this.tracker.onResult((r) => this.gotProgress(r));
   this.tracker.start();
   // Once a minute: time in voice, a full room of your own, guests to welcome.
@@ -34,11 +41,14 @@ export function rankInfo(this: HouseScene) {
   return this.progress ? { lv: this.progress.level, st: this.progress.streak } : {};
 }
 
+const isGuest = () => !!currentUser()?.guest;
+
 export function gotProgress(this: HouseScene, r: Recorded) {
   const first = !this.progress;
   const prevLevel = this.progress?.level;
   this.progress = r;
   this.progressHud?.update(r, first ? 0 : r.gained);
+  if (!isGuest() && (first || r.gained > 0)) refreshWallet(); // coins come with XP (daily visit, challenges, catches)
   if (!first && r.gained > 0) firstRun.notify('xp');
   this.me.setProgress(r.level, r.streak);
   this.presence?.update(this.rankInfo());

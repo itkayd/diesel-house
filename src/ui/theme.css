@@ -1087,3 +1087,38 @@ html, body, #game, #overlay, #overlay * {
 .dh-seg-btn { min-height: 44px; border: 0; cursor: pointer; background: transparent; color: var(--muted); font-family: var(--font-body); }
 .dh-seg-btn[aria-checked="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
 .dh-seg-btn:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
+
+/* S2 shop: coins and gems (top bar, picker), the buy card. */
+:root { --gem: #7fd4ff; }
+.dh-coin { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: calc(13px * var(--ts, 1)); white-space: nowrap; }
+.dh-coin.coin { color: var(--gold); }
+.dh-coin.gem { color: var(--gem); }
+.dh-coin b { font-weight: 500; }
+.dh-coin.pulse { animation: dh-coin-pulse .5s steps(4); }
+@keyframes dh-coin-pulse { 50% { transform: scale(1.25); } }
+.v2-wallet { display: inline-flex; align-items: center; gap: 10px; border: 0; cursor: pointer; padding: 4px 10px; min-height: 44px; box-sizing: border-box;
+  background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge); }
+.v2-wallet:hover, .v2-wallet:focus-visible { background: var(--panel-hi); outline: none; }
+.v2-wallet[hidden] { display: none; }
+.dh-purse { display: inline-flex; gap: 12px; margin-left: auto; margin-right: 8px; padding: 6px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-purse[hidden] { display: none; }
+.dh-buy { display: grid; gap: 8px; }
+.dh-buy[hidden] { display: none; }
+.dh-buy .maths { display: grid; gap: 2px; padding: 8px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); font-size: calc(14px * var(--ts, 1)); }
+.dh-buy .maths .r { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+.dh-buy .maths .r b { color: var(--cream); font-family: var(--font-display); font-weight: 500; }
+.dh-buy .maths .r.after { border-top: 2px solid var(--line); padding-top: 4px; margin-top: 2px; }
+.dh-buy .maths .r.short { border-top: 2px solid var(--line); padding-top: 4px; margin-top: 2px; }
+.dh-buy .maths .r.short b { color: var(--error); }
+.dh-buy .v2-note { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .dh-coin.pulse { animation: none; } }
+/* Buttons that can't be pressed yet look it (and say why in their label). */
+.dh-btn:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.5); }
+/* The buy card on a phone stays compact: the sums in one row, Try on and Keep wearing side by side. */
+.dh-buy .maths { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dh-buy .maths .r { display: grid; gap: 2px; justify-items: start; font-size: calc(12px * var(--ts, 1)); }
+.dh-buy .maths .r b { font-size: calc(14px * var(--ts, 1)); }
+.dh-buy .maths .r.after, .dh-buy .maths .r.short { border-top: 0; padding-top: 0; margin-top: 0; border-left: 2px solid var(--line); padding-left: 8px; }
+.dh-pick-foot.buying { grid-template-columns: 1fr 1fr; }
+.dh-pick-foot.buying > .dh-buy, .dh-pick-foot.buying > .dh-error { grid-column: 1 / -1; }
+.dh-pick-foot.buying > .dh-btn--quiet { font-size: calc(14px * var(--ts, 1)); min-height: 44px; padding-left: 8px; padding-right: 8px; }

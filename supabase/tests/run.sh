@@ -16,6 +16,8 @@ psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/admin_test.sql 2>&1 | gr
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/social_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/dm_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/guest_throttle_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
+psql -v ON_ERROR_STOP=1 -q -d dh_test -f supabase/tests/store_test.sql 2>&1 | grep -E "PASS|FAIL|ERROR"
 node tests/api/admin-api.mjs 2>&1 | grep -E "PASS|FAIL|Error"
 node tests/api/arcade-api.mjs 2>&1 | grep -E "PASS|FAIL|Error"
 node tests/unit/nightraid-replay.mjs 2>&1 | grep -E "PASS|FAIL|Error"
+PGHOST="$PGHOST" ./supabase/tests/store_race.sh

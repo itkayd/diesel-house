@@ -20,6 +20,7 @@ export type MessagesDeps = {
 let open: { with: string; add: (m: Dm) => void } | null = null;
 
 export function addMessagesButton(deps: MessagesDeps) {
+  if (document.getElementById('messages-button')) return; // joining again (after a reconnect): already there
   const b = el('button', 'dh-iconbtn');
   b.type = 'button';
   b.id = 'messages-button';

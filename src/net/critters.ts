@@ -1,4 +1,5 @@
 import { devTest } from './mode';
+import { withSkins } from './store';
 import type { Recorded } from './progress';
 import { supabase } from './supabase';
 
@@ -35,5 +36,5 @@ export async function catchBoard(): Promise<CatchRow[] | null> {
     console.warn('Could not load today’s catches', error.message);
     return null;
   }
-  return (data as CatchRow[]).map((r) => ({ ...r, caught: Number(r.caught), xp: Number(r.xp) }));
+  return withSkins((data as CatchRow[]).map((r) => ({ ...r, caught: Number(r.caught), xp: Number(r.xp) })));
 }

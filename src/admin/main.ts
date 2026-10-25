@@ -11,6 +11,7 @@ import { invites } from './sections/invites';
 import { rooms } from './sections/rooms';
 import { house } from './sections/house';
 import { critters } from './sections/critters';
+import { shop } from './sections/shop';
 import { scores } from './sections/scores';
 import { logs } from './sections/logs';
 import { reports } from './sections/reports';
@@ -20,7 +21,7 @@ import { audit } from './sections/audit';
 // username + password (api/admin.ts); the very first one is made with the setup passcode.
 
 export type Section = { id: string; label: string; icon: Icon; render: (main: HTMLElement, go: (id: string) => void) => Promise<void> | void };
-const SECTIONS: Section[] = [dashboard, players, reports, invites, rooms, house, critters, scores, logs, audit];
+const SECTIONS: Section[] = [dashboard, players, reports, invites, rooms, house, shop, critters, scores, logs, audit];
 
 const root = document.getElementById('admin')!;
 let me = '';

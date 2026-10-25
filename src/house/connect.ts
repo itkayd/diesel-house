@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { type RoomId, WATCH_TOGETHER } from '../config';
+import { refreshWallet } from '../net/store';
 import { currentUser } from '../net/profile';
 import { setDnd, setRoomRules } from '../net/rooms';
 import { gamesFor, type GameId } from '../games/catalog';
@@ -327,6 +328,7 @@ export async function start(this: HouseScene) {
       this.tracker.emit('game_played', { u: game });
       if (won) this.tracker.emit('game_won', { u: game });
       if (won && game === 'quickdraw' && (info.fastestMs ?? Infinity) < 250) this.tracker.emit('qd_fast');
+      refreshWallet(3000); // the host saves the result, which pays everyone's game coins
     },
     hosted: (_game, players) => players >= 4 && this.tracker.emit('host_game_4'),
     quickDrawRound: () => this.tracker.emit('qd_round_won'),

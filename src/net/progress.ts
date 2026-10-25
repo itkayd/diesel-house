@@ -1,4 +1,5 @@
 import { devTest } from './mode';
+import { withSkins } from './store';
 import { supabase } from './supabase';
 
 // Challenges, XP, streaks and medals (UPDATE.md Phase 14, LEVELS.md). Everything is decided on the
@@ -54,5 +55,5 @@ export async function weeklyBoard(): Promise<BoardRow[] | null> {
     console.warn('Could not load the noticeboard', error.message);
     return null;
   }
-  return (data as BoardRow[]).map((r) => ({ ...r, xp_week: Number(r.xp_week), wins_week: Number(r.wins_week) }));
+  return withSkins((data as BoardRow[]).map((r) => ({ ...r, xp_week: Number(r.xp_week), wins_week: Number(r.wins_week) })));
 }

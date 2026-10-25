@@ -15,7 +15,8 @@
 - **Sections:** Dashboard · Players (any level/XP, coins, gems, streak, pet, ban, password, remove,
   history) · Player reports (from Report in the tap-a-friend menu: why, their last chat lines, Ban) ·
   Invites & guests · Rooms · House switches (games, Night Raid, animals per room, pets,
-  critters, announcement) · Critters & challenges · Games & scores · Device logs · Admins & audit.
+  critters, announcement) · **Shop** (prices in coins or gems, on sale or not, how many own each, the coin
+  earn rates and daily caps, gift a character) · Critters & challenges · Games & scores · Device logs · Admins & audit.
 - **House switches** are read live by the game (`src/net/houseSettings.ts`) and enforced by the database
   (`20261114_house_switches.sql`).
 - **Trying it locally:** `supabase/tests/run.sh`, then

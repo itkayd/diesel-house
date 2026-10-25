@@ -90,10 +90,19 @@ export function reportError(message: string, stack?: string) {
   logIssue('error', message, { stack });
 }
 
+// Errors that aren't the game's: another site's script ("Script error."), and in-app browsers (Instagram,
+// Telegram, WeChat…) calling their own hooks on the page ("Can't find variable: onHide").
+const FOREIGN = /^Script error\.?$|Can't find variable: (on[A-Z]\w*|WeixinJSBridge|__gCrWeb|zaloJSV2|webkit)\b|^ResizeObserver loop/;
+export function notOurs(message: string, file?: string) {
+  if (FOREIGN.test(message)) return true;
+  return !!file && !file.startsWith(location.origin) && !file.startsWith('blob:');
+}
+
 // Start listening (main.ts, as early as possible).
 export function installErrorReports() {
   window.addEventListener('error', (e) => {
     if (!e.message) return; // a picture or sound that failed to load: not a bug in the game
+    if (notOurs(e.message, e.filename)) return;
     reportError(e.message, e.error instanceof Error ? e.error.stack : `${e.filename}:${e.lineno}:${e.colno}`);
   });
   window.addEventListener('unhandledrejection', (e) => {

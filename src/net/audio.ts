@@ -15,7 +15,12 @@ export const audioLocked = () => !ctx || ctx.state !== 'running';
 // Must run inside a user gesture (pointer/key/touch handler).
 export function unlockAudio() {
   const c = audioContext();
-  void c.resume().then(() => onUnlock.forEach((f) => f()));
+  // iPhones can refuse ("Failed to start the audio device": a phone call, another app holding the audio):
+  // nothing to do but try again on the next tap.
+  c.resume().then(
+    () => onUnlock.forEach((f) => f()),
+    () => {},
+  );
   // iOS also wants a sound actually started within the gesture: a one-sample silent buffer.
   const src = c.createBufferSource();
   src.buffer = c.createBuffer(1, 1, 22050);

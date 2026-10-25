@@ -221,7 +221,7 @@ export class Voice {
     this.restartedForSilence = false;
 
     this.ctx = audioContext();
-    void this.ctx.resume();
+    this.ctx.resume().catch(() => {}); // refused (a phone call…): the next tap tries again (src/net/audio.ts)
     if (!this.watchingCtx) {
       // Sound unlocked (or locked again): move voices between the element and Web Audio.
       this.watchingCtx = true;

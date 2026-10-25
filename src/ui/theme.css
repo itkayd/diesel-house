@@ -210,7 +210,7 @@
 }
 .dh-joy.on { opacity: 1; box-shadow: inset 0 0 0 2px rgba(255,214,107,.55), 0 0 0 2px rgba(13,9,18,.45); }
 .dh-joy .knob {
-  position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%;
+  position: absolute; left: calc(50% - 22px); top: calc(50% - 22px); width: 44px; height: 44px; border-radius: 50%;
   background: rgba(255,244,224,.88); box-shadow: inset 0 -4px 0 rgba(0,0,0,.18), 0 2px 0 rgba(13,9,18,.45);
 }
 .dh-joy.on .knob { background: var(--cream); }
@@ -346,15 +346,19 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 @container game (max-width: 640px) {
   /* Chat on a phone: above the joystick and the mic button, so you can still walk and mute while it's open. */
   .dh-sheet--side { top: auto; left: 0; width: auto; height: 46%; bottom: calc(176px + var(--safe-b)); }
-  /* Bottom-right on a phone: the small buttons (chat, music, emotes…) in a row above the mic, filled
-     from the right, so nothing runs into the joystick on the left. */
-  .dh-hud-br { display: grid; grid-template-columns: repeat(3, 48px); gap: 12px 10px; direction: rtl; align-items: end;
-    bottom: calc(14px + var(--safe-b)); right: calc(14px + var(--safe-r)); }
-  .dh-hud-br > * { direction: ltr; }
+  /* The bottom bar on a phone: the small buttons (chat, emotes, music…) in a 2 × 2 block on the left,
+     the joystick in the middle and the mic (or walkie) on the right, next to it. The joystick sits away
+     from the screen edges (and the phone's swipe-up bar), so a thumb can push it all the way round. */
+  .dh-hud-br { left: calc(14px + var(--safe-l)); right: calc(14px + var(--safe-r)); bottom: calc(14px + var(--safe-b));
+    display: grid; grid-template-columns: 48px 48px 1fr auto; grid-template-rows: 48px 48px; grid-auto-flow: column; gap: 10px;
+    align-items: end; pointer-events: none; }
+  .dh-hud-br > * { pointer-events: auto; }
   .dh-hud-br > .dh-iconbtn { width: 48px; height: 48px; }
   .dh-hud-br > .dh-iconbtn svg { width: 20px; height: 20px; }
-  .dh-hud-br > #voice-controls, .dh-hud-br > .dh-walkie { grid-column: 1 / -1; justify-self: start; }
-  .dh-hud-bl { bottom: calc(22px + var(--safe-b)); left: calc(16px + var(--safe-l)); }
+  .dh-hud-br > #voice-controls, .dh-hud-br > .dh-walkie { grid-column: 4; grid-row: 1 / span 2; align-self: end; }
+  .dh-hud-bl { left: 50%; transform: translateX(-50%); bottom: calc(26px + var(--safe-b)); }
+  /* Narrow phones: a little smaller, so it still fits between the buttons and the mic. */
+  @container game (max-width: 359px) { .dh-joy { width: 100px; height: 100px; } }
   .dh-mic-paused { bottom: calc(176px + var(--safe-b)); }
   .v2-emotebar { bottom: calc(176px + var(--safe-b)); }
   .dh-scrim { place-items: end center; padding: 0; }

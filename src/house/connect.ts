@@ -115,6 +115,11 @@ export async function start(this: HouseScene) {
     if (!reloadForUpdate()) showWhere(this.zone, 'Offline · reload the page', 'off');
     return;
   }
+  // Seen on iPhones after an update: an import that comes back empty. Same cure as a failed one.
+  if (modules.some((m) => !m)) {
+    if (!reloadForUpdate()) showWhere(this.zone, 'Offline · reload the page', 'off');
+    return;
+  }
   const [{ Presence }, { Voice }, { Games }, { ChatPanel }] = modules;
   this.presence = new Presence(
     currentUser()?.id ?? crypto.randomUUID(),

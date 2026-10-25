@@ -1,8 +1,8 @@
 import { crumb, logIssue } from '../net/errors';
 import { hudBottomLeft } from './overlay';
 
-const MAX = 36; // px the knob can travel from the centre
 const DEADZONE = 6; // px
+const travel = (ringWidth: number) => (ringWidth - 40) / 2; // px the knob can travel from the centre (36 on the 112 px ring)
 
 const sticks = new Set<Joystick>();
 
@@ -163,6 +163,7 @@ export class Joystick {
     let dx = clientX - (r.left + r.width / 2);
     let dy = clientY - (r.top + r.height / 2);
     const len = Math.hypot(dx, dy);
+    const MAX = travel(r.width);
     if (len > MAX) {
       dx = (dx / len) * MAX;
       dy = (dy / len) * MAX;

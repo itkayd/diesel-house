@@ -7,6 +7,7 @@ import { roomDef } from '../house/rooms';
 //   top-left:  [house  Great Hall / ● 4 in the house]   or   [door  Lounge (Quiet) / 2 here]  (two lines)
 //   top-centre: toasts and banners          top-right: [profile] [settings]
 //   bottom-left: joystick (touch)           bottom-right: [chat] [MIC]   (in a room)
+//   (phones: one bottom bar instead: [chat][emotes] block · joystick in the middle · [MIC], theme.css)
 export const overlay = () => document.getElementById('overlay') as HTMLDivElement;
 
 const HUD_LABELS: [string, string][] = [

@@ -33,7 +33,7 @@ function steps(): Step[] {
     {
       id: 'move', icon: 'footprints', chip: 'Moving', title: 'Walking around',
       lines: [
-        phone ? 'Use the joystick at the bottom left to walk.' : 'Walk with WASD or the arrow keys, or hold the mouse where you want to go.',
+        phone ? 'Use the joystick at the bottom of the screen to walk.' : 'Walk with WASD or the arrow keys, or hold the mouse where you want to go.',
         'The map button (top right) shows who’s where. Tap a room on it and you walk there by yourself.',
         'You arrive on the front porch, just below the Great Hall.',
       ],

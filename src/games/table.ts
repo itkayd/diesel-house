@@ -49,6 +49,10 @@ type Handlers = {
   onPeople: (seats: Seat[]) => void;
   // The host left and we are taking over: carry the game on from `s`.
   onTakeover: (s: Snapshot) => void;
+  // Someone said they're in for a game (or not any more): the lobby and the games list update.
+  onReady?: () => void;
+  // Someone at the table cheered (👏 😂 …).
+  onCheer?: (from: string, emoji: string) => void;
   // Is this game still going? (A finished game isn't taken over.)
   running?: (s: Snapshot) => boolean;
 };
@@ -77,6 +81,8 @@ export class GameTable {
   private gone = new Map<string, { seat: Seat; at: number }>(); // just dropped off: still counted for GRACE_MS
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   snap: Snapshot | null = null;
+  // Who is in for which game (the lobby's ready step): id -> game. Ours is sent again to anyone who sits down.
+  private ready = new Map<string, string>();
 
   constructor(
     readonly spot: SpotId,
@@ -121,17 +127,56 @@ export class GameTable {
     ch.on('broadcast', { event: 'hello' }, () => {
       countMessage('received', 'game');
       if (this.isHost && this.snap) this.send('snap', this.snap); // a newcomer gets the game as it is
+      const mine = this.ready.get(this.me.id);
+      if (mine) this.send('ready', { from: this.me.id, game: mine });
+    });
+    ch.on('broadcast', { event: 'ready' }, ({ payload }) => {
+      countMessage('received', 'game');
+      const { from, game } = payload as { from: string; game: string | null };
+      if (typeof from !== 'string' || from === this.me.id) return;
+      if (typeof game === 'string' && game) this.ready.set(from, game.slice(0, 20));
+      else this.ready.delete(from);
+      this.h.onReady?.();
+    });
+    ch.on('broadcast', { event: 'cheer' }, ({ payload }) => {
+      countMessage('received', 'game');
+      const { from, emoji } = payload as { from: string; emoji: string };
+      if (typeof from === 'string' && typeof emoji === 'string') this.h.onCheer?.(from, emoji);
     });
     ch.on('presence', { event: 'sync' }, () => this.sync());
     ch.subscribe((status) => {
       if (status !== 'SUBSCRIBED') return;
       this.track();
       this.send('hello', {});
+      const mine = this.ready.get(this.me.id);
+      if (mine) this.send('ready', { from: this.me.id, game: mine }); // said before we were connected
     });
+  }
+
+  // The ready step: we're in for `game` (or, with null, just watching). Sent to everyone at the table.
+  setReady(game: string | null) {
+    if ((this.ready.get(this.me.id) ?? null) === game) return;
+    if (game) this.ready.set(this.me.id, game);
+    else this.ready.delete(this.me.id);
+    this.send('ready', { from: this.me.id, game });
+    this.h.onReady?.();
+  }
+  // Everyone at the table now who is in for `game`, in the order they sat down.
+  readyFor(game: string) {
+    return this.people.filter((p) => this.ready.get(p.id) === game);
+  }
+  isReady(id: string, game: string) {
+    return this.ready.get(id) === game;
+  }
+  // A quick cheer everyone at the table sees.
+  cheer(emoji: string) {
+    this.send('cheer', { from: this.me.id, emoji });
+    this.h.onCheer?.(this.me.id, emoji);
   }
 
   // Stand up (close the panel). The channel stays a little while in case they come straight back.
   close() {
+    this.setReady(null);
     if (this.seated) void this.channel?.untrack();
     this.seated = false;
     if (this.linger) clearTimeout(this.linger);
@@ -146,6 +191,7 @@ export class GameTable {
     this.seated = false;
     this.present.clear();
     this.gone.clear();
+    this.ready.clear();
     if (this.graceTimer) clearTimeout(this.graceTimer);
     this.graceTimer = null;
   }
@@ -231,7 +277,7 @@ export class GameTable {
     this.h.onTakeover(this.snap);
   }
 
-  private send(event: 'snap' | 'act' | 'hello', payload: unknown) {
+  private send(event: 'snap' | 'act' | 'hello' | 'ready' | 'cheer', payload: unknown) {
     if (!this.channel) return;
     countMessage('sent', 'game');
     void this.channel.send({ type: 'broadcast', event, payload });

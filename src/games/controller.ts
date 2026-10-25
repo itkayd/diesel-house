@@ -57,7 +57,7 @@ type TableGame = {
 const TABLE: Record<TableGameId, TableGame> = {
   quickdraw: {
     short: 'qd', min: 2, max: 8,
-    lobby: 'Everyone at this table plays. 5 rounds; fastest three each round get 3, 2 and 1 points.',
+    lobby: 'Everyone who’s in plays. 5 rounds; fastest three each round get 3, 2 and 1 points.',
     host: (c) => new QuickDrawHost(c.table, c.record),
     view: (me, act, names) => new QuickDrawView(me, act, names),
     running: (st) => (st as { phase: string }).phase === 'round',
@@ -65,7 +65,7 @@ const TABLE: Record<TableGameId, TableGame> = {
   },
   higherlower: {
     short: 'hl', min: 2, max: 8,
-    lobby: 'Everyone at this table plays, taking turns. Is the next card higher or lower? Each right guess in a row is worth more: bank before you bust. 3 rounds.',
+    lobby: 'Everyone who’s in plays, taking turns. Is the next card higher or lower? Each right guess in a row is worth more: bank before you bust. 3 rounds.',
     host: (c) => new HigherLowerHost(c.table, c.record),
     view: (me, act, names) => new HigherLowerView(me, act, names),
     running: (st) => (st as { phase: string }).phase === 'turn',
@@ -92,7 +92,7 @@ const TABLE: Record<TableGameId, TableGame> = {
   },
   quiz: {
     short: 'quiz', min: 2, max: 8,
-    lobby: 'Everyone at this table plays. 8 questions, 15 seconds each, answered in secret. First right answer 3 points, second 2, the rest 1.',
+    lobby: 'Everyone who’s in plays. 8 questions, 15 seconds each, answered in secret. First right answer 3 points, second 2, the rest 1.',
     host: (c) => new QuizHost(c.table, c.record),
     view: (me, act, names) => new QuizView(me, act, names),
     running: (st) => (st as { phase: string }).phase !== 'done',
@@ -127,6 +127,8 @@ const TABLE: Record<TableGameId, TableGame> = {
   },
 };
 const isTableGame = (g: string): g is TableGameId => g in TABLE;
+const CHEERS = ['👏', '😂', '😮', '🔥'];
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
 // Games whose end we've already counted (challenges), kept for this tab so a reload doesn't count them again.
 const SEEN_KEY = 'diesel-house.games-seen';
@@ -183,6 +185,13 @@ export class Games {
   private promptSpot: SpotId | null = null;
   private arrived: SpotId | null = null; // the spot we last walked onto (its click has played)
   private lastGame = new Map<SpotId, string>(); // per table: the game last seen starting (gen:host:game)
+  // U5: when each game started and ended (by gen:host:game), our record at each game tonight, a watcher's
+  // "Join next game", and when we last cheered.
+  private startedAt = new Map<string, number>();
+  private endedAt = new Map<string, number>();
+  private tonight = new Map<TableGameId, { played: number; won: number }>();
+  private joinNext: TableGameId | null = null;
+  private lastCheer = 0;
 
   constructor(private deps: GameDeps) {}
 
@@ -282,6 +291,17 @@ export class Games {
         if (this.spot === spot && (this.screen === 'list' || (isTableGame(this.screen) && (!this.running(spot) || !this.view))) && this.tableKey(spot) !== this.shownKey) this.render();
       },
       running: (s) => isTableGame(s.game) && TABLE[s.game].running(s.state),
+      // Someone is in (or out) for a game: the lobby and the list show it.
+      onReady: () => {
+        if (this.spot === spot && (this.screen === 'list' || (isTableGame(this.screen) && !this.view)) && this.tableKey(spot) !== this.shownKey) this.render();
+        else if (this.spot === spot && this.view && this.viewGame) {
+          const s = t!.snap;
+          if (s) this.again(t!, s);
+        }
+      },
+      onCheer: (from, emoji) => {
+        if (this.spot === spot) this.floatCheer(from, emoji);
+      },
       onTakeover: (s) => {
         if (!isTableGame(s.game) || this.spot !== spot) return;
         this.host?.stop();
@@ -305,7 +325,8 @@ export class Games {
   // What the table screen depends on: the game shown, whether one is going, who's sitting there.
   private tableKey(spot: SpotId) {
     const t = this.tables.get(spot);
-    return `${this.screen}|${this.running(spot)}|${!!this.view}|${t?.people.map((p) => p.id).join(',') ?? ''}`;
+    const ready = isTableGame(this.screen) ? (t?.readyFor(this.screen).map((p) => p.id).join(',') ?? '') : ALL_GAMES.map((g) => t?.readyFor(g).length ?? 0).join('');
+    return `${this.screen}|${this.running(spot)}|${!!this.view}|${t?.people.map((p) => p.id).join(',') ?? ''}|${ready}`;
   }
 
   // A game is going at this table, and its host is still sitting there.
@@ -339,7 +360,10 @@ export class Games {
     if (TABLE[s.game].running(s.state) || this.seenEnd.has(key)) return;
     this.seenEnd.add(key);
     saveSeen(this.seenEnd);
-    this.deps.played?.(s.game, TABLE[s.game].winners(s).includes(t.id), { fastestMs: this.qdBest.get(key) });
+    const won = TABLE[s.game].winners(s).includes(t.id);
+    const rec = this.tonight.get(s.game) ?? { played: 0, won: 0 };
+    this.tonight.set(s.game, { played: rec.played + 1, won: rec.won + (won ? 1 : 0) });
+    this.deps.played?.(s.game, won, { fastestMs: this.qdBest.get(key) });
   }
 
   private snapshot(spot: SpotId, s: Snapshot) {
@@ -359,6 +383,11 @@ export class Games {
     const isNew = this.lastGame.get(spot) !== start;
     this.lastGame.set(spot, start);
     const mine = s.players.some((p) => p.id === t.id);
+    if (!this.startedAt.has(start)) this.startedAt.set(start, Date.now());
+    if (!TABLE[s.game].running(s.state) && !this.endedAt.has(start)) this.endedAt.set(start, Date.now());
+    // A game we're dealt into has just started (the one who pressed Start already heard the click).
+    if (isNew && mine && !t.isHost && TABLE[s.game].running(s.state)) play('card_shuffle', 0.5);
+    if (isNew) this.joinNext = null;
     if (this.screen !== s.game) {
       if (isNew || mine) this.show(s.game);
       else if (this.screen === 'list' || isTableGame(this.screen)) this.render();
@@ -387,6 +416,7 @@ export class Games {
     body.replaceChildren();
     this.shownKey = '';
     if (this.screen === 'list') {
+      this.syncReady();
       this.shownKey = this.tableKey(spot);
       return this.renderList(body, spot);
     }
@@ -394,6 +424,23 @@ export class Games {
     if (this.screen === 'rps') this.renderRps(body);
     if (isTableGame(this.screen)) this.renderTable(body, spot, this.screen);
     body.append(this.back());
+    this.syncReady();
+  }
+
+  // The ready step: we're in for the game whose lobby we're looking at, or the one we just played (for a
+  // rematch); a watcher only after "Join next game". Anywhere else, we're not in for anything.
+  private syncReady() {
+    const spot = this.spot;
+    const t = spot ? this.tables.get(spot) : null;
+    if (!t) return;
+    const game = this.screen;
+    if (!isTableGame(game)) return t.setReady(null);
+    const s = t.snap;
+    if (this.view && this.viewGame === game && s && s.game === game) {
+      const played = s.players.some((p) => p.id === t.id);
+      return t.setReady(played || this.joinNext === game ? game : null);
+    }
+    t.setReady(game);
   }
 
   private renderList(body: HTMLElement, spot: SpotId) {
@@ -422,6 +469,25 @@ export class Games {
       grid.append(b);
     }
     body.append(this.whoIsHere(spot));
+    // Someone is waiting in a game's lobby: one tap joins them.
+    if (t && !playing)
+      for (const id of ALL_GAMES.filter((g) => here.includes(g) && isTableGame(g))) {
+        const waiting = t.readyFor(id).filter((p) => p.id !== t.id);
+        if (!waiting.length || !gameOn(id)) continue;
+        const names = waiting.map((p) => this.deps.names(p.id).name || p.name);
+        const row = el('div', 'v2-item v2-waiting');
+        row.dataset.waiting = id;
+        const faces = el('span', 'faces');
+        for (const p of waiting.slice(0, 3)) faces.append(portrait(this.deps.names(p.id).character ?? p.character, 28));
+        const txt = el('span', 't', `${names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(' & ')} ${names.length > 1 ? 'are' : 'is'} in for ${GAMES[id].title}`);
+        const join = el('button', 'dh-btn');
+        join.type = 'button';
+        join.id = `join-${id}`;
+        join.append(icon(GAMES[id].icon, { width: 18 }), document.createTextNode('Join'));
+        join.addEventListener('click', () => this.show(id as Games['screen']));
+        row.append(faces, txt, join);
+        body.append(row);
+      }
     const invite = this.deps.invite;
     if (invite) {
       const b = el('button', 'dh-btn dh-btn--quiet');
@@ -520,27 +586,39 @@ export class Games {
         this.view = g.view(t.id, (a) => t.act(a), (id) => this.deps.names(id));
         this.viewGame = game;
       }
-      body.append(this.view.root);
+      body.append(this.view.root, this.cheers(t));
       this.view.show(s);
       this.again(t, s);
       this.shownKey = this.tableKey(spot);
       return;
     }
     // Lobby: the first `max` people at the table play (us first), the rest watch.
-    const people = this.lineup(t, g);
+    const people = this.lineup(t, g, game);
     const watching = Math.max(0, (t.people.length || 1) - people.length);
     body.append(el('p', 'v2-note', g.lobby), rulesFold(game));
     const list = el('div', 'v2-list');
     list.id = `${g.short}-lobby`;
     for (const p of people) {
       const row = el('div', 'v2-item');
-      row.append(portrait(this.deps.names(p.id).character ?? p.character, 32), el('span', 't', p.id === t.id ? 'You' : p.name));
+      row.dataset.player = p.id;
+      const tick = el('span', 'v2-chip ok', 'In');
+      tick.prepend(icon('check', { width: 12 }));
+      row.append(portrait(this.deps.names(p.id).character ?? p.character, 32), el('span', 't', p.id === t.id ? 'You' : this.deps.names(p.id).name || p.name), tick);
+      list.append(row);
+    }
+    // Sitting here but not in yet: they join by opening this game (they see "… is in for …" on their list).
+    const notIn = t.people.filter((p) => !people.some((q) => q.id === p.id));
+    for (const p of notIn) {
+      const row = el('div', 'v2-item out');
+      row.dataset.player = p.id;
+      row.append(portrait(this.deps.names(p.id).character ?? p.character, 32), el('span', 't', this.deps.names(p.id).name || p.name), el('span', 'v2-chip', 'Not in yet'));
       list.append(row);
     }
     body.append(list);
-    if (watching) body.append(el('p', 'v2-note', `${watching} more at the table will watch.`));
+    if (watching) body.append(el('p', 'v2-note', notIn.length ? 'Anyone not in when you start watches this game.' : `${watching} more at the table will watch.`));
     const alone = people.length < g.min;
-    if (alone) body.append(el('p', 'v2-note', 'Nobody else is at this table yet. Ask a friend to walk over and open it too.'));
+    if (alone)
+      body.append(el('p', 'v2-note', t.people.length > 1 ? `Waiting for someone to join: they’ll see you’re in for ${GAMES[game].title}.` : 'Nobody else is at this table yet. Ask a friend to walk over and open it too.'));
     // Another game is going at this table: starting this one would end theirs.
     const busy = this.running(spot) && s ? s.game : null;
     if (busy && isTableGame(busy)) {
@@ -554,24 +632,102 @@ export class Games {
     this.shownKey = this.tableKey(spot);
   }
 
-  // Who plays: us first, then by when they sat down, up to the game's maximum.
-  private lineup(t: GameTable, g: TableGame) {
-    const people = t.people.length ? t.people : [t.seat()];
-    const me = people.find((p) => p.id === t.id) ?? t.seat();
-    return [me, ...people.filter((p) => p.id !== t.id)].slice(0, g.max);
+  // Who plays: us first, then everyone who is in for this game (the ready step), by when they sat down, up
+  // to the game's maximum.
+  private lineup(t: GameTable, g: TableGame, game: TableGameId) {
+    const me = t.people.find((p) => p.id === t.id) ?? t.seat();
+    return [me, ...t.readyFor(game).filter((p) => p.id !== t.id)].slice(0, g.max);
   }
 
-  // After a game: "Play again" under the result.
+  // After a game: how it went (your place, how long it took, your record here tonight), then Rematch for
+  // the players still here (a watcher taps "Join next game" first).
   private again(t: GameTable, s: Snapshot) {
     const game = s.game as TableGameId;
     const root = this.view?.root;
     if (!root) return;
-    root.querySelector('.v2-again')?.remove();
+    root.querySelectorAll('.v2-again, .v2-summary').forEach((x) => x.remove());
     if (TABLE[game].running(s.state)) return;
-    const few = this.lineup(t, TABLE[game]).length < TABLE[game].min;
-    const b = this.startButton(t, game, few ? 'Waiting for a second player…' : 'Play again', few);
+    this.syncReady();
+    const played = s.players.some((p) => p.id === t.id);
+    const summary = this.summary(t, s);
+    if (summary) root.append(summary);
+    if (!played && this.joinNext !== game) {
+      const j = el('button', 'dh-btn dh-btn--quiet v2-again');
+      j.type = 'button';
+      j.id = `${TABLE[game].short}-join-next`;
+      j.append(icon('user-round', { width: 18 }), document.createTextNode('Join next game'));
+      j.addEventListener('click', () => {
+        this.joinNext = game;
+        this.again(t, s);
+      });
+      root.append(j);
+      return;
+    }
+    const n = this.lineup(t, TABLE[game], game).length;
+    const few = n < TABLE[game].min;
+    const b = this.startButton(t, game, few ? 'Waiting for a second player…' : played ? `Rematch · ${n} players` : `Start · ${n} players`, few);
     b.classList.add('v2-again');
     root.append(b);
+  }
+
+  // "2nd of 4 · 3 min 12 s · Tonight: 2 wins from 5".
+  private summary(t: GameTable, s: Snapshot) {
+    const game = s.game as TableGameId;
+    const bits: string[] = [];
+    const points = (s.state as { points?: Record<string, number> }).points;
+    if (points && s.players.some((p) => p.id === t.id)) {
+      const mine = points[t.id] ?? 0;
+      const place = 1 + s.players.filter((p) => (points[p.id] ?? 0) > mine).length;
+      const tied = s.players.filter((p) => p.id !== t.id && (points[p.id] ?? 0) === mine).length > 0;
+      bits.push(`${tied ? 'Joint ' : ''}${ordinal(place)} of ${s.players.length}`);
+    }
+    const key = `${s.gen ?? 0}:${s.host}:${s.game}`;
+    const from = this.startedAt.get(key);
+    const to = this.endedAt.get(key);
+    if (from && to && to - from > 5000) {
+      const secs = Math.round((to - from) / 1000);
+      bits.push(secs >= 60 ? `${Math.floor(secs / 60)} min ${secs % 60} s` : `${secs} s`);
+    }
+    const rec = this.tonight.get(game);
+    if (rec?.played) bits.push(`Tonight: ${rec.won} win${rec.won === 1 ? '' : 's'} from ${rec.played}`);
+    if (!bits.length) return null;
+    const box = el('div', 'v2-summary');
+    box.id = 'games-summary';
+    box.append(icon('trophy', { width: 16 }), el('span', '', bits.join(' · ')));
+    return box;
+  }
+
+  // Quick cheers under the game, for players and watchers alike.
+  private cheers(t: GameTable) {
+    const row = el('div', 'v2-cheers');
+    row.id = 'games-cheers';
+    for (const e of CHEERS) {
+      const b = el('button', 'v2-cheer-btn', e);
+      b.type = 'button';
+      b.setAttribute('aria-label', `Cheer ${e}`);
+      b.addEventListener('click', () => {
+        if (Date.now() - this.lastCheer < 700) return;
+        this.lastCheer = Date.now();
+        t.cheer(e);
+      });
+      row.append(b);
+    }
+    return row;
+  }
+
+  // A cheer floats up over the game (with who sent it).
+  private floatCheer(from: string, emoji: string) {
+    const panel = this.ui?.panel;
+    if (!panel || !CHEERS.includes(emoji)) return;
+    const f = el('div', 'v2-cheer');
+    const t = this.tables.get(this.spot!);
+    const me = t?.id === from;
+    const seat = t?.people.find((p) => p.id === from);
+    f.append(el('span', 'e', emoji), el('span', 'n', me ? 'You' : this.deps.names(from).name || seat?.name || 'Someone'));
+    f.style.left = `${15 + Math.random() * 70}%`;
+    panel.append(f);
+    if (!me) play('emote', 0.25);
+    setTimeout(() => f.remove(), 1800);
   }
 
   private startButton(t: GameTable, game: TableGameId, label: string, disabled = false) {
@@ -582,7 +738,7 @@ export class Games {
     b.disabled = disabled;
     b.append(icon(GAMES[game].icon), document.createTextNode(label));
     b.addEventListener('click', () => {
-      const players = this.lineup(t, g);
+      const players = this.lineup(t, g, game);
       if (players.length < g.min || (this.running(t.spot) && t.snap?.game !== game) || (this.running(t.spot) && !t.isHost)) return;
       play('confirm', 0.5);
       this.dropView();

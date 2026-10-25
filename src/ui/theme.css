@@ -333,6 +333,8 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 .dh-pick-filters { display: grid; gap: 8px; }
 .dh-pick-filters .cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .dh-pick-filters .cats::-webkit-scrollbar { display: none; }
+/* More categories off the right edge: the row fades out there, so it reads as "scroll for more". */
+.dh-pick-filters .cats { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); padding-right: 28px; }
 .dh-pick-filters .cats .dh-chip[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
 .dh-pick-foot { position: sticky; bottom: -16px; display: grid; gap: 8px; padding: 10px 0 4px; background: var(--panel); box-shadow: 0 -10px 10px -6px var(--panel); }
 .dh-pick-foot .dh-error { margin: 0; }
@@ -1056,3 +1058,23 @@ html, body, #game, #overlay, #overlay * {
 .dh-linkname:hover, .dh-linkname:focus-visible { color: var(--lamp); text-decoration: underline; }
 .dh-facebtn { border: 0; padding: 0; background: none; cursor: pointer; line-height: 0; }
 .dh-facebtn:focus-visible { outline: 3px solid var(--lamp); }
+
+/* U5 games polish: the ready step, "… is in for …", the end-of-game line and cheers. */
+.v2-chip.ok { display: inline-flex; align-items: center; gap: 4px; background: var(--ok); color: var(--panel-edge); }
+.v2-item.out { opacity: .6; }
+.v2-waiting { box-shadow: inset 0 0 0 2px var(--lamp); }
+.v2-waiting .faces { display: flex; }
+.v2-waiting .faces > * { margin-right: -6px; box-shadow: 0 0 0 2px var(--panel-edge); background: var(--panel); }
+.v2-waiting .dh-btn { min-height: 40px; white-space: nowrap; }
+.v2-summary { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 10px; font-size: 14px; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); text-align: center; }
+.v2-summary svg { color: var(--gold); flex: none; }
+.v2-cheers { display: flex; justify-content: center; gap: 8px; }
+.v2-cheer-btn { width: 48px; height: 44px; border: 0; cursor: pointer; font-size: 22px; line-height: 1; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.v2-cheer-btn:hover, .v2-cheer-btn:focus-visible { box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.v2-cheer-btn:active { transform: translateY(1px); }
+#games > .dh-panel { position: relative; }
+.v2-cheer { position: absolute; bottom: 64px; display: grid; justify-items: center; pointer-events: none; z-index: 5; animation: v2-cheer-up 1.8s ease-out forwards; }
+.v2-cheer .e { font-size: 34px; line-height: 1; }
+.v2-cheer .n { font-family: var(--font-display); font-size: 11px; color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); white-space: nowrap; }
+@keyframes v2-cheer-up { 0% { transform: translateY(0) scale(.6); opacity: 0; } 15% { transform: translateY(-20px) scale(1.1); opacity: 1; } 100% { transform: translateY(-220px) scale(1); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .v2-cheer { animation-duration: .01s; } }

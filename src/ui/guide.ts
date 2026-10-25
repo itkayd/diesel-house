@@ -68,7 +68,7 @@ function steps(): Step[] {
       id: 'games', icon: 'dice-5', chip: 'Games', title: 'Playing games',
       lines: [
         `Walk to a table with a GAMES sign and ${phone ? 'tap Play games' : 'press E'}. Tables are in the hall, the Gaming room, the Café and the Lounge; the Garden’s picnic blanket has the games that need no table.`,
-        'Everyone who opens the same table sits at it. Pick a game, check who’s playing, and tap Start. Anyone else at the table watches, and can play the next one.',
+        'Everyone who opens the same table sits at it. Open a game and you’re in: friends at the table see “… is in” with a Join button. Tap Start when everyone’s in. Anyone not in watches and can cheer; after the game, Rematch keeps the same players.',
         'Party games for 2–8: Quiz night, Sketch & guess, Liar’s dice, Letter rush, Quick Draw, Higher or lower, Would you rather. For two: Four in a row and rock-paper-scissors (tap any friend and pick Duel). On your own: dice, and Night Raid at the Gaming room’s arcade.',
         'Every game has a ? with its rules, and they open by themselves the first time you try one. You stay in voice while you play, so talk it through.',
       ],

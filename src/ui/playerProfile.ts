@@ -147,7 +147,7 @@ export function openPlayerProfile(id: string, name: string, deps: ProfileDeps) {
         f.disabled = status === 'friends' || status === 'outgoing';
         acts.append(f);
       }
-      if (!p.blocked && !isBlocked(p.id)) acts.append(btn('Message', 'message-square', 'pp-message', () => (ui.close(), deps.message(p.id, who, p.character)), false));
+      if (!p.blocked && !isBlocked(p.id)) acts.append(btn('Message', 'mail', 'pp-message', () => (ui.close(), deps.message(p.id, who, p.character)), false));
       acts.append(
         btn('Report', 'info', 'pp-report', () =>
           reportDialog(who, (reason: ReportReason, details: string) => reportPlayer(p.id, reason, details, deps.reportContext(p.id))),

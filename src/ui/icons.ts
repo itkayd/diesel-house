@@ -13,6 +13,7 @@ import {
   Lock,
   LogOut,
   MessageCircleHeart,
+  Mail,
   MessageSquare,
   Mic,
   MicOff,
@@ -81,7 +82,7 @@ import {
 // Lucide icons used in the HUD (no emoji in the HUD, per NEXT.md).
 const ICONS = {
   'book-open': BookOpen, 'circle-help': CircleHelp, 'scroll-text': ScrollText, coffee: Coffee, check: Check, 'door-open': DoorOpen, 'gamepad-2': Gamepad2, hand: Hand, headphones: Headphones,
-  house: House, lock: Lock, 'log-out': LogOut, 'message-circle-heart': MessageCircleHeart, 'message-square': MessageSquare,
+  house: House, lock: Lock, 'log-out': LogOut, mail: Mail, 'message-circle-heart': MessageCircleHeart, 'message-square': MessageSquare,
   mic: Mic, 'mic-off': MicOff, moon: Moon, music: Music, send: Send, settings: Settings, sofa: Sofa, 'user-round': UserRound,
   'volume-1': Volume1, 'volume-2': Volume2, 'volume-x': VolumeX, x: X,
   'audio-lines': AudioLines, 'award': Award, 'calendar': Calendar, 'clock': Clock, 'copy': Copy, 'ellipsis': Ellipsis, 'id-card': IdCard, 'info': Info, 'pencil': Pencil, 'play': Play, 'radio': Radio, 'refresh-cw': RefreshCw, 'share-2': Share2, 'speaker': Speaker, 'square': Square, 'ticket': Ticket, 'timer': Timer, 'users': Users, 'smile-plus': SmilePlus, swords: Swords,

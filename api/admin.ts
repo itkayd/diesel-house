@@ -9,7 +9,7 @@
 // Two locks: the admin_* database functions can only be called with the server's secret key (never sent to a
 // browser), and each one checks the session token first.
 import { isCodeShape, isMemberLogin, PASSWORD_MIN, showCode } from '../src/shared/members.js';
-import { adminDb, hashCode, json, memberAccounts, newCode, same, slowDown, type Env } from './_server.js';
+import { adminDb, hashCode, ipOf, json, memberAccounts, newCode, same, sameSite, slowDown, type Env } from './_server.js';
 
 const COOKIE = '__Host-dh_admin';
 const HOURS = 8;
@@ -36,21 +36,6 @@ const clearCookie = () => `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict
 function withCookie(res: Response, cookie: string) {
   res.headers.append('Set-Cookie', cookie);
   return res;
-}
-
-// The caller's network, for the login lockout (Vercel puts the real address first).
-const ipOf = (request: Request) =>
-  (request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? '').split(',')[0].trim().slice(0, 64) || null;
-
-// Only this site's own page may call (on top of SameSite=Strict): a form on another site can't.
-function sameSite(request: Request) {
-  const origin = request.headers.get('origin');
-  if (!origin) return request.headers.get('sec-fetch-site') !== 'cross-site';
-  try {
-    return new URL(origin).host === new URL(request.url).host || new URL(origin).host === request.headers.get('host');
-  } catch {
-    return false;
-  }
 }
 
 // Calls a database admin function; "not signed in" from the database becomes a 401 that clears the cookie.

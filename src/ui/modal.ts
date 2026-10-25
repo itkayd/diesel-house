@@ -45,6 +45,7 @@ export function openModal(id: string, opts: { dismissable?: boolean; onDismiss?:
     });
   overlay().append(scrim);
   stack.push(entry);
+  dispatchEvent(new Event('dh-modal-open')); // little pop-ups (the tap-a-friend menu) close under a card
   crumb('opened', id);
   if (!opts.quiet) play('click', 0.3);
   // Into the card once it has its contents (they're added straight after this returns).

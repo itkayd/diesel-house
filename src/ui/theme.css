@@ -990,6 +990,12 @@ html, body, #game, #overlay, #overlay * {
   .dh-hud .dh-iconbtn[data-label]::after { content: attr(data-label); font-family: var(--font-display); font-size: 14px; color: var(--cream); white-space: nowrap; }
 }
 #overlay .dh-hud-tc > .dh-room-banner { pointer-events: none; }
+/* Your progress, under the zone pill: XP chip, then Challenges. */
+.v2-progress { display: flex; gap: 8px; align-items: stretch; pointer-events: none; }
+.v2-progress > * { pointer-events: auto; }
+.v2-progress > .dh-iconbtn { width: 48px; height: auto; min-height: 44px; }
+/* Tap-a-friend menu: action buttons stay on one line. */
+#friend-menu .dh-btn { white-space: nowrap; font-size: 15px; }
 
 /* Night Raid's Ult button: a ring that fills with charge, glowing when Shuriken Storm is ready. */
 .dh-arcade .arcade-stage { width: max-content; max-width: 100%; margin: 0 auto; }

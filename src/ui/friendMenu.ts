@@ -268,3 +268,4 @@ export function closeFriendMenu() {
 }
 
 export const friendMenuOpen = () => !!pop;
+addEventListener('dh-modal-open', closeFriendMenu);

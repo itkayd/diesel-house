@@ -27,6 +27,21 @@ export function same(given: string | undefined, expected: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// The caller's network, for the login lockout (Vercel puts the real address first).
+export const ipOf = (request: Request) =>
+  (request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? '').split(',')[0].trim().slice(0, 64) || null;
+
+// Only this site's own page may call (on top of SameSite=Strict): a form on another site can't.
+export function sameSite(request: Request) {
+  const origin = request.headers.get('origin');
+  if (!origin) return request.headers.get('sec-fetch-site') !== 'cross-site';
+  try {
+    return new URL(origin).host === new URL(request.url).host || new URL(origin).host === request.headers.get('host');
+  } catch {
+    return false;
+  }
+}
+
 export const slowDown = () => new Promise((r) => setTimeout(r, 600));
 
 type Db = NonNullable<ReturnType<typeof adminDb>>;

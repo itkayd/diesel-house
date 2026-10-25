@@ -7,7 +7,11 @@
   (`api/admin.ts`, service role); each one checks the session token first. The token lives in an
   HttpOnly, Secure, SameSite=Strict `__Host-` cookie (scripts can't read it), lasts 8 hours, only its
   SHA-256 is stored. 5 wrong passwords lock a username for 15 minutes (10 per network). Requests from
-  other sites are refused. Every change goes in the audit log with who made it.
+  other sites are refused. Every change goes in the audit log with who made it. The admin page has its
+  own stricter Content-Security-Policy (only this site's scripts and `/api`; no frames).
+- **Codes can't be guessed:** member invite codes (`api/join.ts`): 10 wrong per network per 15 minutes
+  (logged in `admin_login_attempts` as `join:<ip>`, which never counts toward the admin lockout); guest
+  codes (`admit_guest`, `20261117_guest_code_throttle.sql`): 8 wrong per visitor per 15 minutes.
 - **Sections:** Dashboard · Players (any level/XP, coins, gems, streak, pet, ban, password, remove,
   history) · Player reports (from Report in the tap-a-friend menu: why, their last chat lines, Ban) ·
   Invites & guests · Rooms · House switches (games, Night Raid, animals per room, pets,

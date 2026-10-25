@@ -2,14 +2,21 @@
 // The invite code (made by Diesel on the door list) works once. No email is involved: the browser then
 // signs in with name + password (src/shared/members.ts maps the name to the account's login).
 import { cleanName, DOMAIN, MAX_MEMBERS, memberLogin, NAME_MAX, NAME_MIN, PASSWORD_MIN } from '../src/shared/members.js';
-import { adminDb, hashCode, json, slowDown, type Env } from './_server.js';
+import { adminDb, hashCode, ipOf, json, sameSite, slowDown, type Env } from './_server.js';
 
 type Body = { code?: string; name?: string; password?: string };
 
 export async function handle(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
+  if (!sameSite(request)) return json({ error: 'Not allowed.' }, 403);
   const db = adminDb(env);
   if (!db) return json({ error: 'Joining is switched off right now. Ask Diesel.' }, 503);
+  // Invite codes can't be guessed: 10 wrong codes from one network per 15 minutes, then it waits.
+  // (Counted in the admin login-attempts table under a "join:" network tag, so it never locks the admin page.)
+  const net = `join:${ipOf(request) ?? 'unknown'}`;
+  const since = new Date(Date.now() - 15 * 60_000).toISOString();
+  const tries = await db.from('admin_login_attempts').select('id', { count: 'exact', head: true }).eq('ip', net).eq('ok', false).gte('at', since);
+  if ((tries.count ?? 0) >= 10) return json({ error: 'Too many wrong codes. Wait 15 minutes and try again.' }, 429);
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -38,6 +45,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     .select('id');
   const codeId = claimed.data?.[0]?.id;
   if (!codeId) {
+    await db.from('admin_login_attempts').insert({ ip: net, username: '(join)', ok: false });
     await slowDown();
     return json({ error: "That invite code doesn't work. It may have been used already. Ask Diesel for a new one." }, 400);
   }

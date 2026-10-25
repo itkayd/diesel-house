@@ -7,7 +7,7 @@ import { critterIcon } from '../critters/art';
 import { critterById } from '../critters/critters';
 import { icon } from './icons';
 import { el, openModal } from './modal';
-import { hudButtons, overlay } from './overlay';
+import { overlay } from './overlay';
 import { portrait } from './portrait';
 import { play } from './sounds';
 import { toast } from './toasts';
@@ -75,12 +75,11 @@ export class ProgressHud {
     this.btn.append(icon('trophy'), this.dot);
     this.dot.hidden = true;
     this.btn.addEventListener('click', () => this.openChallenges());
-    // After the map button, before settings.
-    const row = hudButtons();
-    const map = row.querySelector('#map-button');
-    if (map) map.after(this.btn);
-    else row.prepend(this.btn);
-    document.querySelector('#overlay .dh-hud-tl')?.append(this.chip);
+    // Your progress in one row under the zone pill: the XP chip, then Challenges (the top-right bar keeps
+    // Map · Messages · Settings, so the pill has room on a phone).
+    const row = el('div', 'v2-progress');
+    row.append(this.chip, this.btn);
+    document.querySelector('#overlay .dh-hud-tl')?.append(row);
     this.render();
   }
 

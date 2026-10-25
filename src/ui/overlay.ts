@@ -14,6 +14,7 @@ const HUD_LABELS: [string, string][] = [
   ['guide-button', 'Help'],
   ['map-button', 'Map'],
   ['challenges-button', 'Challenges'],
+  ['messages-button', 'Messages'],
   ['settings-button', 'Settings'],
   ['chat-button', 'Chat'],
   ['jukebox-button', 'Music'],

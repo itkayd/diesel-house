@@ -24,12 +24,16 @@ export function addMessagesButton(deps: MessagesDeps) {
   b.type = 'button';
   b.id = 'messages-button';
   b.setAttribute('aria-label', 'Messages');
-  b.append(icon('message-square'));
+  b.append(icon('mail'));
   const badge = el('span', 'dh-count');
   badge.hidden = true;
   b.append(badge);
   b.addEventListener('click', () => openInbox(deps));
-  hudButtons().prepend(b);
+  // Top-right bar: Map · Messages · Settings.
+  const row = hudButtons();
+  const map = row.querySelector('#map-button');
+  if (map) map.after(b);
+  else row.prepend(b);
   onUnread((n) => {
     badge.hidden = n <= 0;
     badge.textContent = n > 9 ? '9+' : String(n);
@@ -42,7 +46,7 @@ export function addMessagesButton(deps: MessagesDeps) {
     const who = deps.nameOf(m.sender);
     play('emote', 0.5);
     toast({
-      icon: 'message-square',
+      icon: 'mail',
       id: 'dm-toast',
       who: who?.name ?? 'New message',
       what: m.text.length > 90 ? `${m.text.slice(0, 90)}…` : m.text,
@@ -61,7 +65,7 @@ function header(title: string, close: () => void, extra?: HTMLElement) {
   x.setAttribute('aria-label', 'Close');
   x.append(icon('x'));
   x.addEventListener('click', close);
-  head.append(icon('message-square'), t, ...(extra ? [extra] : []), x);
+  head.append(icon('mail'), t, ...(extra ? [extra] : []), x);
   return head;
 }
 

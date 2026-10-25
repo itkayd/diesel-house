@@ -11,6 +11,7 @@ import { currentUser } from '../net/profile';
 import { GameSpots } from '../scenes/gameSpots';
 import { loadSounds } from '../ui/sounds';
 import { addSoundSettings } from '../ui/soundSettings';
+import { addTextSizeSetting } from '../ui/textSize';
 import { saveCharacter, savedCharacter, savedDiscoBright, saveDiscoBright, savedName, savedShowOwnTag, saveShowOwnTag } from '../prefs';
 import { el } from '../ui/modal';
 import { openCredits } from '../ui/credits';
@@ -137,6 +138,7 @@ export function create(this: HouseScene) {
   screen.orientation?.addEventListener?.('change', refit);
 
   this.setupProgress(); // includes the XP chip, which opens your profile
+  addTextSizeSetting();
   this.me.onTagTap(() => this.openMyProfile());
   if (!savedShowOwnTag()) this.me.setTagVisible(false);
   addSettingsSection(

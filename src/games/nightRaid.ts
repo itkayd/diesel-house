@@ -104,7 +104,7 @@ export function openNightRaid(deps: ArcadeDeps) {
   let sheet: HTMLImageElement | null = null;
   let skins: HTMLImageElement | null = null;
   void image('assets/arcade/nightraid.png').then((im) => (sheet = im));
-  void image('assets/characters/skins.png').then((im) => (skins = im));
+  void image('assets/characters/skins.webp').then((im) => (skins = im));
   const stars = Array.from({ length: 50 }, (_, i) => ({ x: (i * 73) % W, y: (i * 151) % H, s: (i % 3) + 1 }));
 
   const pauseBtn = el('button', 'dh-iconbtn arcade-pause');

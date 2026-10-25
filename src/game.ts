@@ -29,6 +29,10 @@ function keepLooping(game: Phaser.Game) {
 }
 
 export function startGame() {
+  // Screen readers: the house is a picture; everything you can do is in the buttons and panels around it.
+  const host = document.getElementById('game');
+  host?.setAttribute('role', 'img');
+  host?.setAttribute('aria-label', 'The house. Walk with the arrow keys or W A S D; the buttons around the edge open the map, messages, chat and settings.');
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',

@@ -54,6 +54,9 @@ function lastProgress(): { xp: number; streak: number } | null {
   }
 }
 
+// Words for screen readers only (the chip's look stays the same).
+const sr = (text: string) => el('span', 'dh-sr', text);
+
 export class ProgressHud {
   private chip = el('button', 'v2-xp');
   private btn = el('button', 'dh-iconbtn');
@@ -67,7 +70,6 @@ export class ProgressHud {
   ) {
     this.chip.type = 'button';
     this.chip.id = 'xp-chip';
-    this.chip.setAttribute('aria-label', 'Your profile, level and streak');
     this.chip.addEventListener('click', openProfile);
     this.btn.type = 'button';
     this.btn.id = 'challenges-button';
@@ -110,15 +112,13 @@ export class ProgressHud {
     if (who.guest || (!p && !last)) {
       mid.append(el('span', 'lv', who.guest ? 'Guest' : 'Lv'));
       if (!who.guest) mid.append(el('span', 'v2-bar v2-bar--skeleton'));
-      this.chip.append(mid);
+      this.chip.append(mid, sr(who.guest ? ': your profile' : ': your profile (level loading)'));
       this.dot.hidden = true;
       this.chip.dataset.level = '';
-      this.chip.setAttribute('aria-label', 'Your profile, level and streak');
       return;
     }
     const xp = p?.xp ?? last!.xp;
     const pr = progress(xp);
-    this.chip.setAttribute('aria-label', `Your profile: level ${pr.level}, ${pr.pct}% to the next`);
     const lv = el('span', 'lv');
     lv.append(medalEl(rankMedal(rankOf(pr.level)), 16), document.createTextNode(`Lv ${pr.level.toLocaleString()}`));
     const bar = el('span', 'v2-bar');
@@ -130,7 +130,8 @@ export class ProgressHud {
     const streak = el('span', 'streak');
     streak.append(icon('flame'), document.createTextNode(String(days)));
     streak.title = `${days}-day streak`;
-    this.chip.append(mid, streak);
+    // A screen reader reads what's shown, then the rest: "Lv 12, your profile, 40% to the next level, 5-day streak".
+    this.chip.append(mid, sr(`, your profile, ${pr.pct}% to the next level,`), streak, sr('-day streak'));
     this.chip.dataset.level = p ? String(pr.level) : '';
     this.dot.hidden = !p || !p.challenges.some((c) => !c.done);
   }

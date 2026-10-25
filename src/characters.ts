@@ -54,8 +54,8 @@ const frameOf = (s: SkinDef, anim: Anim, dir: Dir, step: number) => {
 export const animKey = (skin: Skin, kind: 'walk' | 'idle', dir: Dir) => `${skin}-${kind}-${dir}`;
 
 export function loadCharacterSheets(load: Phaser.Loader.LoaderPlugin) {
-  load.spritesheet('skins', 'assets/characters/skins.png', { frameWidth: data.cell, frameHeight: data.cell });
-  load.spritesheet('faces', 'assets/characters/faces.png', { frameWidth: data.face, frameHeight: data.face });
+  load.spritesheet('skins', 'assets/characters/skins.webp', { frameWidth: data.cell, frameHeight: data.cell });
+  load.spritesheet('faces', 'assets/characters/faces.webp', { frameWidth: data.face, frameHeight: data.face });
 }
 
 export function createCharacterAnims(anims: Phaser.Animations.AnimationManager) {

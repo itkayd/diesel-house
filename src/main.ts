@@ -10,16 +10,28 @@ import { supabase } from './net/supabase';
 import { hideLogin, loginDone, showLogin } from './ui/login';
 import { installUpdateReload, reloadForUpdate } from './ui/update';
 import { installNoSelect, installNoZoom } from './ui/noZoom';
+import { applyTextSize } from './ui/textSize';
 import { errorReportsReady, installErrorReports } from './net/errors';
 
 installErrorReports();
 installUpdateReload();
 installNoZoom();
+applyTextSize(); // Settings → More → Text size, before anything is drawn
 installNoSelect();
 
-// The game (Phaser and the house) downloads while the login screen is up; it runs once you're in.
-const game = import('./game');
-game.catch(() => {}); // (handled below, once it's needed)
+// The game (Phaser and the house, the biggest download). Signed in already: straight away. On the login
+// screen: once the screen is drawn and the phone has a quiet moment, so the login appears (and answers
+// taps) quickly on a slow phone, and the game is usually ready by the time you've typed your password.
+let game: Promise<typeof import('./game')> | null = null;
+function loadGame() {
+  if (!game) {
+    game = import('./game');
+    game.catch(() => {}); // (handled below, once it's needed)
+  }
+  return game;
+}
+const whenIdle = (f: () => void) =>
+  'requestIdleCallback' in window ? requestIdleCallback(f, { timeout: 2500 }) : setTimeout(f, 1200);
 
 // Phaser draws text onto canvases, so the pixel font must be loaded before any text is created.
 async function fontsReady() {
@@ -55,9 +67,11 @@ async function accessWithRetry(guest: boolean) {
 async function signIn() {
   if (!supabase || devTest) return; // no .env, or dev guest mode for automated tests (dev only)
   let session = await currentSession();
+  if (session) loadGame();
   for (;;) {
     if (!session) {
       showLogin();
+      requestAnimationFrame(() => whenIdle(loadGame));
       await loginDone();
       session = await currentSession();
       if (!session) continue;
@@ -85,7 +99,7 @@ void fontsReady()
   .then(async () => {
     let g: typeof import('./game');
     try {
-      g = await game;
+      g = await loadGame();
     } catch (e) {
       // Usually an old copy of the page after an update (its files are gone): load the new one.
       console.warn('Could not load the game', e);

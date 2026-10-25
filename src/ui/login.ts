@@ -9,7 +9,7 @@ import skins from '../house/skins.json';
 
 const SRC = {
   scene: 'assets/ui/login_scene.png',
-  skins: 'assets/characters/skins.png',
+  skins: 'assets/characters/skins.webp',
 };
 const T = 16;
 const SW = 384; // scene size in pixels (24 x 11 tiles)

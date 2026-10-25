@@ -1,7 +1,10 @@
 // Screenshots of every main screen, phone and desktop, for a UI review (dev server on :5173, test mode).
 // Run: DH_CHROMIUM=/opt/pw-browsers/chromium node scripts/ui-audit.mjs <out dir>
+// AXE=1 also runs an axe-core accessibility scan (WCAG 2.1 A + AA) on each screen and writes axe.json.
 import { chromium } from 'playwright-core';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+const AXE = process.env.AXE ? readFileSync('node_modules/axe-core/axe.min.js', 'utf8') : null;
+const axe = {};
 const out = process.argv[2] ?? 'ui-audit';
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ ...(process.env.DH_CHROMIUM ? { executablePath: process.env.DH_CHROMIUM } : { channel: 'msedge' }), headless: true });
@@ -25,6 +28,13 @@ async function session(label, viewport, mobile, { fresh = false, test = true } =
     if (only && !only.includes(name)) return;
     await page.waitForTimeout(350);
     await page.screenshot({ path: `${out}/${label}-${name}.png` });
+    if (AXE) {
+      await page.evaluate(AXE);
+      axe[`${label}-${name}`] = await page.evaluate(async () => {
+        const r = await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] }, exclude: [['canvas']] });
+        return r.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, n: v.nodes.length, nodes: v.nodes.slice(0, 4).map((n) => ({ t: n.target.join(' '), why: n.failureSummary?.split('\n').slice(1, 2).join(' ') })) }));
+      });
+    }
   };
   return { ctx, page, shot };
 }
@@ -115,6 +125,10 @@ for (const [label, viewport, mobile] of [['phone', { width: 390, height: 844 }, 
   await page.waitForSelector('#arcade-play', { timeout: 8000 }).catch(() => {});
   await shot('17-arcade');
   await ctx.close();
+}
+if (AXE) {
+  writeFileSync(`${out}/axe.json`, JSON.stringify(axe, null, 1));
+  for (const [screen, vs] of Object.entries(axe)) console.log(screen, vs.length ? vs.map((v) => `${v.id}(${v.n})`).join(' ') : 'clean');
 }
 console.log(errors.length ? `page errors:\n${errors.join('\n')}` : 'no page errors');
 await browser.close();

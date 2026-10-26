@@ -52,7 +52,9 @@ export function update(this: HouseScene) {
       this.cameras.main.setBounds(w.x, w.y, w.w, tight ? Math.max(lim.column.h, this.cameras.main.height / this.cameras.main.zoom) : w.h);
     }
   }
-  const v = this.canMove && !modalOpen() ? this.inputVelocity() : new Phaser.Math.Vector2(0, 0);
+  // A card on screen (the map, settings, the shop…) blocks your keys and joystick, but a walk you
+  // already started (to a room, a friend, a spot) keeps going underneath it.
+  const v = !this.canMove ? new Phaser.Math.Vector2(0, 0) : modalOpen() ? this.autoVelocity() : this.inputVelocity();
   this.body.setVelocity(v.x, v.y);
 
   const moving = v.lengthSq() > 0;

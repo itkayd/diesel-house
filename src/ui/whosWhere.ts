@@ -26,6 +26,9 @@ export type WhoWhere = {
   answer?: (id: string, yes: boolean) => Promise<void>;
   profile?: (id: string, name: string) => void; // tap a face: their profile
   invite?: () => void; // members: open the invite code (shown when nobody else is in)
+  // Hide and seek mode: set while a round is on. Nobody's dot, room count or whereabouts shows (only you and
+  // the critters), and Join / Go are gone; the line says why.
+  secret?: string | null;
 };
 
 export function addWhosWhereButton(get: () => WhoWhere) {
@@ -50,7 +53,7 @@ function friendRows(w: WhoWhere, close: () => void, get: () => WhoWhere) {
     row.dataset.friend = f.id;
     const txt = el('span');
     txt.style.cssText = 'display:grid;gap:2px;min-width:0;flex:1';
-    const where = f.online ? (!f.zone || f.zone === 'hallway' ? 'In the Great Hall' : `In ${w.label(f.zone)}`) : f.lastSeen ? `Last on ${lastOn(f.lastSeen)}` : 'Not in the house';
+    const where = f.online ? (w.secret ? 'In the house' : !f.zone || f.zone === 'hallway' ? 'In the Great Hall' : `In ${w.label(f.zone)}`) : f.lastSeen ? `Last on ${lastOn(f.lastSeen)}` : 'Not in the house';
     const sub = f.status === 'incoming' ? 'Wants to be friends' : f.status === 'outgoing' ? 'Request sent' : where;
     txt.append(el('span', 't', f.name), el('span', 's', sub));
     const btn = (label: string, ic: Parameters<typeof icon>[0], go: () => void, id: string, quiet = true) => {
@@ -75,7 +78,7 @@ function friendRows(w: WhoWhere, close: () => void, get: () => WhoWhere) {
     const acts: HTMLElement[] =
       f.status === 'incoming' ? [btn('Accept', 'check', answer(true), 'accept', false), iconOnly('Not now', answer(false), 'decline')]
         : f.status === 'outgoing' ? [btn('Cancel', 'x', answer(false), 'cancel')]
-          : f.online ? [btn('Join', 'footprints', () => (close(), get().goTo(f.id)), 'join', false)] : [];
+          : f.online && !w.secret ? [btn('Join', 'footprints', () => (close(), get().goTo(f.id)), 'join', false)] : [];
     row.append(faceButton(f.id, f.name, f.character ? portrait(f.character, 32) : icon('user-round', { width: 32 }), w, close), txt, ...acts);
     box.append(row);
   }
@@ -159,8 +162,15 @@ export function openWhosWhere(get: () => WhoWhere) {
 
   let lastList = '';
   let critNote = el('p');
+  const secretNote = el('p', 'v2-note hs-secret');
+  secretNote.id = 'whos-where-secret';
   const draw = () => {
-    const w = get();
+    const w0 = get();
+    // Hide and seek: nobody else on the map or in the list.
+    const w = w0.secret ? { ...w0, people: [] } : w0;
+    secretNote.hidden = !w0.secret;
+    secretNote.replaceChildren(...(w0.secret ? [icon('eye-off', { width: 18 }), document.createTextNode(w0.secret)] : []));
+    note.textContent = w0.secret ? 'Tap a room on the map and you’ll walk there. Move any way to stop.' : 'Tap a room on the map, or Go next to a friend, and you’ll walk there. Move any way to stop.';
     // Dots: friends' faces, and you (blinking).
     dots.replaceChildren(
       ...w.people.map((p) => {
@@ -209,13 +219,13 @@ export function openWhosWhere(get: () => WhoWhere) {
     me.style.top = pct(w.me.y - 6, w.size.h);
     dots.append(me);
     // The list only when someone moved zone (so a Go button isn't rebuilt under a finger).
-    const key = w.people.map((p) => `${p.id}:${p.zone}:${p.talking}`).join('|') + '#' + (w.friends ?? []).map((f) => `${f.id}:${f.status}:${f.online}:${f.zone}`).join('|');
+    const key = String(!!w0.secret) + w.people.map((p) => `${p.id}:${p.zone}:${p.talking}`).join('|') + '#' + (w.friends ?? []).map((f) => `${f.id}:${f.status}:${f.online}:${f.zone}`).join('|');
     if (key === lastList) return;
     lastList = key;
     list.replaceChildren();
     const friendIds = new Set((w.friends ?? []).filter((f) => f.status === 'friends').map((f) => f.id));
     if (w.friends?.length) list.append(friendRows(w, close, get));
-    if (!w.people.length) {
+    if (!w.people.length && !w0.secret) {
       list.append(el('p', 'v2-note', 'Nobody else is in the house right now.'));
       if (w.invite) {
         const inv = el('button', 'dh-btn dh-btn--quiet');
@@ -252,5 +262,5 @@ export function openWhosWhere(get: () => WhoWhere) {
   };
   draw();
   const timer = setInterval(() => (document.getElementById('whos-where') ? draw() : clearInterval(timer)), 500);
-  ui.panel.append(head, mini, critNote, note, list);
+  ui.panel.append(head, secretNote, mini, critNote, note, list);
 }

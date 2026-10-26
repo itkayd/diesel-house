@@ -79,7 +79,10 @@ export function manualVelocity(this: HouseScene) {
 
 export function whosWhere(this: HouseScene) {
   const here = (r: Remote) => r.info.zone ?? null;
+  // Hide and seek on: the map shows the house and you, never where anyone else is.
+  const secret = this.hideSeek?.active ? 'Hide and seek is on: the map doesn’t show where anyone is until the round ends.' : null;
   return {
+    secret,
     size: { w: this.wallLayer.width, h: this.wallLayer.height },
     zones: this.zones.ids.map((z) => ({ name: z, rect: this.zones.box(z)!, outline: this.zones.outline(z) })),
     me: { x: this.player.x, y: this.player.y, zone: this.zone },
@@ -109,7 +112,7 @@ export function whosWhere(this: HouseScene) {
     invite: currentUser() && !currentUser()!.guest ? () => void openSettings('more') : undefined,
     goTo: (id: string) => {
       const r = this.remotes.get(id);
-      if (!r?.active) return;
+      if (!r?.active || this.hideSeek?.active) return;
       const s = r.avatar.sprite;
       if (this.walkTo(s.x + (s.x > this.player.x ? -14 : 14), s.y)) toast({ icon: 'footprints', who: `Walking to ${r.info.name}`, what: 'Move any way to stop.', small: true, ttl: 1600 });
     },

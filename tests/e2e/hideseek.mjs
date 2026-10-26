@@ -31,7 +31,7 @@ await ev(() => {
 await page.waitForTimeout(400);
 const state = () => ev(() => window.__hs.s && { phase: window.__hs.s.phase, players: window.__hs.s.players.length, seeker: window.__hs.s.seeker, found: window.__hs.s.found, hidden: window.__hs.s.hidden, winners: window.__hs.s.winners });
 const join = (id, name) => ev(([id, name]) => window.__hs.receive({ k: 'act', from: id, a: { t: 'join', name } }), [id, name]);
-const timeUp = () => ev(() => { window.__hs.host.deadline = Date.now() - 1; });
+const timeUp = () => ev(() => { if (window.__hs.host) window.__hs.host.deadline = Date.now() - 1; });
 const me = () => ev(() => ({ x: Math.round(window.__house.player.x), y: Math.round(window.__house.player.y) }));
 const put = (x, y) => ev(([x, y]) => { const h = window.__house; h.body.reset(x, y); h.player.setPosition(x, y); }, [x, y]);
 // A cupboard or bookcase (somewhere you can stand just below it).
@@ -79,6 +79,20 @@ await page.waitForTimeout(200);
 const seek = await ev(() => ({ phase: window.__hs.s.phase, zara: window.__house.remotes.get('zara-1').avatar.sprite.visible, bo: window.__house.remotes.get('bo-2').avatar.sprite.visible, count: !!document.getElementById('hs-count') }));
 await page.screenshot({ path: 'tests/e2e/output/hideseek-torch.png' });
 check('seeking: the torch; Zara (inside) and Bo (far off) can’t be seen', seek, seek.phase === 'seek' && !seek.zara && !seek.bo && !seek.count);
+// The map in Hide and seek mode: you and the house, nobody else.
+await page.click('#map-button');
+await page.waitForSelector('#whos-where');
+await page.waitForTimeout(600);
+const map = await ev(() => ({
+  secret: !document.getElementById('whos-where-secret')?.hidden && document.getElementById('whos-where-secret')?.textContent,
+  dots: document.querySelectorAll('#whos-where-map .dot:not(.me):not(.critter)').length,
+  me: document.querySelectorAll('#whos-where-map .dot.me').length,
+  counts: [...document.querySelectorAll('#whos-where-map .n')].filter((n) => !n.hidden).length,
+  rows: document.querySelectorAll('#whos-where-list [data-person], #whos-where-list [data-walk], #whos-where-list [data-act="join"]').length,
+}));
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => !document.getElementById('whos-where'));
+check('the map in Hide and seek mode: only you, no faces, counts, list or Go buttons', map, /Hide and seek is on/.test(map.secret || '') && map.dots === 0 && map.me === 1 && map.counts === 0 && map.rows === 0);
 // Bo walks right up to you: found.
 await ev(() => { const h = window.__house; h.receiveMove({ id: 'bo-2', x: h.player.x + 8, y: h.player.y, vx: 0, vy: 0, dir: 'down', zone: 'hallway', t: Date.now() }); });
 await page.waitForFunction(() => window.__hs.s.found.includes('bo-2'), null, { timeout: 5000 }).catch(() => {});
@@ -125,6 +139,14 @@ const end2 = await ev(() => ({ sub: document.getElementById('hs-sub')?.textConte
 check('time’s up with you still hidden: the hiders win; everyone visible again', { s, end2 }, s.winners.length === 2 && !s.winners.includes('zara-1') && /win/.test(end2.sub) && end2.alpha === 1 && end2.zara);
 await page.screenshot({ path: 'tests/e2e/output/hideseek-end.png' });
 // After the results, the bar goes.
+await timeUp();
+await page.waitForFunction(() => !window.__hs.s, null, { timeout: 5000 }).catch(() => {});
+await page.click('#map-button');
+await page.waitForSelector('#whos-where');
+await page.waitForTimeout(600);
+const after = await ev(() => ({ secret: !document.getElementById('whos-where-secret')?.hidden, dots: document.querySelectorAll('#whos-where-map .dot:not(.me):not(.critter)').length, rows: document.querySelectorAll('#whos-where-list [data-person]').length }));
+await page.keyboard.press('Escape');
+check('after the round the map shows everyone again', after, !after.secret && after.dots === 2 && after.rows === 2);
 await timeUp();
 await page.waitForFunction(() => !window.__hs.s && !document.getElementById('hs-bar'), null, { timeout: 5000 }).catch(() => {});
 check('the results clear by themselves', await ev(() => !!document.getElementById('hs-bar')), !(await ev(() => !!document.getElementById('hs-bar'))));

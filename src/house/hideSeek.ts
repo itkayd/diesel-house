@@ -112,6 +112,7 @@ export class HideSeek {
     if (!s) {
       if (before && before.phase !== 'end' && !this.host) toast({ icon: 'eye', id: 'hs-off', who: 'Hide and seek called off', small: true, ttl: 2500 });
       this.reset();
+      this.scene.showPresenceStatus(this.scene.presenceState);
       return;
     }
     // Someone started a round: ask everyone who isn't in it yet.
@@ -119,7 +120,10 @@ export class HideSeek {
       const host = s.players.find((p) => p.id === s.host)?.name ?? 'Someone';
       toast({ icon: 'eye', id: 'hs-invite', who: `${host} is starting Hide and seek`, what: 'The whole house can play. Join?', ttl: 20_000, actions: [{ label: 'Join', id: 'hs-join-toast', onClick: () => this.join() }, { label: 'Not now', quiet: true }] });
     }
-    if (before?.phase !== s.phase) this.phaseChanged(s);
+    if (before?.phase !== s.phase) {
+      this.phaseChanged(s);
+      this.scene.showPresenceStatus(this.scene.presenceState); // the room pill: no head counts during a round
+    }
     if (s.last && `${s.round}:${s.last.at}` !== this.lastSeen) {
       this.lastSeen = `${s.round}:${s.last.at}`;
       const who = s.players.find((p) => p.id === s.last!.id)?.name ?? 'Someone';

@@ -101,7 +101,7 @@ export function update(this: HouseScene) {
       const others = this.countIn(zone) - 1;
       const quiet = this.quietRooms.has(zone);
       const music = zone === 'disco' ? this.rooms.get('disco' as RoomId)?.music : null;
-      const who = quiet ? 'Quiet room · people near you hear you softly' : others > 0 ? `${others} here · joining voice…` : 'Nobody else here yet';
+      const who = this.hideSeek?.active ? 'Hide and seek is on' : quiet ? 'Quiet room · people near you hear you softly' : others > 0 ? `${others} here · joining voice…` : 'Nobody else here yet';
       roomBanner(zoneLabel(zone), music ? `${who} · ♪ ${trackName(music)}` : who);
     }
     // (Zone rides on the move message just below; presence is kept for rare changes.)

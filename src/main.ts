@@ -3,6 +3,7 @@ import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
 import './ui/theme.css';
+import './ui/skin.css';
 import { authoriseRealtime, currentSession, hasAccess, NOT_A_MEMBER, signOut, VISIT_OVER } from './net/auth';
 import { setUser } from './net/profile';
 import { devTest } from './net/mode';

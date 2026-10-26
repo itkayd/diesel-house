@@ -1,0 +1,135 @@
+/* Diesel House — the pixel skin (REDESIGN.md R5: "re-skin all panels from the chosen pack", look A).
+   Loaded after theme.css. Real pixel frames instead of flat boxes: sheets and cards get a wood rim with
+   gold rivets and stepped corners, buttons are bevelled and press in, inputs and cards sit in recessed
+   wells, HUD buttons are raised tiles. Frames come from scripts/ui-skin.py (public/assets/ui/skin/, drawn
+   at 2× so border-image uses them 1:1). Colours stay theme.css's night + lamp tokens. */
+
+:root {
+  --skin-panel: url(/assets/ui/skin/panel.png) 10 / 10px;
+  --skin-tile: url(/assets/ui/skin/tile.png) 6 fill / 6px;
+  --skin-well: url(/assets/ui/skin/well.png) 4 fill / 4px;
+  --skin-well-on: url(/assets/ui/skin/well-gold.png) 4 fill / 4px;
+  --skin-gold: url(/assets/ui/skin/btn-gold.png) 6 fill / 6px;
+  --skin-gold-down: url(/assets/ui/skin/btn-gold-down.png) 6 fill / 6px;
+  --skin-plum: url(/assets/ui/skin/btn-plum.png) 6 fill / 6px;
+  --skin-plum-down: url(/assets/ui/skin/btn-plum-down.png) 6 fill / 6px;
+  --skin-red: url(/assets/ui/skin/btn-red.png) 6 fill / 6px;
+  --skin-green: url(/assets/ui/skin/btn-green.png) 6 fill / 6px;
+  --skin-drop: 6px 6px 0 0 rgba(13, 9, 18, .55);
+}
+
+/* ---------- sheets and cards: a wooden frame ---------- */
+.dh-panel, .dh-toast, .dh-sheet {
+  border: 10px solid transparent; border-image: var(--skin-panel); border-image-repeat: stretch;
+  background: var(--panel) url(/assets/ui/skin/dither.png); background-clip: padding-box; image-rendering: pixelated;
+  box-shadow: var(--skin-drop);
+}
+.dh-panel { padding: 14px; }
+.dh-toast { padding: 8px 10px; }
+.dh-toast--small { padding: 4px 8px; }
+.dh-panel h2, .dh-panel .dh-title { color: var(--cream); text-shadow: 2px 2px 0 var(--panel-edge); }
+/* The Shop and the bottom sheets: the frame is the edge of the sheet */
+.dh-scrim > .dh-panel.dh-store { border-width: 10px; }
+.dh-divider { margin: 2px -14px; }
+/* Section headings get a little gold rule, like the store mock */
+.dh-label, .dh-store-sect { position: relative; }
+.dh-store-sect::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: linear-gradient(90deg, var(--lamp-deep), transparent 70%); opacity: .6; }
+
+/* ---------- buttons: bevelled, press in ---------- */
+.dh-btn {
+  border: 6px solid transparent; border-image: var(--skin-gold); background: none; box-shadow: none;
+  padding: 2px 12px 4px; color: var(--panel-edge); image-rendering: pixelated; text-shadow: 0 1px 0 rgba(255, 244, 224, .45);
+}
+.dh-btn:hover { filter: brightness(1.07); }
+.dh-btn:active { transform: translateY(2px); border-image: var(--skin-gold-down); box-shadow: none; }
+.dh-btn--quiet { border-image: var(--skin-plum); color: var(--cream); text-shadow: 1px 1px 0 var(--panel-edge); }
+.dh-btn--quiet:active { border-image: var(--skin-plum-down); }
+.dh-btn--danger { border-image: var(--skin-red); color: var(--panel-edge); }
+.dh-btn--danger:active { border-image: var(--skin-red); }
+.dh-btn:disabled { filter: saturate(.35) brightness(.8); opacity: .8; }
+
+.dh-iconbtn {
+  border: 6px solid transparent; border-image: var(--skin-tile); background: none; box-shadow: var(--skin-drop); image-rendering: pixelated;
+}
+.dh-iconbtn:hover { background: none; filter: brightness(1.18); }
+.dh-iconbtn:active { transform: translateY(2px); box-shadow: 4px 4px 0 0 rgba(13, 9, 18, .55); }
+/* Inside a card the close / small buttons don't need a drop shadow */
+.dh-panel .dh-iconbtn, .dh-sheet .dh-iconbtn, .dh-toast .dh-iconbtn { box-shadow: none; }
+
+/* ---------- the HUD: raised tiles ---------- */
+.dh-pill, .v2-xp, .v2-wallet {
+  border: 6px solid transparent; border-image: var(--skin-tile); background: none; box-shadow: var(--skin-drop); image-rendering: pixelated;
+}
+.dh-pill { padding: 0 8px; min-height: 44px; }
+.v2-xp { padding: 0 6px 0 0; min-height: 44px; }
+.v2-wallet { padding: 0 4px 0 6px; min-height: 44px; }
+.v2-xp:hover, .v2-wallet:hover, .v2-wallet:focus-visible { background: none; filter: brightness(1.15); }
+.v2-wallet .bag { box-shadow: 0 0 0 2px var(--panel-edge); }
+.dh-where { min-height: 44px; }
+
+/* ---------- inputs, chips, segmented controls: recessed wells ---------- */
+.dh-input { border: 4px solid transparent; border-image: var(--skin-well); background: none; box-shadow: none; padding: 7px 8px; }
+.dh-input:focus-visible { border-image: var(--skin-well-on); box-shadow: none; }
+select.dh-input { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(-45deg, transparent 50%, var(--muted) 50%); }
+.dh-chip { border: 4px solid transparent; border-image: var(--skin-well); background: none; box-shadow: none; padding: 0 8px; min-height: 36px; }
+.dh-chip:hover, .dh-chip:focus-visible { border-image: var(--skin-well-on); box-shadow: none; }
+.dh-chip[aria-pressed="true"], .dh-chips .dh-chip[aria-pressed="true"] { border-image: var(--skin-gold); background: none; color: var(--panel-edge); box-shadow: none; }
+.dh-pick-preview .moves .dh-chip[aria-pressed="true"], .dh-store-item .moves .dh-chip[aria-pressed="true"] { border-image: var(--skin-gold); color: var(--panel-edge); box-shadow: none; }
+.dh-seg { border: 4px solid transparent; border-image: var(--skin-well); background: none; box-shadow: none; padding: 0; }
+.dh-seg-btn[aria-checked="true"] { border: 4px solid transparent; border-image: var(--skin-plum); background: none; box-shadow: none; color: var(--lamp); }
+.dh-seg-btn { border: 4px solid transparent; }
+.dh-switch { border: 0; background: var(--panel-edge); box-shadow: 0 0 0 2px var(--panel-edge), inset 0 2px 0 #0f0a15, inset 0 -2px 0 var(--line); }
+.dh-switch::after { box-shadow: inset 0 2px 0 rgba(255, 244, 224, .35), inset 0 -2px 0 rgba(0, 0, 0, .3); }
+.dh-switch:checked { background: #3b2a1f; box-shadow: 0 0 0 2px var(--panel-edge), inset 0 0 0 2px var(--lamp); }
+
+/* ---------- cards: character picks and shop items sit in wells, edged in their rarity ---------- */
+.dh-pick, .dh-scard {
+  border: 4px solid transparent; border-image: var(--skin-well); background: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rc) 70%, transparent);
+}
+.dh-pick[aria-checked="true"] { border-image: var(--skin-well-on); background: none; box-shadow: inset 0 0 0 2px var(--lamp); }
+.dh-scard:hover, .dh-scard:focus-visible, .dh-pick:hover { border-image: var(--skin-well-on); background: none; box-shadow: inset 0 0 0 2px var(--rc); }
+.dh-scard { padding-top: 18px; }
+.dh-scard .tag { top: -4px; left: -4px; box-shadow: 2px 2px 0 var(--panel-edge); }
+.dh-pick-preview, .dh-store-earn, .dh-store-gembox, .dh-store-buy .maths, .dh-store-note {
+  border: 4px solid transparent; border-image: var(--skin-well); background: none; box-shadow: none;
+}
+#store-packs { border-image: var(--skin-well-on); box-shadow: none; }
+.dh-store-hero { border: 4px solid transparent; border-image: var(--skin-well-on); box-shadow: none; }
+.dh-store-stage { border: 4px solid transparent; border-image: var(--skin-well); box-shadow: inset 0 0 0 2px var(--rc); }
+.dh-store-yay { border: 4px solid transparent; border-image: var(--skin-well-on); box-shadow: none; }
+
+/* ---------- tabs: wooden tabs on top of the sheet ---------- */
+.dh-store-tabs { gap: 6px; padding: 0 10px; box-shadow: none; border-bottom: 4px solid var(--panel-edge); }
+.dh-store-tab { border: 6px solid transparent; border-bottom: 0; border-image: url(/assets/ui/skin/btn-plum.png) 6 6 0 fill / 6px 6px 0; background: none; box-shadow: none; margin-bottom: -4px; min-height: 42px; opacity: .8; }
+.dh-store-tab[aria-selected="true"] { border-image: url(/assets/ui/skin/tile.png) 6 6 0 fill / 6px 6px 0; background: none; box-shadow: inset 0 -3px 0 var(--lamp); color: var(--lamp); opacity: 1; }
+.dh-store-purse > .dh-coin { border: 4px solid transparent; border-image: var(--skin-well); background: none; box-shadow: none; height: 36px; padding: 0 6px; }
+.dh-store-gems:hover, .dh-store-gems:focus-visible { border-image: var(--skin-well-on); box-shadow: none; }
+
+/* ---------- the XP bar and other meters: recessed with a lit fill ---------- */
+.v2-bar { box-shadow: 0 0 0 2px var(--panel-edge), inset 0 2px 0 #0f0a15; }
+
+/* ---------- portraits: a little framed window ---------- */
+.dh-portrait { box-shadow: 0 0 0 2px var(--panel-edge), inset 0 -2px 0 rgba(0, 0, 0, .3); }
+
+@media (prefers-reduced-motion: reduce) { .dh-btn:active, .dh-iconbtn:active { transform: none; } }
+
+/* ---------- titles on wooden signs (like the room signs in the house) ---------- */
+.dh-panel h2, .dh-sheet__head > b, .dh-sheet__head .dh-title {
+  display: inline-flex; align-items: center; gap: 8px; flex: none; max-width: 100%; box-sizing: border-box; justify-self: start;
+  border: 6px solid transparent; border-image: url(/assets/ui/skin/sign.png) 6 fill / 6px; image-rendering: pixelated;
+  padding: 0 8px 2px; color: var(--cream); text-shadow: 2px 2px 0 #4a2a19; box-shadow: 4px 4px 0 0 rgba(13, 9, 18, .5);
+}
+.dh-panel h2 svg { color: var(--cream); filter: drop-shadow(2px 2px 0 #4a2a19); }
+/* names inside cards stay plain */
+.dh-store-item .info h2 { border: 0; border-image: none; padding: 0; box-shadow: none; text-shadow: 2px 2px 0 var(--panel-edge); }
+.dh-store-head h2 { flex: none; }
+/* the sign takes its own width; whatever follows it in a header row (help, close) goes to the right */
+.dh-panel h2 { margin-right: auto; }
+.dh-panel .dh-row > h2, .dh-sheet__head > b { margin-right: auto; }
+
+/* ---------- shop cards: a soft glow in the rarity colour behind each face ---------- */
+.dh-scard canvas, .dh-pick canvas { background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--rc) 45%, transparent) 0, transparent 68%); }
+.dh-store-hero .stage { background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--rc) 55%, transparent) 0, transparent 70%); }
+.dh-store-stage { background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--rc) 40%, transparent) 0, var(--panel-edge) 72%); }
+.dh-store-buy .act .dh-btn { white-space: nowrap; font-size: calc(14px * var(--ts, 1)); }

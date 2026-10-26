@@ -187,6 +187,7 @@ Not needed: `Godot Project V4.zip` and `GodotProject.zip` (Ninja Adventure's God
 - **Feedback everywhere:** every tap gets a sound + visual response; every network wait shows a pixel spinner, never a frozen screen; every error says what to do next.
 - **Accessibility:** tap targets ≥ 44 px, contrast AA, reduced-motion setting (turns off disco flashing, which is also a **photosensitivity** concern, so default the disco floor to a slow, soft cycle with no strobing).
 - Run the `design:accessibility-review` and `design:ux-copy` skills over the result.
+- **Skin done 26 Oct 2026:** `src/ui/skin.css` + `scripts/ui-skin.py` (frames drawn in code, in the style of the CC0 Ninja Adventure UI kit, in our night + lamp colours): wooden sheets with gold rivets and stepped corners, titles on wooden signs like the room signs, bevelled buttons that press in, recessed wells for inputs/cards/chips, raised HUD tiles, rarity glows on shop cards. The admin page uses the same frames (`src/admin/admin.css`, end).
 
 **Done when:** a new friend can log in on a phone and, without help, find a friend, join their room, go to the Disco and play a game. Check by watching one real friend try it.
 

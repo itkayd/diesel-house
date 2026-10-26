@@ -54,11 +54,32 @@ function iconTexture(scene: Phaser.Scene, name: IconName, colour: string, ready:
   return null;
 }
 
+// Hide and seek: which furniture you can get into or behind, and what it's called on the button.
+export type HideSpot = { id: string; kind: string; x: number; y: number; w: number; h: number };
+const HIDE_KINDS: [RegExp, string][] = [
+  [/^wardrobe|^dresser|^cabinet/, 'the cupboard'],
+  [/^bookcase|^bookshelf/, 'the bookcase'],
+  [/^fridge/, 'the fridge'],
+  [/^sofa/, 'the sofa'],
+  [/^bed_/, 'the bed'],
+  [/^plant_(big|palm|tall|tree)|^tree_|^bush/, 'the plant'],
+  [/^counter_long|^sink_counter/, 'the counter'],
+  [/^arcade_/, 'the arcade machine'],
+  [/^dj_booth|^speaker_tall|^jukebox/, 'the speakers'],
+  [/^aquarium/, 'the fish tank'],
+  [/^table_long|^desk_/, 'the table'],
+];
+export function hideKind(key: string) {
+  return HIDE_KINDS.find(([re]) => re.test(key))?.[1] ?? null;
+}
+
 export class HouseLook {
   private roomGlow = new Map<RoomId, Phaser.GameObjects.Image>();
   private plates = new Map<RoomId, Nameplate>();
   readonly solids: Phaser.Physics.Arcade.StaticGroup;
   private tall: { x: number; y: number; w: number; h: number; depth: number }[] = []; // things you can stand behind
+  // Furniture you can hide in or behind (Hide and seek, src/house/hideSeek.ts): its footprint, world px.
+  readonly hideSpots: HideSpot[] = [];
 
   constructor(
     private scene: Phaser.Scene,
@@ -85,6 +106,8 @@ export class HouseLook {
         // Only the footprint blocks, so you can stand "behind" the top of tall things.
         const [fx, fy, fw, fh] = String(foot).split(',').map(Number);
         this.solids.add(scene.add.rectangle(fx, fy, fw, fh).setOrigin(0).setVisible(false));
+        const kind = hideKind(key);
+        if (kind) this.hideSpots.push({ id: `${key}@${fx},${fy}`, kind, x: fx, y: fy, w: fw, h: fh });
       }
       const light = prop(o, 'light');
       if (light) this.addLight(o, String(light), reduce);

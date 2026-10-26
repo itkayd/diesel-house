@@ -19,6 +19,7 @@ import { Joystick } from '../ui/joystick';
 import { VoiceControls } from '../ui/voiceControls';
 import { Avatar } from './Avatar';
 import { HouseLook } from './houseLook';
+import type { HideSeek } from '../house/hideSeek';
 import { Hallway } from './hallway';
 import { WalkieButton } from '../ui/walkie';
 import { type NetQuality } from '../net/netQuality';
@@ -102,6 +103,7 @@ export class HouseScene extends Phaser.Scene {
   starting = false;
   presenceState: 'connecting' | 'reconnecting' | 'online' | 'offline' = 'connecting';
   look!: HouseLook;
+  hideSeek: HideSeek | null = null; // src/house/hideSeek.ts
   tappedAvatar = false; // pointer went down on a character: don't start walking towards it
   // Walking by itself (Who's where): corner points for the feet.
   autoPath: Pt[] | null = null;

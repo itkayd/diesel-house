@@ -42,6 +42,7 @@ import { addMessagesButton } from '../ui/messages';
 import { startAnnouncements } from '../ui/announcement';
 import { setLogFacts } from '../net/errors';
 import { modalOpen } from '../ui/modal';
+import { HideSeek } from './hideSeek';
 import { firstRun } from '../ui/hints';
 
 // Going online: presence, voice, chat, games, settings and the HUD buttons, once you have picked a character.
@@ -134,6 +135,7 @@ export async function start(this: HouseScene) {
       onSyncRequest: () => this.sendMove(true),
       onReconnected: () => {
         this.sendMove(true); // so everyone sees us again straight away
+        this.hideSeek?.hello(); // a round of Hide and seek going on?
         // Voice may have died with the socket: rejoin the room (or hallway) we're in.
         const space = this.voice?.space;
         if (space) {
@@ -146,6 +148,7 @@ export async function start(this: HouseScene) {
       onEmote: (m) => this.receiveEmote(m),
       onDice: (m) => this.receiveDice(m),
       onTimer: (m) => this.receiveTimer(m),
+      onHideSeek: (m) => this.hideSeek?.receive(m),
       onDuel: (m) => this.receiveDuel(m),
       onInvite: (m) => this.receiveInvite(m),
       onChat: (e) => {
@@ -163,6 +166,8 @@ export async function start(this: HouseScene) {
   );
   void startDms(this.presence.id); // private messages to us (src/net/dms.ts)
   this.presence.connect();
+  this.hideSeek = new HideSeek(this);
+  setTimeout(() => this.hideSeek?.hello(), 3000); // a round of Hide and seek going on?
   net.start();
   // New version live? Reload at once if we're not talking to anyone; otherwise offer it.
   watchForNewVersion(
@@ -333,6 +338,7 @@ export async function start(this: HouseScene) {
     hosted: (_game, players) => players >= 4 && this.tracker.emit('host_game_4'),
     quickDrawRound: () => this.tracker.emit('qd_round_won'),
     arcade: () => void this.openArcade(),
+    hideSeek: () => this.hideSeek?.start(),
     invite: (spot) => this.inviteToTable(spot),
   });
   this.chat.onProfile = (id, name) => this.openProfileOf(id, name);

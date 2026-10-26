@@ -1205,3 +1205,24 @@ html, body, #game, #overlay, #overlay * {
 .dh-field { display: grid; gap: 6px; }
 /* The wallet in the top bar says it's the way into the Shop */
 .v2-wallet .bag { display: grid; place-items: center; width: 26px; height: 26px; margin-left: -2px; background: var(--lamp); color: var(--panel-edge); }
+
+/* ---------- Hide and seek (src/house/hideSeek.ts) ---------- */
+/* The bar: just above the bottom controls, centred (the notices stay at the top). */
+.hs-bar { position: absolute; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(176px + var(--safe-b)); width: min(420px, calc(100% - 24px)); box-sizing: border-box;
+  padding: 8px 10px !important; gap: 6px !important; pointer-events: auto; }
+.hs-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hs-line b { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: calc(17px * var(--ts, 1)); color: var(--lamp); }
+.hs-time { font-family: var(--font-display); font-size: calc(20px * var(--ts, 1)); color: var(--cream); font-variant-numeric: tabular-nums; }
+.hs-sub { font-size: calc(13px * var(--ts, 1)); color: var(--muted); line-height: 1.35; }
+.hs-acts { display: flex; gap: 8px; }
+.hs-acts .dh-btn { flex: 1; min-height: 44px; font-size: calc(14px * var(--ts, 1)); padding-left: 6px; padding-right: 6px; }
+/* The seeker's torch: the dark, with a lit circle around them (drawn under the HUD). */
+.hs-torch { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+/* The seeker counting: eyes shut. */
+.hs-count { position: absolute; inset: 0; z-index: 25; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center;
+  background: rgba(8, 5, 14, .97); color: var(--cream); pointer-events: auto; }
+.hs-count svg { color: var(--lamp); }
+.hs-count .who { font-family: var(--font-display); font-size: calc(22px * var(--ts, 1)); }
+.hs-count b { font-family: var(--font-display); font-size: calc(96px * var(--ts, 1)); line-height: 1; color: var(--lamp); text-shadow: 4px 4px 0 var(--panel-edge); }
+.hs-count .what { color: var(--muted); }
+@container game (min-width: 641px) { .hs-bar { bottom: calc(96px + var(--safe-b)); } }

@@ -8,7 +8,7 @@ import type { GameId } from './catalog';
 // see that game), from the ? in the games panel, and as a handbook with a tab per game (from the house
 // guide and Settings → More).
 
-export type RulesId = GameId | 'nightraid';
+export type RulesId = GameId | 'nightraid' | 'hideseek';
 export type Rules = { title: string; icon: IconName; players: string; time: string; goal: string; how: string[]; points: string[]; tips: string[] };
 
 export function rulesFor(id: RulesId): Rules {
@@ -89,6 +89,18 @@ export function rulesFor(id: RulesId): Rules {
       points: ['Rock beats scissors, scissors beat paper, paper beats rock. First to 2 wins.'],
       tips: ['The winner wears a crown for 30 seconds.'],
     },
+    hideseek: {
+      title: 'Hide and seek (whole house)', icon: 'eye', players: '2–12', time: '3–4 min',
+      goal: 'Hiders: stay hidden until time’s up. Seeker: find everyone.',
+      how: [
+        'Start it from Games at any table. Everyone in the house is asked to join; it starts after 30 s, or when the starter taps Start.',
+        'One seeker is picked at random and counts with their eyes shut for 30 s while everyone hides.',
+        'Hide anywhere. Next to a cupboard, sofa, bookcase, bed or big plant, tap Hide to get inside: nobody can see you, but you can’t move until you come out.',
+        'The seeker gets a torch: in the dark they only see people close by. Walking into someone finds them; Search checks inside the furniture you’re next to.',
+      ],
+      points: ['Anyone still hidden after 2½ minutes wins. Find everyone and the seeker wins.', 'Playing and winning pays game coins, like the table games.'],
+      tips: ['In the last 45 seconds, hiding places rustle now and then: listen with your eyes.', 'Voice still works: whisper, or you’ll give yourself away.'],
+    },
     nightraid: {
       title: 'Night Raid (arcade)', icon: 'gamepad-2', players: '1', time: '2–5 min',
       goal: 'Defend the rooftop from waves of spooks and beat your best score.',
@@ -158,7 +170,7 @@ export function rulesFold(id: RulesId) {
 }
 
 // The handbook: a tab for every game.
-export const HANDBOOK: RulesId[] = ['quiz', 'sketch', 'liars', 'letters', 'quickdraw', 'higherlower', 'wyr', 'four', 'dice', 'rps', 'nightraid'];
+export const HANDBOOK: RulesId[] = ['quiz', 'sketch', 'liars', 'letters', 'quickdraw', 'higherlower', 'wyr', 'four', 'dice', 'rps', 'hideseek', 'nightraid'];
 
 export function openRules(start: RulesId = 'quiz') {
   const { panel, close } = openModal('rules', { dismissable: true, label: 'rules-title' });

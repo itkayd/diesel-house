@@ -52,6 +52,7 @@ type Handlers = {
   onDice: (m: DiceMsg) => void;
   onDuel: (m: DuelMsg) => void;
   onTimer?: (m: TimerMsg) => void;
+  onHideSeek?: (m: unknown) => void; // Hide and seek (src/house/hideSeek.ts checks the message)
   onInvite?: (m: InviteMsg) => void;
   // Room chat changes (new or deleted messages and reactions), already filtered by the database to rooms
   // this person may see.
@@ -136,6 +137,10 @@ export class Presence {
       countMessage('received', 'invite');
       const m = payload as InviteMsg;
       if (!this.replaced && Array.isArray(m.to) && m.to.includes(this.id) && m.from !== this.id) this.h.onInvite?.(m);
+    });
+    ch.on('broadcast', { event: 'hs' }, ({ payload }) => {
+      countMessage('received', 'hs');
+      if (!this.replaced) this.h.onHideSeek?.(payload);
     });
     ch.on('broadcast', { event: 'timer' }, ({ payload }) => {
       countMessage('received', 'timer');
@@ -328,6 +333,14 @@ export class Presence {
     if (this.replaced || this.channel?.state !== 'joined') return;
     countMessage('sent', 'timer');
     void this.channel.send({ type: 'broadcast', event: 'timer', payload: { ...m, from: this.id } });
+  }
+
+  // Hide and seek: the host's game state, or a player's move to the host. False if not connected.
+  sendHideSeek(m: unknown) {
+    if (this.replaced || this.channel?.state !== 'joined') return false;
+    countMessage('sent', 'hs');
+    void this.channel.send({ type: 'broadcast', event: 'hs', payload: m });
+    return true;
   }
 
   sendInvite(m: Omit<InviteMsg, 'from'>) {

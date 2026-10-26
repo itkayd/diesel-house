@@ -18,6 +18,11 @@ import {
   Gem,
   Sparkles,
   ShoppingBag,
+  Eye,
+  EyeOff,
+  Search,
+  Flashlight,
+  Ghost,
   ChevronRight,
   Shirt,
   MessageSquare,
@@ -96,7 +101,7 @@ const ICONS = {
   'arrow-up': ArrowUp, 'arrow-down': ArrowDown, footprints: Footprints, map: MapIcon,
   flame: Flame, trophy: Trophy, sun: Sun, 'calendar-days': CalendarDays, 'clipboard-list': ClipboardList, 'paw-print': PawPrint,
   tv: Tv, pause: Pause, rewind: Rewind, 'fast-forward': FastForward, 'maximize-2': Maximize2, 'minimize-2': Minimize2, 'chevron-down': ChevronDown, link: Link,
-  brain: Brain, brush: Brush, dices: Dices, type: Type, coins: Coins, gem: Gem, sparkles: Sparkles, 'shopping-bag': ShoppingBag, 'chevron-right': ChevronRight, shirt: Shirt,
+  brain: Brain, brush: Brush, dices: Dices, type: Type, coins: Coins, gem: Gem, sparkles: Sparkles, 'shopping-bag': ShoppingBag, eye: Eye, 'eye-off': EyeOff, search: Search, flashlight: Flashlight, ghost: Ghost, 'chevron-right': ChevronRight, shirt: Shirt,
 } satisfies Record<string, IconNode>;
 export type IconName = keyof typeof ICONS;
 

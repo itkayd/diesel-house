@@ -52,7 +52,7 @@ export const house: Section = {
     const games = h(
       'div',
       { class: 'adm-chips', id: 'games-off' },
-      ...TABLE_GAMES.map((g) => {
+      ...[...TABLE_GAMES, { id: 'hideseek', label: 'Hide and seek' }].map((g) => {
         const b = h('button', { type: 'button', class: 'adm-chip', 'aria-pressed': String(!off.has(g.id)), 'data-game': g.id }, g.label);
         b.addEventListener('click', () => {
           if (off.has(g.id)) off.delete(g.id);

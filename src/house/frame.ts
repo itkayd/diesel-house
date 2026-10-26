@@ -54,7 +54,9 @@ export function update(this: HouseScene) {
   }
   // A card on screen (the map, settings, the shop…) blocks your keys and joystick, but a walk you
   // already started (to a room, a friend, a spot) keeps going underneath it.
-  const v = !this.canMove ? new Phaser.Math.Vector2(0, 0) : modalOpen() ? this.autoVelocity() : this.inputVelocity();
+  const frozen = !!this.hideSeek?.frozen(); // Hide and seek: the seeker counting, or a hider inside something
+  if (frozen) this.autoPath = null;
+  const v = !this.canMove || frozen ? new Phaser.Math.Vector2(0, 0) : modalOpen() ? this.autoVelocity() : this.inputVelocity();
   this.body.setVelocity(v.x, v.y);
 
   const moving = v.lengthSq() > 0;
@@ -116,6 +118,7 @@ export function update(this: HouseScene) {
   // Hallway icons and the walkie button: 10 times a second is plenty (not every frame).
   // Standing at a game spot: "Play games · E". Walk off and an open games panel closes.
   const spot = this.games && this.canMove && !this.presence?.isReplaced ? this.spots.near(this.player.x, this.player.y) : null;
+  this.hideSeek?.frame();
   this.games?.showPrompt(spot, modalOpen());
   this.showBoardPrompt(!modalOpen() && this.canMove && this.spots.nearBoard(this.player.x, this.player.y));
   this.showArcadePrompt(!modalOpen() && this.canMove && !spot && arcadeOn() && nearArcade(this.player.x, this.player.y));

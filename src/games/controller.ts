@@ -167,6 +167,7 @@ export type GameDeps = {
   hosted?: (game: GameId, players: number) => void;
   quickDrawRound?: () => void; // we were fastest in a Quick Draw round
   arcade?: () => void; // open Night Raid (one player)
+  hideSeek?: () => void; // start (or join) Hide and seek, the whole house
   // U4: ping friends (or everyone in the house) to come and play here. Returns who was asked, or why not.
   invite?: (spot: SpotId) => string;
 };
@@ -523,6 +524,25 @@ export class Games {
       a.addEventListener('click', () => {
         this.close();
         arcade();
+      });
+      body.append(a);
+    }
+    // Hide and seek: the whole house, not this table.
+    const hs = this.deps.hideSeek;
+    if (hs && gameOn('hideseek')) {
+      const a = el('button', 'v2-game v2-game--wide');
+      a.type = 'button';
+      a.id = 'games-hideseek';
+      const gi = el('span', 'gi');
+      gi.append(icon('eye'));
+      const top = el('span', 'top');
+      const tag = el('span', 'tag', '2–12');
+      tag.prepend(icon('users', { width: 12 }));
+      top.append(gi, tag);
+      a.append(top, el('b', '', 'Hide and seek (whole house)'), el('span', '', 'One seeker with a torch, everyone else hides in cupboards, behind sofas, among the plants.'));
+      a.addEventListener('click', () => {
+        this.close();
+        hs();
       });
       body.append(a);
     }

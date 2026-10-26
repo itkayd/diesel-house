@@ -331,11 +331,7 @@ select.dh-input { appearance: none; background-image: linear-gradient(45deg, tra
 .dh-fav { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; font-size: calc(18px * var(--ts, 1)); color: var(--faint); }
 .dh-fav[aria-pressed="true"] { color: var(--lamp); }
 .dh-pick-filters { display: grid; gap: 8px; }
-.dh-pick-filters .cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.dh-pick-filters .cats::-webkit-scrollbar { display: none; }
 /* More categories off the right edge: the row fades out there, so it reads as "scroll for more". */
-.dh-pick-filters .cats { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); padding-right: 28px; }
-.dh-pick-filters .cats .dh-chip[aria-selected="true"] { background: var(--panel-hi); color: var(--lamp); box-shadow: inset 0 -3px 0 var(--lamp); }
 .dh-pick-foot { position: sticky; bottom: -16px; display: grid; gap: 8px; padding: 10px 0 4px; background: var(--panel); box-shadow: 0 -10px 10px -6px var(--panel); }
 .dh-pick-foot .dh-error { margin: 0; }
 
@@ -1096,29 +1092,116 @@ html, body, #game, #overlay, #overlay * {
 .dh-coin b { font-weight: 500; }
 .dh-coin.pulse { animation: dh-coin-pulse .5s steps(4); }
 @keyframes dh-coin-pulse { 50% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .dh-coin.pulse { animation: none; } }
 .v2-wallet { display: inline-flex; align-items: center; gap: 10px; border: 0; cursor: pointer; padding: 4px 10px; min-height: 44px; box-sizing: border-box;
   background: var(--panel); color: var(--cream); box-shadow: 0 0 0 3px var(--panel-edge); }
 .v2-wallet:hover, .v2-wallet:focus-visible { background: var(--panel-hi); outline: none; }
 .v2-wallet[hidden] { display: none; }
-.dh-purse { display: inline-flex; gap: 12px; margin-left: auto; margin-right: 8px; padding: 6px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
-.dh-purse[hidden] { display: none; }
-.dh-buy { display: grid; gap: 8px; }
-.dh-buy[hidden] { display: none; }
-.dh-buy .maths { display: grid; gap: 2px; padding: 8px 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); font-size: calc(14px * var(--ts, 1)); }
-.dh-buy .maths .r { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
-.dh-buy .maths .r b { color: var(--cream); font-family: var(--font-display); font-weight: 500; }
-.dh-buy .maths .r.after { border-top: 2px solid var(--line); padding-top: 4px; margin-top: 2px; }
-.dh-buy .maths .r.short { border-top: 2px solid var(--line); padding-top: 4px; margin-top: 2px; }
-.dh-buy .maths .r.short b { color: var(--error); }
-.dh-buy .v2-note { margin: 0; }
-@media (prefers-reduced-motion: reduce) { .dh-coin.pulse { animation: none; } }
 /* Buttons that can't be pressed yet look it (and say why in their label). */
 .dh-btn:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.5); }
-/* The buy card on a phone stays compact: the sums in one row, Try on and Keep wearing side by side. */
-.dh-buy .maths { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.dh-buy .maths .r { display: grid; gap: 2px; justify-items: start; font-size: calc(12px * var(--ts, 1)); }
-.dh-buy .maths .r b { font-size: calc(14px * var(--ts, 1)); }
-.dh-buy .maths .r.after, .dh-buy .maths .r.short { border-top: 0; padding-top: 0; margin-top: 0; border-left: 2px solid var(--line); padding-left: 8px; }
-.dh-pick-foot.buying { grid-template-columns: 1fr 1fr; }
-.dh-pick-foot.buying > .dh-buy, .dh-pick-foot.buying > .dh-error { grid-column: 1 / -1; }
-.dh-pick-foot.buying > .dh-btn--quiet { font-size: calc(14px * var(--ts, 1)); min-height: 44px; padding-left: 8px; padding-right: 8px; }
+
+/* ---------- The Shop (src/ui/store.ts, design/store/store.html): its own sheet ---------- */
+:root { --r-common: #bcaccb; --r-rare: #7fb2ff; --r-epic: #c99bff; --r-free: #6fdc8c; }
+.dh-scrim > .dh-panel.dh-store { width: min(100%, 560px); height: min(760px, 100%); padding: 0; gap: 0; display: flex; flex-direction: column; overflow: hidden; }
+.dh-store-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; }
+.dh-store-head h2 { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.dh-store-head h2 svg { color: var(--lamp); flex: none; }
+.dh-store-purse { display: flex; gap: 6px; }
+.dh-store-purse > .dh-coin { height: 36px; padding: 0 10px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); font-size: calc(14px * var(--ts, 1)); }
+.dh-store-gems { border: 0; cursor: pointer; font: inherit; }
+.dh-store-gems .plus { display: grid; place-items: center; width: 18px; height: 18px; margin-left: 2px; background: var(--lamp); color: var(--panel-edge); font-size: 14px; line-height: 1; }
+.dh-store-gems:hover, .dh-store-gems:focus-visible { box-shadow: inset 0 0 0 2px var(--lamp); outline: none; }
+.dh-store-tabs { display: flex; gap: 4px; padding: 0 12px; box-shadow: inset 0 -3px 0 var(--panel-edge); }
+.dh-store-tab { flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; cursor: pointer;
+  background: transparent; color: var(--muted); font-family: var(--font-display); font-size: calc(15px * var(--ts, 1)); }
+.dh-store-tab[aria-selected="true"] { color: var(--lamp); background: var(--panel-hi); box-shadow: inset 0 -3px 0 var(--lamp); }
+.dh-store-tab:hover { color: var(--cream); }
+.dh-store-tab:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
+.dh-store-body { flex: 1; min-height: 0; overflow-y: auto; touch-action: pan-y; padding: 12px 14px calc(18px + var(--safe-b)); display: grid; align-content: start; gap: 10px; }
+.dh-store-sect { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 6px; font-family: var(--font-display);
+  font-size: calc(13px * var(--ts, 1)); letter-spacing: .06em; text-transform: uppercase; color: var(--cream); }
+.dh-store-sect .side { color: var(--muted); letter-spacing: .02em; text-transform: none; font-family: var(--font-body); font-size: calc(12px * var(--ts, 1)); }
+.dh-store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.dh-store-filter { grid-template-columns: repeat(4, 1fr); }
+.dh-store-filter .dh-seg-btn { min-height: 40px; }
+/* A card: rarity tag, face, name, price (or ✓ Owned) */
+.dh-scard { --rc: var(--r-common); position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-height: 128px; padding: 22px 4px 8px;
+  border: 0; cursor: pointer; font: inherit; color: var(--cream); background: var(--panel-edge); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rc) 55%, var(--panel-edge)); }
+.dh-scard:hover, .dh-scard:focus-visible { box-shadow: inset 0 0 0 3px var(--rc); outline: none; background: #1d1526; }
+.dh-scard canvas { width: 56px; height: 56px; image-rendering: pixelated; }
+.dh-scard .tag { position: absolute; top: 0; left: 0; padding: 1px 6px 2px; font-family: var(--font-display); font-size: calc(11px * var(--ts, 1)); color: var(--panel-edge); background: var(--rc); }
+.dh-scard .nm { font-size: calc(13px * var(--ts, 1)); line-height: 1.15; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dh-scard .st { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-display); font-size: calc(13px * var(--ts, 1)); color: var(--ok); }
+.dh-scard.own canvas { opacity: .85; }
+.r-common { --rc: var(--r-common); } .r-rare { --rc: var(--r-rare); } .r-epic { --rc: var(--r-epic); } .r-starter { --rc: var(--r-free); }
+.dh-price { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-display); font-size: calc(14px * var(--ts, 1)); }
+.dh-price b { font-weight: 500; }
+.dh-price.coins { color: var(--gold); } .dh-price.gems { color: var(--gem); }
+/* This week's pick */
+.dh-store-hero { display: flex; align-items: center; gap: 14px; padding: 12px; border: 0; cursor: pointer; font: inherit; color: var(--cream); text-align: left;
+  background: linear-gradient(90deg, #3a2c46, #2b2034 70%); box-shadow: inset 0 0 0 2px var(--rc); }
+.dh-store-hero:hover, .dh-store-hero:focus-visible { background: linear-gradient(90deg, #47365a, #2b2034 70%); outline: none; }
+.dh-store-hero .stage { width: 64px; height: 64px; image-rendering: pixelated; flex: none; background: radial-gradient(circle at 50% 70%, #4a3a57 0, transparent 70%); }
+.dh-store-hero .info { flex: 1; display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.dh-store-hero .info b { font-family: var(--font-display); font-size: calc(20px * var(--ts, 1)); font-weight: 600; }
+.dh-store-hero > svg { color: var(--muted); flex: none; }
+/* Earning coins, the gems tab */
+.dh-store-earn { display: grid; gap: 8px; padding: 12px; margin-top: 6px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-store-earn .top { display: flex; align-items: center; gap: 8px; color: var(--gold); }
+.dh-store-earn .top b { font-family: var(--font-display); font-weight: 600; color: var(--cream); }
+.dh-store-earn .today { font-size: calc(12px * var(--ts, 1)); color: var(--muted); }
+.dh-store-earn ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: calc(13px * var(--ts, 1)); color: var(--muted); }
+.dh-store-gembox { display: flex; align-items: center; gap: 10px; padding: 14px; color: var(--gem); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-store-gembox b { font-family: var(--font-display); font-size: calc(28px * var(--ts, 1)); font-weight: 600; }
+.dh-store-gembox span { color: var(--muted); }
+.dh-store-note { padding: 12px; background: var(--panel-hi); box-shadow: inset 0 0 0 2px var(--line); display: grid; gap: 4px; }
+.dh-store-note b { font-family: var(--font-display); font-weight: 600; }
+.dh-store-note p { margin: 0; font-size: calc(13px * var(--ts, 1)); color: var(--muted); line-height: 1.45; }
+#store-packs { box-shadow: inset 0 0 0 2px var(--r-epic); }
+.dh-store-fine { margin: 0; font-size: calc(12px * var(--ts, 1)); color: var(--muted); line-height: 1.4; }
+/* The buy card */
+.dh-scrim > .dh-panel.dh-store-item { width: min(100%, 400px); }
+.dh-store-item .top { position: relative; display: flex; gap: 14px; align-items: center; padding-right: 52px; }
+.dh-store-item .top > .dh-iconbtn { position: absolute; top: 0; right: 0; }
+.dh-store-stage { flex: none; width: 112px; height: 112px; display: grid; place-items: center; background: radial-gradient(circle at 50% 65%, #3a2c46 0, var(--panel-edge) 72%); box-shadow: inset 0 0 0 2px var(--rc); }
+.dh-store-stage canvas { width: 96px; height: 96px; image-rendering: pixelated; }
+.dh-store-item .info { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.dh-store-item .info h2 { font-size: calc(22px * var(--ts, 1)); }
+.dh-store-item .moves { display: flex; gap: 6px; flex-wrap: wrap; }
+.dh-store-item .moves .dh-chip { min-height: 36px; padding: 4px 8px; }
+.dh-store-item .moves .dh-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--lamp); color: var(--lamp); }
+.dh-store-buy { display: grid; gap: 10px; }
+.dh-store-buy .maths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 12px; background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--line); }
+.dh-store-buy .maths .r { display: grid; gap: 2px; justify-items: start; font-size: calc(12px * var(--ts, 1)); color: var(--muted); }
+.dh-store-buy .maths .r b { font-family: var(--font-display); font-weight: 500; font-size: calc(15px * var(--ts, 1)); color: var(--cream); }
+.dh-store-buy .maths .r.after, .dh-store-buy .maths .r.short { border-left: 2px solid var(--line); padding-left: 10px; }
+.dh-store-buy .maths .r.after b { color: var(--ok); }
+.dh-store-buy .maths .r.short b { color: var(--error); }
+.dh-store-buy .act { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.dh-store-buy .act .dh-btn { padding-left: 8px; padding-right: 8px; font-size: calc(15px * var(--ts, 1)); }
+.dh-store-buy .dh-error { margin: 0; }
+.dh-store-yay { margin: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-family: var(--font-display); font-size: calc(18px * var(--ts, 1));
+  color: var(--lamp); background: var(--panel-edge); box-shadow: inset 0 0 0 2px var(--lamp); animation: dh-yay .5s steps(5); }
+@keyframes dh-yay { from { transform: scale(.85); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dh-store-yay { animation: none; } }
+@container game (max-width: 640px) {
+  .dh-scrim > .dh-panel.dh-store { height: 90%; max-height: 90%; }
+  .dh-store-grid { grid-template-columns: repeat(3, 1fr); }
+  .dh-store-head { padding: 12px 12px 8px; }
+  .dh-store-body { padding: 10px 12px calc(18px + var(--safe-b)); }
+  .dh-store-tab { font-size: calc(14px * var(--ts, 1)); gap: 4px; }
+  .dh-store-item .top { gap: 12px; padding-right: 0; align-items: end; }
+  .dh-store-stage { width: 96px; height: 96px; }
+  .dh-store-stage canvas { width: 80px; height: 80px; }
+}
+@container game (max-width: 359px) { .dh-store-purse > .dh-coin { padding: 0 6px; } .dh-store-tab svg { display: none; } }
+/* The wardrobe's way to the Shop */
+.dh-pick--shop { --rc: var(--lamp); align-content: center; color: var(--lamp); }
+.dh-pick--shop .st { color: var(--muted); }
+.dh-pick-filters { grid-template-columns: 1fr auto; align-items: center; }
+.dh-pick-filters[hidden] { display: none; }
+.dh-pick-filters .dh-chip { min-height: 44px; }
+.dh-pick-filters .dh-chip[aria-pressed="true"] { color: var(--lamp); box-shadow: inset 0 0 0 2px var(--lamp); }
+.dh-field { display: grid; gap: 6px; }
+/* The wallet in the top bar says it's the way into the Shop */
+.v2-wallet .bag { display: grid; place-items: center; width: 26px; height: 26px; margin-left: -2px; background: var(--lamp); color: var(--panel-edge); }

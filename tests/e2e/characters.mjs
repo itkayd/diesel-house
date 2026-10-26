@@ -17,36 +17,27 @@ const st = () => page.evaluate(() => { const h = window.__house; return { x: Mat
 const hold = async (key, ms = 2500) => { await page.keyboard.down(key); await page.waitForTimeout(ms); const during = await st(); await page.keyboard.up(key); await page.waitForTimeout(150); return { during, after: await st() }; };
 const tp = (x, y) => page.evaluate(([x, y]) => window.__house.body.reset(x, y), [x, y]);
 
-// First launch: picker (R4: 92 Ninja Adventure characters; 12 free starters can be worn now)
+// First launch: the wardrobe (R4 + S2c): only what you can wear, the 12 free starters; the Shop sells the rest.
 const n = await page.locator('button[data-character]').count();
-const free = await page.$$eval('button[data-character]:has(.st.own)', (bs) => bs.map((b) => b.dataset.character));
-check('picker shows on first launch with every Ninja character (92), 12 free to wear', { n, free: free.length }, n === 92 && free.length === 12);
+const free = await page.$$eval('button[data-character]', (bs) => bs.filter((b) => /Free/.test(b.textContent)).length);
+const firstVisit = await page.evaluate(() => ({ title: document.getElementById('picker-title')?.textContent, shop: !!document.getElementById('picker-shop'), filters: document.querySelector('.dh-pick-filters')?.hidden }));
+check('first launch: “Who are you?” with the 12 free starters, no Shop card or search yet', { n, free, firstVisit }, n === 12 && free === 12 && firstVisit.title === 'Who are you?' && !firstVisit.shop && firstVisit.filters);
 let a = await st(); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(600); await page.keyboard.up('ArrowRight'); let b = await st();
 check('cannot walk while picker is open', b, a.x === b.x);
 // Portraits drawn (non-blank) — checked numerically
 const blank = await page.evaluate(() => [...document.querySelectorAll('button[data-character] canvas')].filter((c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return false; return true; }).length);
 check('every portrait has a picture', blank, blank === 0);
-// Search and categories
-await page.fill('#picker-search', 'ninja');
-const ninjas = await page.locator('button[data-character]').count();
-await page.fill('#picker-search', '');
-await page.click('[data-cat="fantasy"]');
-const fantasy = await page.$$eval('button[data-character]', (bs) => bs.map((b) => b.dataset.character));
-await page.click('[data-cat="all"]');
-check('search narrows the list, and categories filter it', { ninjas, fantasy: fantasy.length }, ninjas >= 15 && ninjas < 92 && fantasy.includes('ninja.skeleton') && !fantasy.includes('ninja.boy'));
-// A shop character: preview it, star it, but Done keeps a free one
-await page.click('button[data-character="ninja.knight"]');
-const shop = await page.evaluate(() => ({ name: document.getElementById('picker-selected')?.textContent, tag: document.querySelector('.dh-pick-preview .dh-rarity')?.textContent }));
+// Preview a starter, save it as a favourite
+await page.click('button[data-character="ninja.oldman"]');
+const prev = await page.evaluate(() => ({ name: document.getElementById('picker-selected')?.textContent, tag: document.querySelector('.dh-pick-preview .dh-rarity')?.textContent, knight: !!document.querySelector('button[data-character="ninja.knight"]') }));
 await page.click('#picker-fav');
-await page.click('[data-cat="fav"]');
-const favs = await page.$$eval('button[data-character]', (bs) => bs.map((b) => b.dataset.character));
-await page.click('[data-cat="all"]');
-check('a shop character previews with its rarity and can be saved as a favourite', { shop, favs }, shop.name === 'Knight' && shop.tag === 'Rare' && JSON.stringify(favs) === '["ninja.knight"]');
+const starred = await page.$$eval('button[data-character] .fv', (fs) => fs.map((f) => f.closest('button').dataset.character));
+check('a starter previews as Free and can be saved; shop characters aren’t in the wardrobe', { prev, starred }, prev.name === 'Old Man' && prev.tag === 'Free' && !prev.knight && JSON.stringify(starred) === '["ninja.oldman"]');
 
 // Picking without a name is refused
 await page.click('button[data-character="ninja.villager2"]');
 await page.click('#picker-done');
-check('picker refuses to continue without a name', { error: await page.locator('#picker-error').textContent() }, (await page.locator('button[data-character]').count()) === 92);
+check('picker refuses to continue without a name', { error: await page.locator('#picker-error').textContent() }, (await page.locator('button[data-character]').count()) === 12);
 await page.fill('#player-name', 'Tester');
 await page.click('button[data-character="ninja.villager2"]');
 await page.click('#picker-done');
@@ -83,16 +74,19 @@ await page.evaluate(() => localStorage.setItem('diesel-house.character', '18'));
 await page.reload(); await page.waitForFunction(() => window.__house?.player);
 b = await st(); check('an old saved character number (18) becomes its starter (Woman)', b, b.anim === 'ninja.woman-idle-down');
 
-// Change character; try a shop one on for 60 s (only on this screen)
+// Change character: the wardrobe again, now with "More in the Shop"; try a shop one on for 60 s (only on this screen)
 await page.click('#xp-chip');
-check('Change character reopens picker', 0, (await page.locator('button[data-character]').count()) === 92);
-await page.click('button[data-character="ninja.samurai"]');
-const keep = await page.locator('#picker-done').textContent();
-await page.click('#picker-try');
+await page.waitForSelector('#picker-shop');
+const again = await page.evaluate(() => ({ n: document.querySelectorAll('button[data-character]').length, title: document.getElementById('picker-title')?.textContent, done: document.getElementById('picker-done')?.textContent }));
+check('Change character reopens the wardrobe with a way to the Shop', again, again.n === 12 && again.title === 'Your character' && again.done === 'Done');
+await page.click('#picker-shop');
+await page.waitForSelector('#store-tab-characters[aria-selected="true"]');
+await page.click('[data-item="ninja.samurai"]');
+await page.click('#store-try');
 await page.waitForTimeout(300);
 r = await hold('ArrowRight', 800);
-const kept = await page.evaluate(() => ({ mine: window.__house.character, saved: localStorage.getItem('diesel-house.character') }));
-check('Try it on: the shop character walks around, but your own stays saved', { anim: r.during.anim, keep, kept }, r.during.anim === 'ninja.samurai-walk-right' && /Keep wearing Woman/.test(keep ?? '') && kept.mine === 'ninja.woman' && kept.saved === 'ninja.woman'); // (the old number was saved back as a key)
+const kept = await page.evaluate(() => ({ mine: window.__house.character, saved: localStorage.getItem('diesel-house.character'), open: !!document.getElementById('store') }));
+check('Shop → Try on: the shop character walks around, but your own stays saved', { anim: r.during.anim, kept }, r.during.anim === 'ninja.samurai-walk-right' && !kept.open && kept.mine === 'ninja.woman' && kept.saved === 'ninja.woman'); // (the old number was saved back as a key)
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${out}/r4_try_on.png` });
 console.log(res.join('\n')); console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no page errors');

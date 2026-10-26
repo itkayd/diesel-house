@@ -43,6 +43,8 @@ const REASONS: [ReportReason, string][] = [
 // Tap anywhere else to close.
 export function showFriendMenu(m: FriendMenu) {
   closeFriendMenu();
+  // A card opened while this was on its way (it waits for the friend status): don't pop up over it.
+  if (document.querySelector('.dh-scrim')) return;
   pop = el('div', 'dh-panel vol-pop');
   pop.id = 'friend-menu';
   pop.setAttribute('role', 'dialog');

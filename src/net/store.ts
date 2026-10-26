@@ -22,6 +22,7 @@ const changed = () => listeners.forEach((f) => f());
 
 export const currentWallet = () => wallet;
 export const shopItem = (id: string) => items.get(id) ?? null;
+export const shopItems = () => [...items.values()];
 export const ownsItem = (id: string) => STARTERS.includes(id) || owned.has(id);
 export const ownedSkins = (): Skin[] => [...STARTERS, ...SKINS.filter((s) => owned.has(s.key)).map((s) => s.key)];
 export const canShop = () => member;

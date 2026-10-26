@@ -153,6 +153,7 @@ export class HouseScene extends Phaser.Scene {
   showHost = identity.showHost;
   applyIdentity = identity.applyIdentity;
   choose = identity.choose;
+  openShop = identity.openShop;
   tryOn = identity.tryOn;
   setMyPet = identity.setMyPet;
   openMyProfile = identity.openMyProfile;

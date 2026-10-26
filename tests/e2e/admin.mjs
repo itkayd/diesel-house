@@ -161,11 +161,24 @@ async function run(label, viewport, mobile) {
   await page.waitForSelector('#shop-table');
   await page.selectOption('#shop-cur-ninja\\.pig', 'coins');
   await page.fill('#shop-price-ninja\\.pig', '1500');
+  const lit = await page.evaluate(() => document.getElementById('shop-save-ninja.pig').classList.contains('gold'));
+  check('desktop: Shop: a changed row’s Save lights up', lit, lit);
   await page.locator('tr[data-item="ninja.pig"] button').click();
   await page.waitForFunction(() => document.querySelector('.adm-toast')?.textContent?.includes('Pig saved'));
   const price = sql(`select price_coins from public.catalog_items where id = 'ninja.pig'`, 'postgres');
   check(`desktop: Shop: an item’s price is changed (Pig: 1,500 coins)`, price, Number(price.data) === 1500);
   sql(`update public.catalog_items set price_coins = 2000, price_gems = null where id = 'ninja.pig'`, 'postgres');
+  // One price for every Rare.
+  await page.fill('#bulk-price-rare', '450');
+  await page.click('#bulk-go-rare');
+  await page.waitForFunction(() => document.querySelector('.adm-toast')?.textContent?.includes('Every rare'), null, { timeout: 30000 });
+  const rares = sql(`select count(*) from public.catalog_items where rarity = 'rare' and price_gems is distinct from 450`, 'postgres');
+  check('desktop: Shop: “Apply to all” sets every Rare to 450 gems', rares, rares.error == null && Number(rares.data) === 0);
+  sql(`update public.catalog_items set price_gems = 400 where rarity = 'rare'`, 'postgres');
+  await page.click('[data-k="epic"]');
+  const shown = await page.$$eval('#shop-table tbody tr', (rs) => rs.filter((r) => !r.hidden).map((r) => r.dataset.rarity));
+  check('desktop: Shop: the Epic chip shows only Epics', shown.length, shown.length > 0 && shown.every((r) => r === 'epic'));
+  await page.click('[data-k="all"]');
   await page.selectOption('#gift-member', P);
   await page.selectOption('#gift-item', 'ninja.vampire');
   await page.click('#gift-go');

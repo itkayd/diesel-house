@@ -3,7 +3,7 @@ import { icon } from './icons';
 import { el } from './modal';
 
 // Your coins and gems in the top bar, beside your level (UI-REVIEW §3 rule 1): whatever the server last said
-// (src/net/store.ts). Tapping either opens the shop. Members only.
+// (src/net/store.ts). Tapping them (or the little gold bag) opens the Shop. Members only.
 export function addWalletChips(openShop: () => void) {
   const box = el('button', 'v2-wallet');
   box.type = 'button';
@@ -11,7 +11,9 @@ export function addWalletChips(openShop: () => void) {
   box.hidden = true;
   const coins = el('span', 'dh-coin coin');
   const gems = el('span', 'dh-coin gem');
-  box.append(coins, gems);
+  const bag = el('span', 'bag');
+  bag.append(icon('shopping-bag', { width: 16, height: 16 }));
+  box.append(coins, gems, bag);
   box.addEventListener('click', openShop);
   const pulse = (c: HTMLElement) => {
     c.classList.remove('pulse');

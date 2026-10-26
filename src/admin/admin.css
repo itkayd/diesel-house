@@ -50,7 +50,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .adm-top { position: sticky; top: 0; height: 100dvh; align-content: start; padding: 20px 14px; box-shadow: 3px 0 0 var(--panel-edge); overflow: hidden auto; min-width: 0; }
   .adm-top-row { flex-wrap: wrap; gap: 4px 10px; }
   .adm-top-row h1 { font-size: 22px; flex-basis: 100%; }
-  .adm-who { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .adm-who { display: block; flex-basis: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .adm-nav { flex-direction: column; overflow: visible; margin: 0; padding: 0; gap: 4px; }
   .adm-nav button { width: 100%; min-width: 0; justify-content: flex-start; }
   .adm-nav button span:not(.adm-count) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -210,3 +210,4 @@ button.adm-row:hover { background: var(--panel-hi); }
 .adm-skel { height: 58px; background: linear-gradient(90deg, var(--panel) 0%, var(--panel-hi) 50%, var(--panel) 100%); background-size: 200% 100%; animation: adm-skel 1.2s infinite linear; box-shadow: 0 0 0 2px var(--panel-edge); }
 @keyframes adm-skel { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .adm-skel { animation: none; } }
+.adm-fields3 { display: grid; gap: 12px 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); align-items: start; }

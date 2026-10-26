@@ -124,6 +124,19 @@ for (const [label, viewport, mobile] of [['phone', { width: 390, height: 844 }, 
   await page.evaluate(() => window.__house.openArcade());
   await page.waitForSelector('#arcade-play', { timeout: 8000 }).catch(() => {});
   await shot('17-arcade');
+  // The Shop, a character's buy card, and the wardrobe.
+  await clear(page);
+  await page.click('#wallet-chips');
+  await page.waitForSelector('#store');
+  await shot('18-shop');
+  await page.click('#store-tab-characters');
+  await page.click('[data-item="ninja.eggboy"]');
+  await page.waitForSelector('#store-item');
+  await shot('19-shop-item');
+  await clear(page);
+  await page.evaluate(() => void window.__house.choose());
+  await page.waitForSelector('#picker');
+  await shot('20-wardrobe');
   await ctx.close();
 }
 if (AXE) {

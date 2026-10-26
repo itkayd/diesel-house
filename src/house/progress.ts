@@ -28,7 +28,7 @@ export function setupProgress(this: HouseScene) {
   );
   // Coins and gems beside the level (members); tapping them opens the shop.
   if (!guest) {
-    addWalletChips(() => void this.choose(false, true));
+    addWalletChips(() => void this.openShop());
     void loadStore(false);
   }
   this.tracker.onResult((r) => this.gotProgress(r));

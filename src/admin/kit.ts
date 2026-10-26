@@ -84,8 +84,8 @@ export function toast(text: string, bad = false) {
   if (!toasts) document.body.append((toasts = h('div', { class: 'adm-toasts', role: 'status', 'aria-live': 'polite' })));
   const t = h('div', { class: `adm-toast${bad ? ' bad' : ''}` }, icon(bad ? 'circle-x' : 'circle-check'), h('span', {}, text));
   toasts.append(t);
-  while (toasts.children.length > 3) toasts.firstElementChild?.remove(); // only the latest few
-  setTimeout(() => t.remove(), bad ? 6000 : 3200);
+  while (toasts.children.length > 2) toasts.firstElementChild?.remove(); // only the latest two
+  setTimeout(() => t.remove(), bad ? 6000 : 2400);
 }
 
 // ---- Dialogs: confirm (optionally "type the name to confirm") and ask (a few fields) ----
